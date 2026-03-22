@@ -61,3 +61,28 @@ Phase 1 (Week 1-2): Core, Event, ObjectPool, DI/IoC, FSM, Procedure
 Phase 2 (Week 3-4): Resource, UI, Entity, Network, Audio, Scene
 Phase 3 (Week 5-6): 性能优化, CI/CD, Code Review, 热更新, DataTable, Timer, i18n, Logger/Debug
 Phase 4 (Week 7-8): 综合 Demo 项目, 面试冲刺
+
+## 一致性守卫（每个 Session 必读）
+
+**重要**：本项目每天的任务可能在不同的 session 中进行。为保证一致性：
+
+### 新 Session 启动时
+1. 自动读取本文件（copilot-instructions.md）— Copilot 已自动完成
+2. 如果大圆说"继续培训"或开始新任务，**必须先读取**：
+   - `docs/module-registry.md` — 了解模块全局依赖关系
+   - `training/progress.md` — 了解当前进度
+   - 当前要操作的模块的 `README.md`（如果存在）
+
+### 开发过程中
+3. 每写一个新模块，必须同时：
+   - 在模块目录下创建 `README.md`（参考 `docs/module-readme-template.md`）
+   - 更新 `docs/module-registry.md` 的状态和 API
+4. 代码必须通过 `docs/consistency-guide.md` 的三维度检查
+
+### Session 结束时
+5. 更新 `training/progress.md` 的"上次会话断点"部分
+
+### 不确定时的原则
+- 如果对某个设计决策不确定，**先读 module-registry.md 和相关模块 README**
+- 如果仍不确定，**遵循已有模块的模式**（先例优先原则）
+- 如果发现已有代码不一致，**提醒大圆但不自行修改**（除非大圆明确要求）
