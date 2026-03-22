@@ -1,0 +1,21 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "github.copilot.chat.codeGeneration.instructions": [
+    { "file": ".github/copilot-instructions.md" }
+  ],
+  "github.copilot.chat.testGeneration.instructions": [
+    {
+      "text": "为 CocosCreator 游戏框架模块生成 Jest 单元测试。需要 mock cc 命名空间的依赖。测试边界情况包括 null 输入、空数组、并发操作等。使用 describe/it 代码块，测试名称用中文描述。"
+    }
+  ],
+  "github.copilot.chat.reviewSelection.instructions": [
+    {
+      "text": "以资深 CocosCreator 主程序的视角审查代码。检查以下方面：1) 内存泄漏（未移除的监听器、未清理的定时器）2) 性能问题（update 循环中不必要的对象创建）3) 架构违规（framework 层引入了 cc 命名空间）4) 异步操作的线程安全性 5) 缺失的错误处理。要具体并给出修复建议。用中文回复。"
+    }
+  ]
+}
