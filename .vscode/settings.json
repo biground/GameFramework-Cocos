@@ -1,0 +1,21 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "github.copilot.chat.codeGeneration.instructions": [
+    { "file": ".github/copilot-instructions.md" }
+  ],
+  "github.copilot.chat.testGeneration.instructions": [
+    {
+      "text": "Generate Jest unit tests for CocosCreator framework modules. Mock cc namespace dependencies. Test edge cases including null inputs, empty arrays, and concurrent operations. Use describe/it blocks with clear test names in English."
+    }
+  ],
+  "github.copilot.chat.reviewSelection.instructions": [
+    {
+      "text": "Review this code as a senior CocosCreator lead programmer. Check for: 1) Memory leaks (unreleased listeners, uncleaned timers) 2) Performance issues (unnecessary allocations in update loops) 3) Architecture violations (framework importing cc namespace) 4) Thread safety of async operations 5) Missing error handling. Be specific and suggest fixes."
+    }
+  ]
+}

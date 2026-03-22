@@ -1,0 +1,36 @@
+{
+  "name": "gameframework-cocos",
+  "version": "0.1.0",
+  "description": "CocosCreator 3.x Game Framework inspired by Unity GameFramework (EllanJiang)",
+  "scripts": {
+    "lint": "eslint 'assets/scripts/**/*.ts' 'tests/**/*.ts'",
+    "lint:fix": "eslint 'assets/scripts/**/*.ts' 'tests/**/*.ts' --fix",
+    "format": "prettier --write 'assets/scripts/**/*.ts' 'tests/**/*.ts'",
+    "test": "jest --config jest.config.js",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "prepare": "husky"
+  },
+  "keywords": ["cocos-creator", "game-framework", "typescript", "gameframework"],
+  "author": "biground",
+  "license": "MIT",
+  "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "@types/jest": "^29.5.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.0",
+    "husky": "^9.0.0",
+    "jest": "^29.7.0",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.2.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.4.0"
+  },
+  "lint-staged": {
+    "*.ts": ["eslint --fix", "prettier --write"]
+  }
+}

@@ -1,3 +1,28 @@
+# Cocos Creator
+library/
+temp/
+local/
+build/
+profiles/
+native/
+*.meta
+
+# IDE
+.idea/
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+
 # Logs
 logs
 *.log
