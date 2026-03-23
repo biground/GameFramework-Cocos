@@ -1,0 +1,19 @@
+{
+  "name": "asset-scanner",
+  "version": "1.0.0",
+  "description": "跨模块游戏美术资源重复检测工具 — 帮助游戏开发者发现美术图片在不同模块间的复用情况",
+  "main": "src/index.ts",
+  "bin": {
+    "asset-scanner": "./src/index.ts"
+  },
+  "scripts": {
+    "scan": "ts-node src/index.ts scan",
+    "diff": "ts-node src/index.ts diff",
+    "test": "jest --config jest.config.js",
+    "build": "tsc -p tsconfig.json"
+  },
+  "keywords": ["game-dev", "asset-management", "cocos-creator", "duplicate-detection"],
+  "author": "biground",
+  "license": "MIT",
+  "devDependencies": {}
+}

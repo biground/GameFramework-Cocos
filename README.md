@@ -75,10 +75,27 @@ assets/scripts/
 └── game/          # 业务层（Demo 项目）
 ```
 
+## 🛠️ 工具
+
+| 工具 | 位置 | 说明 |
+|------|------|------|
+| asset-scanner | `tools/asset-scanner/` | 跨模块美术资源重复检测工具，帮助发现不同模块间复用的图片 |
+
+```bash
+# 扫描所有模块，列出跨模块共享的图片
+npx ts-node tools/asset-scanner/src/index.ts scan <美术资源根目录>
+
+# 对比新模块与已有模块，找出哪些图片已存在
+npx ts-node tools/asset-scanner/src/index.ts diff <美术资源根目录> <新模块目录>
+```
+
+详情参见 [docs/asset-scanner.md](docs/asset-scanner.md)。
+
 ## 📚 文档
 
 - [架构设计文档](docs/architecture.md)
 - [Code Review 检查清单](docs/code-review-checklist.md)
+- [美术资源扫描工具](docs/asset-scanner.md)
 - [培训进度](training/progress.md)
 
 ## 📄 License
