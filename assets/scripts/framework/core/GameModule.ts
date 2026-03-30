@@ -7,37 +7,79 @@ import { ModuleBase } from './ModuleBase';
  * 设计参考：Unity GameFramework 的 GameEntry
  */
 export class GameModule {
-    // TODO: 大圆，请实现以下内容：
-    //
-    // 私有静态属性：
-    // - _modules: Map<string, ModuleBase> — 模块存储映射表
-    // - _sortedModules: ModuleBase[] — 按 priority 排序的模块数组
-    // - _isDirty: boolean — 标记排序是否需要更新（脏标记优化）
-    //
-    // 静态方法：
-    // 1. register(module: ModuleBase): void
-    //    - 注册模块到映射表
-    //    - 如果已存在同名模块，抛出 Error
-    //    - 调用模块的 onInit()
-    //    - 设置脏标记为 true
-    //
-    // 2. getModule<T extends ModuleBase>(name: string): T
-    //    - 从映射表获取模块并转换类型
-    //    - 找不到时抛出 Error（不要返回 undefined）
-    //
-    // 3. hasModule(name: string): boolean
-    //    - 检查模块是否已注册
-    //
-    // 4. update(deltaTime: number): void
-    //    - 如果脏标记为 true，重新排序 _sortedModules（按 priority 升序）
-    //    - 按顺序调用每个模块的 onUpdate(deltaTime)
-    //
-    // 5. shutdownAll(): void
-    //    - 按 priority 降序调用每个模块的 onShutdown()
-    //    - 清空 _modules 和 _sortedModules
-    //
-    // 提示：
-    // - 脏标记（dirty flag）模式可以避免每次 update 都排序
-    // - 排序用 Array.sort((a, b) => a.priority - b.priority)
-    // - shutdown 时逆序遍历排序后的数组
+    private static _modules: Map<string, ModuleBase> = new Map();
+    private static _sortedModules: ModuleBase[] = [];
+    private static _isDirty: boolean = false;
+
+    /**
+     * 注册模块
+     * @param {ModuleBase} module 模块实例
+     * @throws {Error} 如果模块名称已存在
+     */
+    public static register(module: ModuleBase): void {
+        const name = module.moduleName;
+        if (this._modules.has(name)) {
+            throw new Error(`模块 "${name}" 已经注册。`);
+        }
+        this._modules.set(name, module);
+        module.onInit();
+        this._isDirty = true;
+    }
+    /**
+     * 获取模块
+     * @param {string} name 模块名称
+     * @returns {T} 模块实例
+     * @throws {Error} 如果模块未找到
+     */
+    public static getModule<T extends ModuleBase>(name: string): T {
+        const module = this._modules.get(name);
+        if (!module) {
+            throw new Error(`模块 "${name}" 未找到。`);
+        }
+        return module as T;
+    }
+
+    /**
+     * 检查模块是否已注册
+     * @param {string} name 模块名称
+     * @returns {boolean} 是否已注册
+     */
+    public static hasModule(name: string): boolean {
+        return this._modules.has(name);
+    }
+
+    /**
+     * 更新所有模块
+     * @param {number} deltaTime 时间增量
+     */
+    public static update(deltaTime: number): void {
+        if (this._isDirty) {
+            this._sortedModules = Array.from(this._modules.values()).sort(
+                (a, b) => a.priority - b.priority,
+            );
+            this._isDirty = false;
+        }
+        for (const mod of this._sortedModules) {
+            mod.onUpdate(deltaTime);
+        }
+    }
+
+    /**
+     * 关闭所有模块
+     */
+    public static shutdownAll(): void {
+        // 按 priority 降序调用 onShutdown，倒序遍历已排序数组
+        if (this._isDirty) {
+            this._sortedModules = Array.from(this._modules.values()).sort(
+                (a, b) => a.priority - b.priority,
+            );
+            this._isDirty = false;
+        }
+        for (let i = this._sortedModules.length - 1; i >= 0; i--) {
+            this._sortedModules[i].onShutdown();
+        }
+        this._modules.clear();
+        this._sortedModules = [];
+        this._isDirty = false;
+    }
 }
