@@ -1,3 +1,4 @@
+import { GameModule } from './GameModule';
 import { ModuleBase } from './ModuleBase';
 
 /**
@@ -5,6 +6,8 @@ import { ModuleBase } from './ModuleBase';
  * 提供统一的 API 访问框架功能
  *
  * 设计参考：Unity GameFramework 的 GameEntry
+ * - 门面模式的价值在于：对外提供简洁统一的 API
+ * - 未来可以在这里加日志、性能监控等横切关注点
  *
  * @example
  * ```typescript
@@ -23,23 +26,20 @@ import { ModuleBase } from './ModuleBase';
  * ```
  */
 export class GameEntry {
-    // TODO: 大圆，请实现以下内容：
-    // 委托给 GameModule 的门面方法：
-    //
-    // 1. static registerModule(module: ModuleBase): void
-    //    - 委托给 GameModule.register()
-    //
-    // 2. static getModule<T extends ModuleBase>(name: string): T
-    //    - 委托给 GameModule.getModule<T>()
-    //
-    // 3. static update(deltaTime: number): void
-    //    - 委托给 GameModule.update()
-    //
-    // 4. static shutdown(): void
-    //    - 委托给 GameModule.shutdownAll()
-    //
-    // 提示：
-    // - 这个类应该非常薄，每个方法只有一行
-    // - 门面模式的价值在于：对外提供简洁统一的 API
-    // - 未来可以在这里加日志、性能监控等横切关注点
+    /** 注册模块到框架 */
+    static registerModule(mod: ModuleBase): void {
+        GameModule.register(mod);
+    }
+    /** 获取已注册的模块 */
+    static getModule<T extends ModuleBase>(name: string): T {
+        return GameModule.getModule<T>(name);
+    }
+    /** 驱动所有模块更新 */
+    static update(deltaTime: number): void {
+        GameModule.update(deltaTime);
+    }
+    /** 关闭所有模块 */
+    static shutdown(): void {
+        GameModule.shutdownAll();
+    }
 }

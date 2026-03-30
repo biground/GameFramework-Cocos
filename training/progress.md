@@ -9,7 +9,7 @@
 ## 模块开发进度
 | 模块 | 状态 | 完成日期 | Review 评分 | 备注 |
 |------|------|---------|------------|------|
-| Core（GameEntry / ModuleBase / GameModule） | ⬜ 未开始 | - | - | Week 1 Day 1-2 |
+| Core（GameEntry / ModuleBase / GameModule） | ✅ 已完成 | 2026-03-23 | 92 | Week 1 Day 1 |
 | EventManager（事件管理器） | ⬜ 未开始 | - | - | Week 1 Day 2-3 |
 | ObjectPool + ReferencePool（对象池） | ⬜ 未开始 | - | - | Week 1 Day 3 |
 | IoC Container（依赖注入容器） | ⬜ 未开始 | - | - | Week 1 Day 4 |
@@ -46,11 +46,13 @@
 - [ ] 🟡 架构知识面：消息总线、DI、ECS 等模式
 - [ ] 🟡 Code Review 经验
 - [ ] 🟡 CI/CD 流程独立搭建
+- [x] ✅ 脏标记模式：理解正确，能说出 priority 运行时改变导致失效的场景
 
 ## 面试题积累
 详见 training/interview-qa.md
 
 ## 上次会话断点
-- 最后操作：项目初始化
-- 下次继续：Week 1 Day 1 — GameEntry + ModuleBase + GameModule
+- 最后操作：Week 1 Day 1 — Core 模块完成（ModuleBase / GameModule / GameEntry + 单元测试）
+- Review 评分：92/100（性能优化：shutdownAll 复用排序数组；风格：GameEntry 参数名 mod + JSDoc）
+- 下次继续：Week 1 Day 2 — EventManager（事件管理器）
 - 未完成事项：无
