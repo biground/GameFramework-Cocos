@@ -1,5 +1,7 @@
+import 'reflect-metadata';
 import { Container } from '../../assets/scripts/framework/di/Container';
 import { ServiceKey } from '../../assets/scripts/framework/di/DITypes';
+import { Inject } from '../../assets/scripts/framework/di/Decorators';
 
 // ============================================================
 // 测试用的接口和实现
@@ -161,5 +163,130 @@ describe('Container', () => {
         container.bind(ILogger).to(ConsoleLogger); // 覆盖
         const logger = container.resolve(ILogger);
         expect(logger).toBeInstanceOf(ConsoleLogger);
+    });
+
+    // --- @Inject 自动注入 ---
+
+    test('resolve 自动注入 @Inject 标记的构造函数参数', () => {
+        class GameService implements IService {
+            constructor(
+                @Inject(ILogger) public logger: ILogger,
+                @Inject(IDatabase) public db: IDatabase,
+            ) {}
+            execute(): string {
+                return this.logger.log(this.db.query('SELECT 1'));
+            }
+        }
+
+        container.bind(ILogger).to(ConsoleLogger);
+        container.bind(IDatabase).to(MockDatabase);
+        container.bind(IService).to(GameService);
+
+        const service = container.resolve(IService);
+        expect(service.execute()).toBe('[LOG] result of: SELECT 1');
+    });
+
+    test('resolve 无 @Inject 的类仍以无参方式创建', () => {
+        container.bind(ILogger).to(ConsoleLogger);
+        const logger = container.resolve(ILogger);
+        expect(logger).toBeInstanceOf(ConsoleLogger);
+    });
+
+    test('resolve 支持多级依赖链（A → B → C）', () => {
+        interface IC {
+            value(): string;
+        }
+        const IC = new ServiceKey<IC>('IC');
+
+        class C implements IC {
+            value(): string {
+                return 'C';
+            }
+        }
+
+        interface IB {
+            value(): string;
+        }
+        const IB = new ServiceKey<IB>('IB');
+
+        class B implements IB {
+            constructor(@Inject(IC) private c: IC) {}
+            value(): string {
+                return `B(${this.c.value()})`;
+            }
+        }
+
+        interface IA {
+            value(): string;
+        }
+        const IA = new ServiceKey<IA>('IA');
+
+        class A implements IA {
+            constructor(@Inject(IB) private b: IB) {}
+            value(): string {
+                return `A(${this.b.value()})`;
+            }
+        }
+
+        container.bind(IC).to(C);
+        container.bind(IB).to(B);
+        container.bind(IA).to(A);
+
+        const a = container.resolve(IA);
+        expect(a.value()).toBe('A(B(C))');
+    });
+
+    // --- 循环依赖检测 ---
+
+    test('resolve 检测到循环依赖时抛出错误', () => {
+        interface IFoo {
+            name: string;
+        }
+        interface IBar {
+            name: string;
+        }
+        const IFoo = new ServiceKey<IFoo>('IFoo');
+        const IBar = new ServiceKey<IBar>('IBar');
+
+        class Foo implements IFoo {
+            name = 'foo';
+            constructor(@Inject(IBar) public bar: IBar) {}
+        }
+        class Bar implements IBar {
+            name = 'bar';
+            constructor(@Inject(IFoo) public foo: IFoo) {}
+        }
+
+        container.bind(IFoo).to(Foo);
+        container.bind(IBar).to(Bar);
+
+        expect(() => container.resolve(IFoo)).toThrow(/Circular dependency detected/);
+    });
+
+    test('Singleton + @Inject：依赖只创建一次', () => {
+        let loggerCount = 0;
+        class CountedLogger implements ILogger {
+            constructor() {
+                loggerCount++;
+            }
+            log(msg: string): string {
+                return `[LOG] ${msg}`;
+            }
+        }
+
+        class ServiceA implements IService {
+            constructor(@Inject(ILogger) public logger: ILogger) {}
+            execute(): string {
+                return 'A';
+            }
+        }
+
+        container.bind(ILogger).to(CountedLogger).inSingletonScope();
+        container.bind(IService).to(ServiceA);
+
+        container.resolve(IService);
+        container.resolve(IService);
+
+        expect(loggerCount).toBe(1); // Logger 只创建一次
     });
 });

@@ -1,4 +1,5 @@
 import { ServiceKey, Lifecycle, ServiceBinding, Newable } from './DITypes';
+import { getInjectMetadata } from './Decorators';
 
 /**
  * IoC 容器（控制反转容器）
@@ -29,6 +30,8 @@ export class Container {
     private _bindings: Map<ServiceKey<unknown>, ServiceBinding<unknown>> = new Map();
     /** 父容器（用于层级查找） */
     private _parent: Container | null = null;
+    /** 解析栈，用于检测循环依赖 */
+    private _resolutionStack: Set<ServiceKey<unknown>> = new Set();
 
     /**
      * 创建容器
@@ -79,19 +82,33 @@ export class Container {
             return binding.instance;
         }
 
-        let instance: T;
-        if (binding.factory) {
-            instance = binding.factory();
-        } else if (binding.ctor) {
-            instance = new binding.ctor();
-        } else {
-            throw new Error(`Invalid binding for service: ${key.description}`);
+        // 循环依赖检测
+        if (this._resolutionStack.has(key)) {
+            const chain = [...this._resolutionStack].map((k) => k.description).join(' → ');
+            throw new Error(
+                `[Container] Circular dependency detected: ${chain} → ${key.description}`,
+            );
         }
 
-        if (binding.lifecycle === Lifecycle.Singleton) {
-            binding.instance = instance;
+        this._resolutionStack.add(key);
+        try {
+            let instance: T;
+            if (binding.factory) {
+                instance = binding.factory();
+            } else if (binding.ctor) {
+                const args = this._resolveConstructorArgs(binding.ctor);
+                instance = new (binding.ctor as new (...args: unknown[]) => T)(...args);
+            } else {
+                throw new Error(`Invalid binding for service: ${key.description}`);
+            }
+
+            if (binding.lifecycle === Lifecycle.Singleton) {
+                binding.instance = instance;
+            }
+            return instance;
+        } finally {
+            this._resolutionStack.delete(key);
         }
-        return instance;
     }
 
     /**
@@ -136,6 +153,24 @@ export class Container {
             }
         }
         this._bindings.clear();
+    }
+
+    /**
+     * 读取构造函数的 @Inject 元数据，递归解析依赖
+     * @param ctor 目标构造函数
+     * @returns 按参数顺序排列的依赖实例数组
+     */
+    private _resolveConstructorArgs(ctor: Newable<unknown>): unknown[] {
+        const injectMap = getInjectMetadata(ctor);
+        if (!injectMap || injectMap.size === 0) {
+            return [];
+        }
+
+        const args: unknown[] = [];
+        for (const [index, serviceKey] of injectMap) {
+            args[index] = this.resolve(serviceKey);
+        }
+        return args;
     }
 }
 
