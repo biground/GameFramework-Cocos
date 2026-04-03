@@ -43,6 +43,7 @@
 **文件路径**：`assets/scripts/framework/fsm/FsmDefs.ts`
 
 **需求**：
+
 - 定义 `IFsmState<T>` 接口（状态的生命周期方法）
 - 定义 `IFsm<T>` 接口（状态机本身的接口）
     - `readonly name: string` — 状态机名称
@@ -58,6 +59,7 @@
 **文件路径**：`assets/scripts/framework/fsm/FsmState.ts`
 
 **需求**：
+
 - 抽象基类，提供默认空实现和 `changeState` 便捷方法
 - 子类只需 override 关心的生命周期方法
 
@@ -66,6 +68,7 @@
 **文件路径**：`assets/scripts/framework/fsm/Fsm.ts`
 
 **需求**：
+
 - 构造参数：`name`, `owner`, `states[]`
 - `start<TState>(stateType)` — 以某个状态启动
 - `changeState<TState>(stateType)` — 切换到指定类型的状态
@@ -78,6 +81,7 @@
 **文件路径**：`assets/scripts/framework/fsm/FsmManager.ts`
 
 **需求**：
+
 - 继承 `ModuleBase`，priority 在 100-199 区间（核心服务层）
 - `createFsm<T>(name, owner, ...states): IFsm<T>` — 创建状态机
 - `destroyFsm(name): boolean` — 销毁状态机
@@ -90,6 +94,7 @@
 ## 🧪 测试要求
 
 在 `tests/fsm/` 下创建测试文件，至少覆盖：
+
 1. 创建状态机，初始化状态
 2. 启动状态机，验证进入初始状态
 3. 切换状态，验证 onLeave → onEnter 调用顺序
