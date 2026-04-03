@@ -2,17 +2,17 @@
 
 ## 基本信息
 - 开始日期：2026-03-23
-- 当前日期：2026-03-23
-- 当前周次：Week 1 / 8
-- 总完成度：0%
+- 当前日期：2026-04-03
+- 当前周次：Week 2 / 8
+- 总完成度：18%
 
 ## 模块开发进度
 | 模块 | 状态 | 完成日期 | Review 评分 | 备注 |
 |------|------|---------|------------|------|
 | Core（GameEntry / ModuleBase / GameModule） | ✅ 已完成 | 2026-03-23 | 92 | Week 1 Day 1 |
-| EventManager（事件管理器） | ⬜ 未开始 | - | - | Week 1 Day 2-3 |
-| ObjectPool + ReferencePool（对象池） | ⬜ 未开始 | - | - | Week 1 Day 3 |
-| IoC Container（依赖注入容器） | ⬜ 未开始 | - | - | Week 1 Day 4 |
+| EventManager（事件管理器） | ✅ 已完成 | 2026-03-30 | 93 | Week 2 Day 1；含 EventKey<T> 类型安全增强 |
+| ObjectPool + ReferencePool（对象池） | ✅ 已完成 | 2026-03-31 | 91 | Week 2 Day 2；含 ObjectPool<T> + ReferencePool 模块 |
+| IoC Container（依赖注入容器） | 🟡 开发中 | - | - | Week 2 Day 3；Container 已完成，装饰器待实现 |
 | FSM（有限状态机） | ⬜ 未开始 | - | - | Week 2 Day 1 |
 | ProcedureManager（流程管理器） | ⬜ 未开始 | - | - | Week 2 Day 2 |
 | Cocos 适配层（CocosEntry） | ⬜ 未开始 | - | - | Week 2 Day 3-4 |
@@ -33,12 +33,12 @@
 ## 能力成长追踪
 | 维度 | Week 0 基线 | 当前 | 目标 |
 |------|-----------|------|------|
-| 框架设计 | C+ | C+ | B+ |
+| 框架设计 | C+ | B | B+ |
 | 引擎底层 | B | B | A- |
-| 架构知识面 | C+ | C+ | B+ |
+| 架构知识面 | C+ | B | B+ |
 | CI/CD | C+ | C+ | B |
-| Code Review | D | D | B |
-| 面试表现 | C | C | A- |
+| Code Review | D | C- | B |
+| 面试表现 | C | C+ | A- |
 
 ## 薄弱点追踪
 - [ ] 🔴 框架设计能力：从 0 到 1 设计完整框架
@@ -47,12 +47,17 @@
 - [ ] 🟡 Code Review 经验
 - [ ] 🟡 CI/CD 流程独立搭建
 - [x] ✅ 脏标记模式：理解正确，能说出 priority 运行时改变导致失效的场景
+- [x] ✅ 发布-订阅模式：EventManager 实现完成，理解 emit 遍历安全
+- [x] ✅ EventKey<T> 类型安全事件系统：掌握条件 rest params + phantom type
+- [x] ✅ 对象池模式：ObjectPool<T> 栈模式 + ReferencePool 多类型管理
+- [x] ✅ 插件化架构思维：提出 gfc-fast-pool 热拔插方案
 
 ## 面试题积累
 详见 training/interview-qa.md
 
 ## 上次会话断点
-- 最后操作：Week 1 Day 1 — Core 模块完成（ModuleBase / GameModule / GameEntry + 单元测试）
-- Review 评分：92/100（性能优化：shutdownAll 复用排序数组；风格：GameEntry 参数名 mod + JSDoc）
-- 下次继续：Week 1 Day 2 — EventManager（事件管理器）
-- 未完成事项：无
+- 最后操作：Week 2 Day 3 — DI/IoC Container 核心实现完成（10 个单元测试通过）
+- 当前状态：Container.ts + DITypes.ts 已完成，Decorators.ts 装饰器待实现（@Injectable / @Inject）
+- 下次继续：Week 2 Day 3 — 完成 DI 装饰器实现 → FSM 模块
+- 未完成事项：DI 装饰器（@Injectable / @Inject）
+- 更新日期：2026-04-03

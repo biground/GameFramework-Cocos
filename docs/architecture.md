@@ -54,6 +54,48 @@
 | i18n（多语言） | 本地化支持 | ⬜ 待开发 |
 | Debug（调试工具） | 日志与调试面板 | ⬜ 待开发 |
 
+## 插件化架构（Plugin Architecture）
+
+框架采用 **核心 + 插件** 的热拔插设计，支持通过 npm 包替换/增强默认模块。
+
+### 设计原则
+
+1. **接口隔离**：每个模块定义接口（`IEventManager`, `IObjectPoolManager` 等），业务层依赖接口而非实现
+2. **模块可替换**：`GameModule.register()` 支持 `allowReplace` 模式，插件可替换同名默认模块
+3. **插件约定**：所有插件实现 `IPlugin` 接口，通过 `GameEntry.installPlugin()` 安装
+
+### 包结构规划
+
+```
+@gfc/core              ← 基础框架（接口层 + 默认实现）
+gfc-fast-pool          ← 高级对象池（Int32Array 侵入式空闲链表）
+gfc-ecs                ← ECS 实体组件系统
+gfc-behavior-tree      ← 行为树
+```
+
+### 分层对应
+
+```
+framework/
+├── interfaces/         ← 纯接口层（模块契约 + IPlugin）
+├── core/               ← 核心（ModuleBase, GameModule, GameEntry）
+├── objectpool/         ← 默认对象池实现（implements IObjectPoolManager）
+└── event/              ← 默认事件实现（implements IEventManager）
+
+npm 插件包：
+gfc-fast-pool/
+├── src/FastPool.ts     ← implements IObjectPoolManager
+└── src/index.ts        ← 导出 IPlugin 实现
+```
+
+### 实施路线
+
+| 阶段 | 内容 |
+|------|------|
+| Phase 1 (Week 2) | 提取接口层 → DI/IoC 容器 → GameModule 支持 replace |
+| Phase 2 (Week 3-4) | 每个新模块先定接口再写实现 |
+| Phase 3 (Week 5-6) | IPlugin 接口 → monorepo 拆包 → npm publish + CI/CD |
+
 ## 类图
 
 （待补充 — Week 1 完成后绘制核心模块类图）

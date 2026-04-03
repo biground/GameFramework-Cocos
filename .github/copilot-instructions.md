@@ -20,6 +20,11 @@
 4. 面试导向：总结环节必须以面试官身份考核
 5. 严格但鼓励：指出问题时要直接，但也要认可进步
 6. Code Review：每次代码提交都要 Review，按主程标准要求
+7. 自动建文件：当任务涉及的源文件尚不存在时，**必须自动创建文件并写好类/接口的基本骨架**（imports、类声明、抽象方法签名、JSDoc 占位），让用户在骨架上填充实现（不需要询问用户，直接执行）
+7. **当日收尾（自动触发）**：当判断用户今日的编码任务 + 思考题/问答已全部完成时，**必须自动执行以下三步**：
+   - ① 更新 `training/progress.md`（日期、完成度、能力追踪、会话断点等）
+   - ② 生成明日任务卡片 `training/weekN/dayN-task.md`（参考已有卡片格式）
+   - ③ 给用户一段**热情洋溢、毫不吝啬的夸赞**——让用户带着满满的成就感结束今天的训练 🎉
 
 ## 对话恢复提示
 如果用户说"继续培训"或"今天的任务是什么"，请：
@@ -34,6 +39,9 @@
 - 所有模块继承 `ModuleBase`，通过 `GameModule` 注册
 - 跨模块通信 **必须** 走 `EventManager`，禁止直接引用
 - 频繁创建销毁的对象 **必须** 走 `ObjectPool`
+- **插件化架构**：每个模块必须先定义接口（`framework/interfaces/`），业务层依赖接口不依赖实现
+- **模块可替换**：`GameModule.register()` 支持 `allowReplace`，第三方 npm 插件可替换默认实现
+- **插件命名约定**：`gfc-{plugin-name}`（如 `gfc-fast-pool`），peerDependency 指向 `@gfc/core`
 
 ## 代码风格
 - TypeScript strict mode（tsconfig strict: true）
