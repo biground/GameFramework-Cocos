@@ -1,4 +1,5 @@
 import { ServiceKey, Lifecycle, Newable } from './DITypes';
+import 'reflect-metadata';
 
 /**
  * 装饰器元数据键
@@ -6,8 +7,6 @@ import { ServiceKey, Lifecycle, Newable } from './DITypes';
  */
 const _INJECTABLE_METADATA_KEY = Symbol('gfc:injectable');
 const _INJECT_METADATA_KEY = Symbol('gfc:inject');
-void _INJECTABLE_METADATA_KEY;
-void _INJECT_METADATA_KEY;
 
 /**
  * @Injectable 类装饰器
@@ -23,12 +22,10 @@ void _INJECT_METADATA_KEY;
  * }
  * ```
  */
-export function Injectable(_lifecycle: Lifecycle = Lifecycle.Transient): ClassDecorator {
-    // TODO: 实现
-    // 提示：
-    // 1. 使用 Reflect.defineMetadata 存储生命周期信息
-    // 2. 后续 Container 扫描注册时读取此元数据
-    throw new Error('TODO: 实现 @Injectable 装饰器');
+export function Injectable(lifecycle: Lifecycle = Lifecycle.Transient) {
+    return <T extends Newable<unknown>>(target: T): void => {
+        Reflect.defineMetadata(_INJECTABLE_METADATA_KEY, lifecycle, target);
+    };
 }
 
 /**
@@ -48,12 +45,24 @@ export function Injectable(_lifecycle: Lifecycle = Lifecycle.Transient): ClassDe
  * }
  * ```
  */
-export function Inject<T>(_key: ServiceKey<T>): ParameterDecorator {
-    // TODO: 实现
-    // 提示：
-    // 1. 使用 Reflect.defineMetadata 在目标类上存储参数索引 → ServiceKey 的映射
-    // 2. Container.resolve() 创建实例时读取此映射，自动注入依赖
-    throw new Error('TODO: 实现 @Inject 装饰器');
+export function Inject<T>(key: ServiceKey<T>): ParameterDecorator {
+    return (
+        target: object,
+        _propertyKey: string | symbol | undefined,
+        parameterIndex: number,
+    ): void => {
+        const metadataTarget = typeof target === 'function' ? target : target.constructor;
+        let injectMap = Reflect.getOwnMetadata(_INJECT_METADATA_KEY, metadataTarget) as
+            | Map<number, ServiceKey<unknown>>
+            | undefined;
+
+        if (!injectMap) {
+            injectMap = new Map<number, ServiceKey<unknown>>();
+            Reflect.defineMetadata(_INJECT_METADATA_KEY, injectMap, metadataTarget);
+        }
+
+        injectMap.set(parameterIndex, key as ServiceKey<unknown>);
+    };
 }
 
 /**
@@ -61,9 +70,8 @@ export function Inject<T>(_key: ServiceKey<T>): ParameterDecorator {
  * @param target 目标类
  * @returns 生命周期，如果未标记则返回 undefined
  */
-export function getInjectableMetadata(_target: Newable<unknown>): Lifecycle | undefined {
-    // TODO: 实现
-    throw new Error('TODO: 实现 getInjectableMetadata');
+export function getInjectableMetadata(target: Newable<unknown>): Lifecycle | undefined {
+    return Reflect.getOwnMetadata(_INJECTABLE_METADATA_KEY, target) as Lifecycle | undefined;
 }
 
 /**
@@ -72,8 +80,9 @@ export function getInjectableMetadata(_target: Newable<unknown>): Lifecycle | un
  * @returns 参数索引 → ServiceKey 的映射
  */
 export function getInjectMetadata(
-    _target: Newable<unknown>,
+    target: Newable<unknown>,
 ): Map<number, ServiceKey<unknown>> | undefined {
-    // TODO: 实现
-    throw new Error('TODO: 实现 getInjectMetadata');
+    return Reflect.getOwnMetadata(_INJECT_METADATA_KEY, target) as
+        | Map<number, ServiceKey<unknown>>
+        | undefined;
 }
