@@ -14,12 +14,16 @@ export class GameModule {
     /**
      * 注册模块
      * @param {ModuleBase} module 模块实例
-     * @throws {Error} 如果模块名称已存在
+     * @param {boolean} allowReplace 是否允许替换已有同名模块（默认 false）
+     * @throws {Error} 如果模块名称已存在且不允许替换
      */
-    public static register(module: ModuleBase): void {
+    public static register(module: ModuleBase, allowReplace: boolean = false): void {
         const name = module.moduleName;
         if (this._modules.has(name)) {
-            throw new Error(`模块 "${name}" 已经注册。`);
+            if (!allowReplace) {
+                throw new Error(`模块 "${name}" 已经注册。`);
+            }
+            this._modules.get(name)!.onShutdown();
         }
         this._modules.set(name, module);
         module.onInit();

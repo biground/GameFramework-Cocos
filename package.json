@@ -11,13 +11,18 @@
     "test:coverage": "jest --coverage",
     "prepare": "husky"
   },
-  "keywords": ["cocos-creator", "game-framework", "typescript", "gameframework"],
+  "keywords": [
+    "cocos-creator",
+    "game-framework",
+    "typescript",
+    "gameframework"
+  ],
   "author": "biground",
   "license": "MIT",
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",
     "@commitlint/config-conventional": "^19.0.0",
-    "@types/jest": "^29.5.0",
+    "@types/jest": "^29.5.14",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^8.57.0",
@@ -31,6 +36,9 @@
     "typescript": "^5.4.0"
   },
   "lint-staged": {
-    "*.ts": ["eslint --fix", "prettier --write"]
+    "*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   }
 }

@@ -27,10 +27,10 @@ GameEntry（框架入口）
 
 | 模块 | 路径 | 核心 API | 依赖 | 状态 |
 |------|------|---------|------|------|
-| Core | framework/core/ | GameEntry.registerModule() / getModule() / update() / shutdown() | 无 | 🟡 开发中 |
-| Event | framework/event/ | on() / once() / off() / emit() | 无 | ⬜ 待开发 |
-| ObjectPool | framework/objectpool/ | acquire\<T\>() / release() / clear() | 无 | ⬜ 待开发 |
-| DI/IoC | framework/di/ | @Injectable / @Inject / Container.resolve() | 无 | ⬜ 待开发 |
+| Core | framework/core/ | GameEntry.registerModule() / getModule() / update() / shutdown() | 无 | ✅ 已完成 |
+| Event | framework/event/ | EventKey<T> / on() / once() / off() / offAll() / offByCaller() / emit() | 无 | ✅ 已完成 |
+| ObjectPool | framework/objectpool/ | acquire\<T\>() / release() / clearPool() / clearAll() / getStats() / setMaxSize() | 无 | ✅ 已完成 |
+| DI/IoC | framework/di/ | @Injectable / @Inject / Container.resolve() | 无 | 🟡 开发中 |
 | FSM | framework/fsm/ | create\<T\>() / changeState() / update() | Event | ⬜ 待开发 |
 | Procedure | framework/procedure/ | startProcedure() / changeProcedure() | FSM | ⬜ 待开发 |
 | Resource | framework/resource/ | loadAsset\<T\>() / releaseAsset() / preload() | Event, ObjectPool | ⬜ 待开发 |
@@ -67,3 +67,6 @@ GameEntry（框架入口）
 | 日期 | 变更内容 | 操作人 |
 |------|---------|--------|
 | 2026-03-23 | 初始化模块注册表 | 系统 |
+| 2026-03-30 | Event 模块完成，含 EventKey<T> 类型安全事件系统 | 大圆 |
+| 2026-03-31 | ObjectPool + ReferencePool 完成（91/100），插件化架构方案确定 | 大圆 |
+| 2026-04-03 | DI Container 核心实现完成（10 个测试通过），装饰器待实现；更新模块状态 | 大圆 |
