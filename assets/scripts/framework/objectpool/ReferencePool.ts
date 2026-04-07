@@ -36,9 +36,10 @@ export class ReferencePool extends ModuleBase {
     /** 模块初始化 */
     public onInit(): void {}
 
-    /** 模块销毁，清空所有对象池 */
+    /** 模块销毁，清空所有对象池并释放映射表 */
     public onShutdown(): void {
         this.clearAll();
+        this._poolMap.clear();
     }
 
     /**
@@ -85,7 +86,6 @@ export class ReferencePool extends ModuleBase {
      */
     public clearAll(): void {
         this._poolMap.forEach((pool) => pool.clear());
-        this._poolMap.clear();
     }
 
     /**

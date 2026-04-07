@@ -1,11 +1,15 @@
 {
-	"servers": {
-		"makenotion/notion-mcp-server": {
-			"type": "http",
-			"url": "https://mcp.notion.com/sse",
-			"gallery": "https://api.mcp.github.com",
-			"version": "1.0.0"
-		}
-	},
-	"inputs": []
+    "inputs": [
+        {
+            "type": "promptString",
+            "id": "vaultPath",
+            "description": "Path to Obsidian vault"
+        }
+    ],
+    "servers": {
+        "obsidian": {
+            "command": "npx",
+            "args": ["-y", "mcp-obsidian", "${input:vaultPath}"]
+        }
+    }
 }
