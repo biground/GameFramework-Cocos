@@ -3,9 +3,9 @@
 ## 基本信息
 
 - 开始日期：2026-03-23
-- 当前日期：2026-04-07
+- 当前日期：2026-04-08
 - 当前周次：Week 3 / 8
-- 总完成度：35%
+- 总完成度：40%
 
 ## 模块开发进度
 
@@ -18,8 +18,8 @@
 | FSM（有限状态机）                           | ✅ 已完成 | 2026-04-04 | 93          | Week 2 Day 4；FsmDefs + FsmState + Fsm + FsmManager，52 个测试             |
 | ProcedureManager（流程管理器）              | ✅ 已完成 | 2026-04-07 | 94          | Week 3 Day 1；ProcedureBase + ProcedureManager，13 个测试                  |
 | Cocos 适配层（CocosEntry）                  | ⬜ 未开始 | -          | -           | Week 2 Day 3-4                                                             |
-| ResourceManager（资源管理器）               | ✅ 已完成 | 2026-04-07 | -           | Week 3 Day 2；ResourceDefs + IResourceManager + ResourceManager，26 个测试 |
-| UIManager（UI管理器）                       | ⬜ 未开始 | -          | -           | Week 3 Day 3-4                                                             |
+| ResourceManager（资源管理器）               | ✅ 已完成 | 2026-04-07 | 95          | Week 3 Day 2；ResourceDefs + IResourceManager + ResourceManager，26 个测试；补 ReadonlyAssetInfo 修复 |
+| UIManager（UI管理器）                       | ✅ 已完成 | 2026-04-08 | -           | Week 3 Day 3；UIDefs + UIFormBase + IUIManager + UIManager，31 个测试             |
 | EntityManager（实体管理器）                 | ⬜ 未开始 | -          | -           | Week 4 Day 1-2                                                             |
 | NetworkManager（网络管理器）                | ⬜ 未开始 | -          | -           | Week 4 Day 3-4                                                             |
 | AudioManager（音频管理器）                  | ⬜ 未开始 | -          | -           | Week 4 Day 5                                                               |
@@ -61,6 +61,9 @@
 - [x] ✅ FSM 模式：状态生命周期、Constructor 类型映射、反递归保护、Blackboard 数据共享
 - [x] ✅ 流程管理模式：Procedure = FsmState 的业务语义封装，薄封装复用底层模块
 - [x] ✅ 资源管理模式：引用计数（owner 粒度去重）、加载去重、IResourceLoader 策略注入
+- [x] ✅ 深层只读类型：Readonly<T> 浅只读 vs ReadonlySet/显式 ReadonlyAssetInfo 接口
+- [x] ✅ UI 分层管理：UILayer 分组 + 栈管理 + Cover/Reveal 生命周期通知
+- [x] ✅ IUIFormFactory 策略注入：与 IResourceLoader 一致的模式复用
 
 ## 面试题积累
 
@@ -68,9 +71,9 @@
 
 ## 上次会话断点
 
-- 最后操作：Week 3 Day 2 — ResourceManager 完成（ResourceDefs + IResourceManager + ResourceManager，26 个测试全绿）
-- Review 评分：待评
-- 下次继续：Week 3 Day 3 — UIManager（UI 管理器）
-- 未完成事项：ResourceManager Code Review
-- 额外成就：IResourceLoader 策略注入模式、引用计数 owner 去重、加载去重模式
-- 更新日期：2026-04-07
+- 最后操作：Week 3 Day 3 — UIManager 完成（UIDefs + UIFormBase + IUIManager + UIManager，31 个测试全绿）+ ResourceManager Review 补完（95/100，ReadonlyAssetInfo 修复）
+- Review 评分：UIManager 待评
+- 下次继续：Week 3 Day 4 — UIManager Code Review + EntityManager 或 NetworkManager
+- 未完成事项：UIManager Code Review
+- 额外成就：UILayer 分组栈管理、Cover/Reveal 生命周期、pauseCoveredForm 可配、closeAllForms 逆序关闭
+- 更新日期：2026-04-08
