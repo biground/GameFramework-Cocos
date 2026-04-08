@@ -6,6 +6,7 @@ import {
     LoadAssetCallbacks,
     LoadState,
     PreloadCallbacks,
+    ReadonlyAssetInfo,
 } from './ResourceDefs';
 
 /**
@@ -43,12 +44,14 @@ export class ResourceManager extends ModuleBase implements IResourceManager {
     }
 
     public onShutdown(): void {
-        // 释放底层所有资源
-        for (const [path] of this._assets) {
-            this._loader?.releaseAsset(path);
-        }
+        // 先拷贝路径、清空内部状态，再释放底层资源
+        // 确保即使 releaseAsset 有副作用也不会影响遍历
+        const paths = [...this._assets.keys()];
         this._assets.clear();
         this._pendingCallbacks.clear();
+        for (const path of paths) {
+            this._loader?.releaseAsset(path);
+        }
     }
 
     // ─── IResourceManager 实现 ─────────────────────────
@@ -190,9 +193,9 @@ export class ResourceManager extends ModuleBase implements IResourceManager {
     }
 
     /**
-     * 获取资源详细信息
+     * 获取资源详细信息（返回深层只读视图，外部无法篡改）
      */
-    public getAssetInfo(path: string): Readonly<AssetInfo> | undefined {
+    public getAssetInfo(path: string): ReadonlyAssetInfo | undefined {
         return this._assets.get(path);
     }
 
