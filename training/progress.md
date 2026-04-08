@@ -19,7 +19,7 @@
 | ProcedureManager（流程管理器）              | ✅ 已完成 | 2026-04-07 | 94          | Week 3 Day 1；ProcedureBase + ProcedureManager，13 个测试                  |
 | Cocos 适配层（CocosEntry）                  | ⬜ 未开始 | -          | -           | Week 2 Day 3-4                                                             |
 | ResourceManager（资源管理器）               | ✅ 已完成 | 2026-04-07 | 95          | Week 3 Day 2；ResourceDefs + IResourceManager + ResourceManager，26 个测试；补 ReadonlyAssetInfo 修复 |
-| UIManager（UI管理器）                       | ✅ 已完成 | 2026-04-08 | -           | Week 3 Day 3；UIDefs + UIFormBase + IUIManager + UIManager，31 个测试             |
+| UIManager（UI管理器）                       | ✅ 已完成 | 2026-04-08 | 92          | Week 3 Day 3；UIDefs + UIFormBase + IUIManager + UIManager，31 个测试             |
 | EntityManager（实体管理器）                 | ⬜ 未开始 | -          | -           | Week 4 Day 1-2                                                             |
 | NetworkManager（网络管理器）                | ⬜ 未开始 | -          | -           | Week 4 Day 3-4                                                             |
 | AudioManager（音频管理器）                  | ⬜ 未开始 | -          | -           | Week 4 Day 5                                                               |
@@ -72,7 +72,7 @@
 ## 上次会话断点
 
 - 最后操作：Week 3 Day 3 — UIManager 完成（UIDefs + UIFormBase + IUIManager + UIManager，31 个测试全绿）+ ResourceManager Review 补完（95/100，ReadonlyAssetInfo 修复）
-- Review 评分：UIManager 待评
+- Review 评分：UIManager 92/100（onUpdate 设计取舍可接受）
 - 下次继续：Week 3 Day 4 — UIManager Code Review + EntityManager 或 NetworkManager
 - 未完成事项：UIManager Code Review
 - 额外成就：UILayer 分组栈管理、Cover/Reveal 生命周期、pauseCoveredForm 可配、closeAllForms 逆序关闭
