@@ -30,6 +30,18 @@ export interface AssetInfo {
 }
 
 /**
+ * 资源信息的只读视图（对外暴露用）
+ * 所有属性均为 readonly，Set 替换为 ReadonlySet，防止外部篡改
+ */
+export interface ReadonlyAssetInfo {
+    readonly path: string;
+    readonly asset: unknown;
+    readonly state: LoadState;
+    readonly refCount: number;
+    readonly owners: ReadonlySet<string>;
+}
+
+/**
  * 资源加载回调
  */
 export interface LoadAssetCallbacks {

@@ -1,7 +1,7 @@
 import {
     LoadAssetCallbacks,
     PreloadCallbacks,
-    AssetInfo,
+    ReadonlyAssetInfo,
     IResourceLoader,
 } from '../resource/ResourceDefs';
 
@@ -68,11 +68,11 @@ export interface IResourceManager {
     getAssetRefCount(path: string): number;
 
     /**
-     * 获取资源的详细信息（只读）
+     * 获取资源的详细信息（深层只读视图）
      * @param path 资源路径
      * @returns 资源信息，不存在返回 undefined
      */
-    getAssetInfo(path: string): Readonly<AssetInfo> | undefined;
+    getAssetInfo(path: string): ReadonlyAssetInfo | undefined;
 
     /**
      * 预加载一组资源
