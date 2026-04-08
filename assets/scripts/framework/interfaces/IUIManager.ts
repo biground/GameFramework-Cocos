@@ -9,7 +9,7 @@ import { UIFormConfig, UILayer, IUIFormFactory, OpenFormCallbacks } from '../ui/
  * 1. UI 表单的配置注册与生命周期管理
  * 2. 分层分组管理（UILayer → UIGroup 栈）
  * 3. 覆盖/恢复通知（onCover / onReveal）
- * 4. 与 ResourceManager 集成的资源加载/释放
+ * 4. 通过 IUIFormFactory 策略注入创建/销毁表单（资源加载由 factory 实现负责）
  */
 export interface IUIManager {
     /**
@@ -29,9 +29,9 @@ export interface IUIManager {
 
     /**
      * 打开表单
-     * - 已打开（非 allowMultiple）：忽略
-     * - 未加载：通过 ResourceManager 加载后创建
-     * - 已缓存：直接复用
+     * - 已打开（非 allowMultiple）：忽略，直接返回
+     * - allowMultiple=true：每次调用创建新实例，closeForm 按 LIFO 顺序关闭
+     * - 资源加载由注入的 IUIFormFactory 实现负责
      *
      * @param formName 表单名称
      * @param data 传递给 onOpen 的业务数据（可选）

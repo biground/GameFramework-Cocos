@@ -194,6 +194,37 @@ describe('UIManager', () => {
             manager.openForm('MainPanel'); // 第二次应被忽略
             expect(factory.created.length).toBe(1);
         });
+
+        it('allowMultiple 时每次 openForm 创建新实例', () => {
+            manager.registerForm('DamageNum', {
+                path: 'ui/damage',
+                layer: UILayer.Toast,
+                allowMultiple: true,
+            });
+            manager.openForm('DamageNum');
+            manager.openForm('DamageNum');
+            manager.openForm('DamageNum');
+            expect(factory.created.length).toBe(3);
+            expect(manager.hasForm('DamageNum')).toBe(true);
+        });
+
+        it('allowMultiple 时 closeForm 按 LIFO 顺序关闭最新实例', () => {
+            manager.registerForm('DamageNum', {
+                path: 'ui/damage',
+                layer: UILayer.Toast,
+                allowMultiple: true,
+            });
+            manager.openForm('DamageNum');
+            manager.openForm('DamageNum');
+            // 关闭一次
+            manager.closeForm('DamageNum');
+            expect(factory.destroyed.length).toBe(1);
+            expect(manager.hasForm('DamageNum')).toBe(true); // 还剩一个
+            // 关闭第二次
+            manager.closeForm('DamageNum');
+            expect(factory.destroyed.length).toBe(2);
+            expect(manager.hasForm('DamageNum')).toBe(false); // 全部关闭
+        });
     });
 
     // ─── Cover / Reveal ───────────────────────────────
