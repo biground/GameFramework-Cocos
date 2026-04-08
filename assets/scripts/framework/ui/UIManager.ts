@@ -28,8 +28,11 @@ export class UIManager extends ModuleBase implements IUIManager {
     /** 分层管理：UILayer → 表单栈（栈顶 = 数组末尾） */
     private readonly _groups: Map<UILayer, UIFormBase[]> = new Map();
 
-    /** 已打开的表单索引：formName → UIFormBase */
-    private readonly _openForms: Map<string, UIFormBase> = new Map();
+    /**
+     * 已打开的表单索引：formName → UIFormBase[]
+     * allowMultiple=false 时数组长度为 1，allowMultiple=true 时可有多个实例
+     */
+    private readonly _openForms: Map<string, UIFormBase[]> = new Map();
 
     /** 表单工厂（由 Runtime 层注入） */
     private _factory: IUIFormFactory | null = null;
@@ -41,8 +44,13 @@ export class UIManager extends ModuleBase implements IUIManager {
     }
 
     public onUpdate(deltaTime: number): void {
-        for (const form of this._openForms.values()) {
-            form.onUpdate(deltaTime);
+        // 对所有层所有实例分发 update，包含被覆盖的表单
+        // 被覆盖的表单可能仍需维护内部状态（如实时数据刷新）
+        // 若子类需要在被覆盖时暂停更新，可在 onCover/onReveal 中自行设置标志
+        for (const instances of this._openForms.values()) {
+            for (const form of instances) {
+                form.onUpdate(deltaTime);
+            }
         }
     }
 
@@ -92,7 +100,7 @@ export class UIManager extends ModuleBase implements IUIManager {
         }
 
         // 2. 非 allowMultiple 时，已打开则忽略
-        if (!config.allowMultiple && this._openForms.has(formName)) {
+        if (!config.allowMultiple && (this._openForms.get(formName)?.length ?? 0) > 0) {
             return;
         }
 
@@ -114,7 +122,9 @@ export class UIManager extends ModuleBase implements IUIManager {
 
         // 6. 推入栈 + 记录
         group.push(form);
-        this._openForms.set(formName, form);
+        const instances = this._openForms.get(formName) ?? [];
+        instances.push(form);
+        this._openForms.set(formName, instances);
         form._setOpen(true);
 
         // 7. 调用 onOpen
@@ -128,8 +138,11 @@ export class UIManager extends ModuleBase implements IUIManager {
      * 关闭表单
      */
     public closeForm(formName: string): void {
-        const form = this._openForms.get(formName);
-        if (!form) return; // 静默忽略
+        const instances = this._openForms.get(formName);
+        if (!instances || instances.length === 0) return; // 静默忽略
+
+        // allowMultiple 时关闭最后打开的实例（LIFO）
+        const form = instances[instances.length - 1];
 
         const config = this._formConfigs.get(formName);
         if (!config) return;
@@ -146,7 +159,12 @@ export class UIManager extends ModuleBase implements IUIManager {
         // 调用 onClose + 更新状态
         form.onClose();
         form._setOpen(false);
-        this._openForms.delete(formName);
+
+        // 从 _openForms 中移除该实例
+        instances.pop();
+        if (instances.length === 0) {
+            this._openForms.delete(formName);
+        }
 
         // 如果移除的是栈顶，通知新栈顶 onReveal
         const pauseCovered = config.pauseCoveredForm !== false;
@@ -177,14 +195,16 @@ export class UIManager extends ModuleBase implements IUIManager {
      * 获取已打开的表单
      */
     public getForm(formName: string): UIFormBase | undefined {
-        return this._openForms.get(formName);
+        const instances = this._openForms.get(formName);
+        // 返回最后打开的实例（allowMultiple 时为最新实例）
+        return instances?.[instances.length - 1];
     }
 
     /**
      * 查询表单是否已打开
      */
     public hasForm(formName: string): boolean {
-        return this._openForms.has(formName);
+        return (this._openForms.get(formName)?.length ?? 0) > 0;
     }
 
     // ─── 内部辅助方法 ──────────────────────────────────
