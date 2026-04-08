@@ -5,7 +5,7 @@
 - 开始日期：2026-03-23
 - 当前日期：2026-04-08
 - 当前周次：Week 3 / 8
-- 总完成度：40%
+- 总完成度：48%
 
 ## 模块开发进度
 
@@ -19,8 +19,8 @@
 | ProcedureManager（流程管理器）              | ✅ 已完成 | 2026-04-07 | 94          | Week 3 Day 1；ProcedureBase + ProcedureManager，13 个测试                  |
 | Cocos 适配层（CocosEntry）                  | ⬜ 未开始 | -          | -           | Week 2 Day 3-4                                                             |
 | ResourceManager（资源管理器）               | ✅ 已完成 | 2026-04-07 | 95          | Week 3 Day 2；ResourceDefs + IResourceManager + ResourceManager，26 个测试；补 ReadonlyAssetInfo 修复 |
-| UIManager（UI管理器）                       | ✅ 已完成 | 2026-04-08 | 92          | Week 3 Day 3；UIDefs + UIFormBase + IUIManager + UIManager，31 个测试             |
-| EntityManager（实体管理器）                 | ⬜ 未开始 | -          | -           | Week 4 Day 1-2                                                             |
+| UIManager（UI管理器）                       | ✅ 已完成 | 2026-04-08 | 92          | Week 3 Day 3；UIDefs + UIFormBase + IUIManager + UIManager，33 个测试（含 allowMultiple bug 修复）|
+| EntityManager（实体管理器）                 | ✅ 已完成 | 2026-04-08 | 95          | Week 3 Day 4；EntityDefs + EntityBase + EntityGroup + EntityManager，31 个测试；_entityGroupMap O(1) 反查设计 |
 | NetworkManager（网络管理器）                | ⬜ 未开始 | -          | -           | Week 4 Day 3-4                                                             |
 | AudioManager（音频管理器）                  | ⬜ 未开始 | -          | -           | Week 4 Day 5                                                               |
 | SceneManager（场景管理器）                  | ⬜ 未开始 | -          | -           | Week 4 Day 5                                                               |
@@ -64,6 +64,9 @@
 - [x] ✅ 深层只读类型：Readonly<T> 浅只读 vs ReadonlySet/显式 ReadonlyAssetInfo 接口
 - [x] ✅ UI 分层管理：UILayer 分组 + 栈管理 + Cover/Reveal 生命周期通知
 - [x] ✅ IUIFormFactory 策略注入：与 IResourceLoader 一致的模式复用
+- [x] ✅ allowMultiple 多实例管理：Map<string, UIFormBase[]> + LIFO 关闭顺序
+- [x] ✅ 实体管理模式：EntityGroup 双池（活跃/等待）+ EntityManager O(1) 反查表 + IEntityFactory 策略注入
+- [x] ✅ 对象复用进阶：hide 不销毁回等待池，show 优先复用，从 ObjectPool 到 EntityGroup 的思维迁移
 
 ## 面试题积累
 
@@ -71,9 +74,9 @@
 
 ## 上次会话断点
 
-- 最后操作：Week 3 Day 3 — UIManager 完成（UIDefs + UIFormBase + IUIManager + UIManager，31 个测试全绿）+ ResourceManager Review 补完（95/100，ReadonlyAssetInfo 修复）
-- Review 评分：UIManager 92/100（onUpdate 设计取舍可接受）
-- 下次继续：Week 3 Day 4 — UIManager Code Review + EntityManager 或 NetworkManager
-- 未完成事项：UIManager Code Review
-- 额外成就：UILayer 分组栈管理、Cover/Reveal 生命周期、pauseCoveredForm 可配、closeAllForms 逆序关闭
+- 最后操作：Week 3 Day 4 — EntityManager 完成（EntityDefs + EntityBase + EntityGroup + EntityManager，31 个测试全绿，95/100）+ UIManager allowMultiple bug 修复
+- Review 评分：EntityManager 95/100（_entityGroupMap O(1) 反查设计、快照遍历、状态重置）
+- 下次继续：Week 4 Day 1 — NetworkManager 教学与实现
+- 未完成事项：无
+- 额外成就：hideAllEntities 快照遍历安全、onInit 多次重置支持、entityId 自增 + 重置设计权衡
 - 更新日期：2026-04-08
