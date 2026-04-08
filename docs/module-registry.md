@@ -34,7 +34,7 @@ GameEntry（框架入口）
 | FSM        | framework/fsm/        | createFsm\<T\>() / destroyFsm() / getFsm() / hasFsm() / IFsm.changeState() / IFsm.start()                                            | 无                          | ✅ 已完成 |
 | Procedure  | framework/procedure/  | initialize() / startProcedure() / hasProcedure() / currentProcedure / changeProcedure()                                              | FSM                         | ✅ 已完成 |
 | Resource   | framework/resource/   | setResourceLoader() / loadAsset() / releaseAsset() / releaseByOwner() / preload() / hasAsset() / getAssetRefCount() / getAssetInfo() | Event, ObjectPool           | ✅ 已完成 |
-| UI         | framework/ui/         | openUI() / closeUI() / getUI()                                                                                                       | Resource, Event, ObjectPool | ⬜ 待开发 |
+| UI         | framework/ui/         | setUIFormFactory() / registerForm() / openForm() / closeForm() / closeAllForms() / getForm() / hasForm()                         | Resource, Event, ObjectPool | ✅ 已完成 |
 | Entity     | framework/entity/     | showEntity() / hideEntity() / getEntity()                                                                                            | Resource, Event, ObjectPool | ⬜ 待开发 |
 | Network    | framework/network/    | connect() / send() / close()                                                                                                         | Event                       | ⬜ 待开发 |
 | Audio      | framework/audio/      | playMusic() / playSound() / stop()                                                                                                   | Resource                    | ⬜ 待开发 |
@@ -74,3 +74,4 @@ GameEntry（框架入口）
 | 2026-04-04 | FSM 模块完成（FsmDefs + FsmState + Fsm + FsmManager），52 个测试全绿                  | 大圆   |
 | 2026-04-07 | Procedure 模块完成（ProcedureBase + ProcedureManager），13 个测试全绿，94/100         | 大圆   |
 | 2026-04-07 | Resource 模块完成（ResourceDefs + IResourceManager + ResourceManager），26 个测试全绿 | 大圆   |
+| 2026-04-08 | UI 模块完成（UIDefs + UIFormBase + IUIManager + UIManager），31 个测试全绿                 | 大圆   |
