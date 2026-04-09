@@ -30,10 +30,6 @@ export class EcsWorld implements IEcsWorldAccess {
     /** System 管理器 */
     private readonly _systemManager: SystemManager = new SystemManager();
 
-    constructor() {
-        void this._nextEntityId;
-    }
-
     // ─── Entity 管理 ──────────────────────────────────
 
     /**

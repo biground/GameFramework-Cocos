@@ -20,7 +20,6 @@ export class SystemManager {
      */
     public addSystem(system: ISystem): void {
         if (this._systems.includes(system)) {
-            console.warn(`[SystemManager] System "${system.name}" 已注册，跳过重复添加`);
             return;
         }
         this._systems.push(system);
