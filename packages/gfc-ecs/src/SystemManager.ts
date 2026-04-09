@@ -1,72 +1,110 @@
-import { ISystem } from './EcsDefs';
+import { ISystem, SystemPhase } from './EcsDefs';
 
 /**
  * System 管理器
  * 管理所有 System 的注册、排序和执行调度
  *
  * 设计要点：
- * - System 按 priority 排序执行（借鉴 GameModule 的脏标记模式）
+ * - System 按 SystemPhase 分组，每组内按 priority 排序执行
+ * - 脏标记粒度为 per-phase，避免不必要的全量排序
  * - 支持动态启用/禁用 System
  */
 export class SystemManager {
-    /** 已注册的 System 列表 */
-    private readonly _systems: ISystem[] = [];
+    /** 按 phase 分组的 System 列表 */
+    private readonly _phases: Map<SystemPhase, ISystem[]> = new Map();
 
-    /** 是否需要重新排序（脏标记） */
-    private _dirty: boolean = false;
+    /** Phase 执行顺序 */
+    private readonly _phaseOrder: SystemPhase[] = [
+        SystemPhase.PreUpdate,
+        SystemPhase.Update,
+        SystemPhase.PostUpdate,
+        SystemPhase.LateUpdate,
+    ];
+
+    /** 需要重新排序的 phase */
+    private readonly _dirtyPhases: Set<SystemPhase> = new Set();
+
+    /** 总 System 数量 */
+    private _totalCount = 0;
+
+    constructor() {
+        for (const phase of this._phaseOrder) {
+            this._phases.set(phase, []);
+        }
+    }
 
     /**
      * 注册 System
      */
     public addSystem(system: ISystem): void {
-        if (this._systems.includes(system)) {
+        const phase = system.phase ?? SystemPhase.Update;
+        const list = this._phases.get(phase);
+        if (!list) {
+            throw new Error(`[SystemManager] 未知的 SystemPhase: ${phase}`);
+        }
+        if (list.includes(system)) {
             return;
         }
-        this._systems.push(system);
-        this._dirty = true;
+        list.push(system);
+        this._dirtyPhases.add(phase);
+        this._totalCount++;
     }
 
     /**
      * 移除 System
      */
     public removeSystem(system: ISystem): void {
-        const index = this._systems.indexOf(system);
+        const phase = system.phase ?? SystemPhase.Update;
+        const list = this._phases.get(phase);
+        if (!list) return;
+        const index = list.indexOf(system);
         if (index !== -1) {
-            this._systems.splice(index, 1);
+            list.splice(index, 1);
             system.onDestroy?.();
-            this._dirty = true;
+            this._dirtyPhases.add(phase);
+            this._totalCount--;
         }
     }
 
     /**
-     * 按 priority 顺序执行所有启用的 System
+     * 按 phase 顺序执行所有启用的 System，每组内按 priority 排序
      */
     public update(deltaTime: number): void {
-        if (this._dirty) {
-            this._systems.sort((a, b) => a.priority - b.priority);
-            this._dirty = false;
-        }
-        for (const system of this._systems) {
-            if (system.enabled) {
-                system.update(deltaTime);
+        for (const phase of this._phaseOrder) {
+            const list = this._phases.get(phase)!;
+            if (list.length === 0) continue;
+
+            if (this._dirtyPhases.has(phase)) {
+                list.sort((a, b) => a.priority - b.priority);
+                this._dirtyPhases.delete(phase);
+            }
+
+            for (const system of list) {
+                if (system.enabled) {
+                    system.update(deltaTime);
+                }
             }
         }
     }
 
     /**
-     * 销毁所有 System
+     * 销毁所有 System（按 phase 倒序 + 列表内倒序）
      */
     public destroyAll(): void {
-        for (let i = this._systems.length - 1; i >= 0; i--) {
-            this._systems[i].onDestroy?.();
+        for (let pi = this._phaseOrder.length - 1; pi >= 0; pi--) {
+            const list = this._phases.get(this._phaseOrder[pi])!;
+            for (let i = list.length - 1; i >= 0; i--) {
+                list[i].onDestroy?.();
+            }
+            list.length = 0;
         }
-        this._systems.length = 0;
+        this._totalCount = 0;
     }
 
     /**
      * 获取已注册的 System 数量
      */
     public get systemCount(): number {
-        return this._systems.length;
+        return this._totalCount;
     }
 }
