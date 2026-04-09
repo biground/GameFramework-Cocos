@@ -3,6 +3,7 @@ import { SystemManager } from '../src/SystemManager';
 import {
     ISystem,
     IEcsWorldAccess,
+    IReactiveGroup,
     EcsEntityId,
     ComponentType,
     QueryDescriptor,
@@ -63,6 +64,16 @@ const mockWorld: IEcsWorldAccess = {
         return false;
     },
     commands: mockCommandBuffer,
+    registerGroup(_descriptor: QueryDescriptor): IReactiveGroup {
+        return {
+            descriptor: _descriptor,
+            count: 0,
+            matchedIndices: new Set(),
+            drainEntered: () => [],
+            drainRemoved: () => [],
+            has: () => false,
+        };
+    },
 };
 void mockWorld;
 
