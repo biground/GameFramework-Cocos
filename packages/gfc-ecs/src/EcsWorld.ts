@@ -163,7 +163,12 @@ export class EcsWorld implements IEcsWorldAccess {
     }
 
     /**
-     * 高级查询：支持 all / none / any 条件
+     * 高级查询：支持 all / none / any 条件组合
+     *
+     * 候选集策略：
+     * - 有 all → 最小 all storage 作为遍历起点
+     * - 无 all 有 any → 合并所有 any storage 的实体作为候选
+     * - 纯 none → 遍历全部存活实体
      */
     public queryAdvanced(descriptor: QueryDescriptor): readonly EcsEntityId[] {
         const allTypes = descriptor.all ?? [];
@@ -172,21 +177,43 @@ export class EcsWorld implements IEcsWorldAccess {
         if (allTypes.length === 0 && noneTypes.length === 0 && anyTypes.length === 0) {
             return [];
         }
-        let smallestStorage: ComponentStorage<unknown> | null = null;
-        for (const type of allTypes) {
-            const storage = this._storages.get(type.typeId);
-            if (!storage) {
-                return [];
+
+        // 确定候选实体集合
+        let candidateEntities: Iterable<EcsEntityId>;
+
+        if (allTypes.length > 0) {
+            // 有 all：选最小 storage 缩小搜索范围
+            let smallestStorage: ComponentStorage<unknown> | null = null;
+            for (const type of allTypes) {
+                const storage = this._storages.get(type.typeId);
+                if (!storage) {
+                    return [];
+                }
+                if (!smallestStorage || storage.size < smallestStorage.size) {
+                    smallestStorage = storage;
+                }
             }
-            if (!smallestStorage || storage.size < smallestStorage.size) {
-                smallestStorage = storage;
+            candidateEntities = smallestStorage!.entities;
+        } else if (anyTypes.length > 0) {
+            // 无 all 有 any：合并所有 any storage 的实体（去重）
+            const candidates = new Set<EcsEntityId>();
+            for (const type of anyTypes) {
+                const storage = this._storages.get(type.typeId);
+                if (storage) {
+                    for (const entityId of storage.entities) {
+                        candidates.add(entityId);
+                    }
+                }
             }
+            candidateEntities = candidates;
+        } else {
+            // 纯 none：遍历全部存活实体
+            candidateEntities = this._aliveEntities;
         }
-        if (!smallestStorage) {
-            return [];
-        }
+
         const result: EcsEntityId[] = [];
-        for (const entityId of smallestStorage.entities) {
+        for (const entityId of candidateEntities) {
+            // all 检查
             let hasAll = true;
             for (const type of allTypes) {
                 const storage = this._storages.get(type.typeId)!;
@@ -198,6 +225,7 @@ export class EcsWorld implements IEcsWorldAccess {
             if (!hasAll) {
                 continue;
             }
+            // none 检查
             let hasNone = false;
             for (const type of noneTypes) {
                 const storage = this._storages.get(type.typeId);
@@ -209,7 +237,8 @@ export class EcsWorld implements IEcsWorldAccess {
             if (hasNone) {
                 continue;
             }
-            if (anyTypes.length > 0) {
+            // any 检查（仅当有 all 起点时才需要，纯 any 候选集已保证）
+            if (allTypes.length > 0 && anyTypes.length > 0) {
                 let hasAny = false;
                 for (const type of anyTypes) {
                     const storage = this._storages.get(type.typeId);

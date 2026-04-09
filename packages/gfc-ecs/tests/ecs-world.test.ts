@@ -204,6 +204,103 @@ describe('EcsWorld — Query', () => {
         expect(result.length).toBe(1);
         expect(result).toContain(e1);
     });
+
+    it('queryAdvanced 纯 any：返回拥有任一组件的实体', () => {
+        const e1 = world.createEntity();
+        world.addComponent(e1, Position, { x: 0, y: 0 });
+
+        const e2 = world.createEntity();
+        world.addComponent(e2, Velocity, { vx: 1, vy: 0 });
+
+        const e3 = world.createEntity();
+        world.addComponent(e3, Health, { hp: 100, maxHp: 100 });
+
+        // any: Position | Velocity → e1, e2（不含 e3）
+        const result = world.queryAdvanced({ any: [Position, Velocity] });
+        expect(result.length).toBe(2);
+        expect(result).toContain(e1);
+        expect(result).toContain(e2);
+        expect(result).not.toContain(e3);
+    });
+
+    it('queryAdvanced any + none 组合', () => {
+        const e1 = world.createEntity();
+        world.addComponent(e1, Position, { x: 0, y: 0 });
+
+        const e2 = world.createEntity();
+        world.addComponent(e2, Position, { x: 1, y: 1 });
+        world.addComponent(e2, Health, { hp: 100, maxHp: 100 });
+
+        const e3 = world.createEntity();
+        world.addComponent(e3, Velocity, { vx: 1, vy: 0 });
+
+        // any: Position | Velocity, none: Health → e1, e3（e2 被 Health 排除）
+        const result = world.queryAdvanced({
+            any: [Position, Velocity],
+            none: [Health],
+        });
+        expect(result.length).toBe(2);
+        expect(result).toContain(e1);
+        expect(result).toContain(e3);
+        expect(result).not.toContain(e2);
+    });
+
+    it('queryAdvanced 纯 none：排除拥有指定组件的存活实体', () => {
+        const e1 = world.createEntity();
+        world.addComponent(e1, Position, { x: 0, y: 0 });
+
+        const e2 = world.createEntity();
+        world.addComponent(e2, Velocity, { vx: 1, vy: 0 });
+
+        const e3 = world.createEntity();
+        // e3 没有任何组件
+
+        // none: Position → 排除 e1，返回 e2, e3
+        const result = world.queryAdvanced({ none: [Position] });
+        expect(result.length).toBe(2);
+        expect(result).toContain(e2);
+        expect(result).toContain(e3);
+        expect(result).not.toContain(e1);
+    });
+
+    it('queryAdvanced all + any 组合', () => {
+        const e1 = world.createEntity();
+        world.addComponent(e1, Position, { x: 0, y: 0 });
+
+        const e2 = world.createEntity();
+        world.addComponent(e2, Position, { x: 1, y: 1 });
+        world.addComponent(e2, Velocity, { vx: 1, vy: 0 });
+
+        const e3 = world.createEntity();
+        world.addComponent(e3, Position, { x: 2, y: 2 });
+        world.addComponent(e3, Health, { hp: 100, maxHp: 100 });
+
+        // all: Position, any: Velocity | Health → e2, e3（e1 没有 Velocity 也没有 Health）
+        const result = world.queryAdvanced({
+            all: [Position],
+            any: [Velocity, Health],
+        });
+        expect(result.length).toBe(2);
+        expect(result).toContain(e2);
+        expect(result).toContain(e3);
+        expect(result).not.toContain(e1);
+    });
+
+    it('queryAdvanced 空描述符返回空数组', () => {
+        world.createEntity();
+        expect(world.queryAdvanced({})).toEqual([]);
+    });
+
+    it('queryAdvanced 纯 any 去重：同一实体拥有多个 any 组件只出现一次', () => {
+        const e1 = world.createEntity();
+        world.addComponent(e1, Position, { x: 0, y: 0 });
+        world.addComponent(e1, Velocity, { vx: 1, vy: 0 });
+
+        // any: Position | Velocity → e1 只出现一次
+        const result = world.queryAdvanced({ any: [Position, Velocity] });
+        expect(result.length).toBe(1);
+        expect(result).toContain(e1);
+    });
 });
 
 // ─── System 测试 ─────────────────────────────────────
