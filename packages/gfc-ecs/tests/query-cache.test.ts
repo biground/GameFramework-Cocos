@@ -127,6 +127,55 @@ describe('QueryCache — 单元测试', () => {
         cache.resolve(handle); // callCount = 2
         expect(callCount).toBe(2);
     });
+
+    // ─── removeQuery ─────────────────────────────────
+
+    it('removeQuery 后 resolve 该 handle 抛错', () => {
+        const cache = new QueryCache(() => []);
+        const handle = cache.register({ all: [Pos] });
+        cache.resolve(handle);
+
+        expect(cache.removeQuery(handle)).toBe(true);
+        expect(() => cache.resolve(handle)).toThrow('[QueryCache]');
+    });
+
+    it('removeQuery 不影响其他已注册的查询', () => {
+        let callCount = 0;
+        const cache = new QueryCache(() => [++callCount]);
+        const h1 = cache.register({ all: [Pos] });
+        const h2 = cache.register({ all: [Vel] });
+
+        cache.resolve(h1);
+        cache.resolve(h2);
+
+        cache.removeQuery(h1);
+        // h2 仍然可用
+        cache.markDirtyByType(Vel.typeId);
+        const result = cache.resolve(h2);
+        expect(result).toEqual([3]);
+    });
+
+    it('removeQuery 后相关 typeId 的脏标记不再影响已删除的条目', () => {
+        let callCount = 0;
+        const cache = new QueryCache(() => [++callCount]);
+        const h1 = cache.register({ all: [Pos] });
+        const h2 = cache.register({ all: [Pos, Vel] });
+
+        cache.resolve(h1);
+        cache.resolve(h2);
+        expect(callCount).toBe(2);
+
+        cache.removeQuery(h1);
+        // 标记 Pos 脏 → 只有 h2 被重算（h1 已删除）
+        cache.markDirtyByType(Pos.typeId);
+        cache.resolve(h2);
+        expect(callCount).toBe(3);
+    });
+
+    it('removeQuery 不存在的 handle 返回 false', () => {
+        const cache = new QueryCache(() => []);
+        expect(cache.removeQuery({ _id: 999 })).toBe(false);
+    });
 });
 
 // ─── EcsWorld 集成测试 ───────────────────────────────
@@ -352,5 +401,40 @@ describe('EcsWorld — Query 缓存', () => {
 
         const result = world.queryAdvanced({ all: [Pos], none: [Hp] });
         expect(result).toEqual([e]);
+    });
+
+    // ─── removeQuery 集成测试 ────────────────────────
+
+    it('removeQuery 后 resolveQuery 抛错', () => {
+        const e = world.createEntity();
+        world.addComponent(e, Pos, { x: 0, y: 0 });
+
+        const handle = world.registerQuery({ all: [Pos] });
+        world.resolveQuery(handle);
+
+        expect(world.removeQuery(handle)).toBe(true);
+        expect(() => world.resolveQuery(handle)).toThrow('[QueryCache]');
+    });
+
+    it('removeQuery 后其他查询不受影响', () => {
+        const e = world.createEntity();
+        world.addComponent(e, Pos, { x: 0, y: 0 });
+        world.addComponent(e, Vel, { vx: 1, vy: 1 });
+
+        const hPos = world.registerQuery({ all: [Pos] });
+        const hPosVel = world.registerQuery({ all: [Pos, Vel] });
+
+        world.resolveQuery(hPos);
+        world.resolveQuery(hPosVel);
+
+        world.removeQuery(hPos);
+
+        // hPosVel 仍然可用
+        const result = world.resolveQuery(hPosVel);
+        expect(result).toEqual([e]);
+    });
+
+    it('removeQuery 不存在的 handle 返回 false', () => {
+        expect(world.removeQuery({ _id: 999 })).toBe(false);
     });
 });

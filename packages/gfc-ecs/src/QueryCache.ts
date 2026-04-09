@@ -1,13 +1,4 @@
-import { QueryDescriptor, EcsEntityId, buildComponentMask } from './EcsDefs';
-
-/**
- * 缓存的查询句柄
- * 通过 `registerQuery` 获取，用于 `resolveQuery` 快速检索结果
- */
-export interface QueryHandle {
-    /** 内部唯一标识 */
-    readonly _id: number;
-}
+import { QueryDescriptor, EcsEntityId, buildComponentMask, QueryHandle } from './EcsDefs';
 
 /** 缓存条目 */
 interface CacheEntry {
@@ -133,6 +124,27 @@ export class QueryCache {
         this._nextId = 0;
     }
 
+    /**
+     * 删除已注册的查询
+     * @param handle 查询句柄
+     * @returns 是否成功删除
+     */
+    removeQuery(handle: QueryHandle): boolean {
+        const entry = this._entries.get(handle._id);
+        if (!entry) {
+            return false;
+        }
+        // 清理反向映射
+        const allTypes = entry.descriptor.all ?? [];
+        const noneTypes = entry.descriptor.none ?? [];
+        const anyTypes = entry.descriptor.any ?? [];
+        for (const t of allTypes) this._removeReverseMapping(t.typeId, handle._id);
+        for (const t of noneTypes) this._removeReverseMapping(t.typeId, handle._id);
+        for (const t of anyTypes) this._removeReverseMapping(t.typeId, handle._id);
+        this._entries.delete(handle._id);
+        return true;
+    }
+
     /** 添加反向映射条目 */
     private _addReverseMapping(typeId: number, entryId: number): void {
         let set = this._typeToEntries.get(typeId);
@@ -141,5 +153,16 @@ export class QueryCache {
             this._typeToEntries.set(typeId, set);
         }
         set.add(entryId);
+    }
+
+    /** 删除反向映射条目 */
+    private _removeReverseMapping(typeId: number, entryId: number): void {
+        const set = this._typeToEntries.get(typeId);
+        if (set) {
+            set.delete(entryId);
+            if (set.size === 0) {
+                this._typeToEntries.delete(typeId);
+            }
+        }
     }
 }

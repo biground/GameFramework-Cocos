@@ -269,4 +269,20 @@ describe('CommandBuffer', () => {
 
         world.destroy();
     });
+
+    // ─── 多个临时实体互相引用 ──────────────────────────
+
+    test('多个临时实体：前者的 addComponent 引用后者的 tempId', () => {
+        const world = new EcsWorld();
+        const buffer = new CommandBuffer();
+        const temp1 = buffer.createEntity();
+        const temp2 = buffer.createEntity();
+        buffer.addComponent(temp1, Health, { hp: 10 });
+        buffer.addComponent(temp2, Health, { hp: 20 });
+        buffer.flush(world);
+        expect(world.entityCount).toBe(2);
+        const entities = world.query(Health);
+        expect(entities).toHaveLength(2);
+        world.destroy();
+    });
 });
