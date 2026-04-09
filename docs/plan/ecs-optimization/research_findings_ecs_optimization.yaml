@@ -1,0 +1,664 @@
+plan_id: ecs-optimization
+objective: "研究 5 个 ECS 优化方向（Generational ID / Bitwise Mask / Query Cache / Command Buffer / System Phase），输出设计方案"
+focus_area: "packages/gfc-ecs/src — ECS 核心优化"
+created_at: "2026-04-09"
+created_by: researcher
+status: completed
+
+tldr: |
+  - 当前 EcsEntityId = number，ID 回收后存在 ABA 问题；query 每帧遍历 storage 无缓存；System update 中直接操作 entity 有遍历安全风险
+  - 5 个优化依赖链：Generational ID（无依赖）→ Bitwise Mask（依赖 typeId 上限） → Query Cache（依赖 Mask）→ Command Buffer（独立但建议在 Cache 之后）→ System Phase（独立）
+  - 推荐实现顺序：① Generational ID → ② Bitwise Mask → ③ Query Cache → ④ Command Buffer → ⑤ System Phase
+  - 所有方案保持 IEcsWorldAccess 接口向后兼容，新增接口用 ICommandBuffer / SystemPhase 等扩展点
+
+research_metadata:
+  methodology: "read_file 逐文件精读 + 结构分析 + 业界 ECS 实践对比"
+  scope: "packages/gfc-ecs/src 全部 5 个源文件 + 4 个测试文件"
+  confidence: high
+  coverage: 100
+  decision_blockers: 0
+  research_blockers: 0
+
+# ===================================================================
+# 第一部分：现有代码结构分析
+# ===================================================================
+
+files_analyzed:
+  - file: EcsDefs.ts
+    path: packages/gfc-ecs/src/EcsDefs.ts
+    purpose: "类型定义：ComponentType（phantom type + 自增 typeId）、EcsEntityId、ISystem、IEcsWorldAccess、QueryDescriptor"
+    key_elements:
+      - element: ComponentType
+        type: class
+        location: "EcsDefs.ts:16"
+        description: "phantom type 模式，typeId 由全局静态计数器自增分配"
+      - element: EcsEntityId
+        type: type
+        location: "EcsDefs.ts:38"
+        description: "= number，纯数字类型别名，无 generation 信息"
+      - element: IEcsWorldAccess
+        type: interface
+        location: "EcsDefs.ts:81"
+        description: "System 与 World 的交互接口，包含 CRUD + query"
+      - element: QueryDescriptor
+        type: interface
+        location: "EcsDefs.ts:107"
+        description: "all / none / any 三路过滤条件"
+    language: TypeScript
+    lines: 115
+
+  - file: SparseSet.ts
+    path: packages/gfc-ecs/src/SparseSet.ts
+    purpose: "泛型稀疏集合，entityId → data 映射，swap-remove O(1)"
+    key_elements:
+      - element: SparseSet
+        type: class
+        location: "SparseSet.ts:12"
+        description: "sparse/dense/data 三数组，has/get/add/remove 均 O(1)"
+    language: TypeScript
+    lines: 120
+
+  - file: ComponentStorage.ts
+    path: packages/gfc-ecs/src/ComponentStorage.ts
+    purpose: "SparseSet 的薄封装，per ComponentType 一个实例"
+    key_elements:
+      - element: ComponentStorage
+        type: class
+        location: "ComponentStorage.ts:11"
+        description: "委托 SparseSet，暴露 set/get/has/remove/entities/size"
+    language: TypeScript
+    lines: 78
+
+  - file: SystemManager.ts
+    path: packages/gfc-ecs/src/SystemManager.ts
+    purpose: "System 注册/排序/调度，脏标记排序优化"
+    key_elements:
+      - element: SystemManager
+        type: class
+        location: "SystemManager.ts:12"
+        description: "addSystem/removeSystem/update/destroyAll，dirty flag 排序"
+    language: TypeScript
+    lines: 76
+
+  - file: EcsWorld.ts
+    path: packages/gfc-ecs/src/EcsWorld.ts
+    purpose: "核心容器：Entity 管理（ID 回收）、Component CRUD、Query、System 生命周期"
+    key_elements:
+      - element: _recycledIds
+        type: variable
+        location: "EcsWorld.ts:23"
+        description: "EcsEntityId[] 栈，ID 回收后 push，createEntity 时 pop 复用"
+      - element: _aliveEntities
+        type: variable
+        location: "EcsWorld.ts:26"
+        description: "Set<EcsEntityId>，用于快速判断存活"
+      - element: query
+        type: function
+        location: "EcsWorld.ts:128"
+        description: "简单 query，选最小 storage 遍历 + 逐类型 has 检查"
+      - element: queryAdvanced
+        type: function
+        location: "EcsWorld.ts:159"
+        description: "all/none/any 三路过滤，候选集策略：最小 all → any 合并 → 全体存活"
+    language: TypeScript
+    lines: 310
+
+# ===================================================================
+# 第二部分：现有模式
+# ===================================================================
+
+patterns_found:
+  - category: architecture
+    pattern: "phantom type 类型安全"
+    description: "ComponentType<T> 用 phantom field 区分不同组件类型，与框架的 ServiceKey<T> / EventKey<T> 一致"
+    examples:
+      - file: EcsDefs.ts
+        location: "EcsDefs.ts:18"
+        snippet: "declare private readonly _phantom: T;"
+    prevalence: common
+
+  - category: architecture
+    pattern: "脏标记延迟排序"
+    description: "register 后标记 dirty，update 前才排序，避免频繁排序开销"
+    examples:
+      - file: SystemManager.ts
+        location: "SystemManager.ts:25-26"
+        snippet: "this._dirty = true; // addSystem 时标记"
+    prevalence: common
+
+  - category: architecture
+    pattern: "ID 回收复用（栈式）"
+    description: "destroyEntity push → createEntity pop，无 generation 保护"
+    examples:
+      - file: EcsWorld.ts
+        location: "EcsWorld.ts:40-45"
+        snippet: "recycledIds.pop() / recycledIds.push(entityId)"
+    prevalence: common
+
+  - category: architecture
+    pattern: "最小 storage 优化"
+    description: "query 选择 entity 最少的 storage 作为遍历起点"
+    examples:
+      - file: EcsWorld.ts
+        location: "EcsWorld.ts:138-144"
+        snippet: "if (!smallestStorage || storage.size < smallestStorage.size)"
+    prevalence: common
+
+# ===================================================================
+# 第三部分：5 个优化方向设计方案
+# ===================================================================
+
+optimization_designs:
+
+  # ─────────────────────────────────────────────────────
+  # 1. Generational Entity ID
+  # ─────────────────────────────────────────────────────
+  - id: generational-entity-id
+    title: "Generational Entity ID"
+    priority_order: 1
+    depends_on: []
+    problem: |
+      当前 ID 回收后直接复用同一数字。如果外部持有旧引用 entityId=5，
+      该实体被销毁并回收后，新实体又分配到 5，旧引用会误认为实体仍然存活。
+      这就是经典的 ABA 问题。
+
+    design:
+      approach: "index + generation 打包方案"
+      bit_layout: |
+        方案 A — 单 number 打包（推荐）:
+          EcsEntityId = number
+          低 20 bit = index（最多 1,048,576 个实体槽位）
+          高 12 bit = generation（0~4095 轮回一次，足够检测绝大多数悬挂引用）
+
+          打包:   id = (generation << 20) | index
+          解包:   index = id & 0xFFFFF
+                  generation = (id >>> 20) & 0xFFF
+
+        方案 B — 分离数组:
+          EcsEntityId 仍为 index
+          另开 _generations: number[] 数组，按 index 索引
+
+        推荐方案 A：单值打包，EcsEntityId 类型不变（仍为 number），
+        外部代码无需更改类型签名，只需通过辅助函数解包。
+
+      interface_draft: |
+        // ─── 新增工具函数（EcsDefs.ts）───
+        const INDEX_BITS = 20;
+        const INDEX_MASK = (1 << INDEX_BITS) - 1;       // 0xFFFFF
+        const GENERATION_MASK = 0xFFF;                    // 12 bit
+        const MAX_INDEX = INDEX_MASK;
+
+        function packEntityId(index: number, generation: number): EcsEntityId {
+            return ((generation & GENERATION_MASK) << INDEX_BITS) | (index & INDEX_MASK);
+        }
+        function entityIndex(id: EcsEntityId): number {
+            return id & INDEX_MASK;
+        }
+        function entityGeneration(id: EcsEntityId): number {
+            return (id >>> INDEX_BITS) & GENERATION_MASK;
+        }
+
+      key_changes: |
+        EcsWorld 改动：
+        1. _recycledIds 改为存储 index（不含 generation）
+        2. 新增 _generations: number[]，按 index 索引，初始 0
+        3. createEntity:
+           - 从 _recycledIds pop 出 index → generation = _generations[index]
+           - 无回收时 index = _nextIndex++ → _generations[index] = 0
+           - 返回 packEntityId(index, generation)
+        4. destroyEntity:
+           - 解包 index = entityIndex(id)
+           - 验证 generation 匹配（不匹配说明已是过时引用，直接 return）
+           - _generations[index]++（自动溢出回绕由 & GENERATION_MASK 保证）
+           - push index 到 _recycledIds
+        5. isAlive:
+           - 解包 index + generation → _generations[index] === generation
+           - 比当前 Set<EcsEntityId>.has() 更高效（数组索引 vs Set 查找）
+        6. _aliveEntities Set 可能改为 BitSet 或保留（视其他优化需要）
+
+      aba_protection: |
+        - 悬挂引用持有旧 generation，isAlive 返回 false
+        - addComponent/removeComponent/getComponent 在 isAlive 检查中自动拒绝
+        - generation 满 4095 后回绕到 0，极低概率碰撞（需要同一 index 被回收 4096 次才会重合）
+
+      backward_compatibility: |
+        - EcsEntityId 类型仍然是 number，无破坏性变更
+        - 测试中 id == 0, 1, 2 的断言需要改为用 entityIndex(id) 检查
+        - IEcsWorldAccess 接口签名不变
+
+      test_strategy: |
+        - 测试 ABA 场景：create → destroy → create → 旧 ID isAlive 应为 false
+        - 测试 generation 回绕：手动设置 generation 为 4095 → destroy → 新 generation 为 0
+        - 测试 ID 解包一致性
+
+  # ─────────────────────────────────────────────────────
+  # 2. Bitwise Component Mask
+  # ─────────────────────────────────────────────────────
+  - id: bitwise-component-mask
+    title: "Bitwise Component Mask"
+    priority_order: 2
+    depends_on:
+      - generational-entity-id  # 需要 entityIndex 来索引 mask 数组
+    problem: |
+      当前 query 对每个候选实体逐个调用 storage.has()，
+      每次 has 是 sparse 数组两次下标 + 交叉验证。
+      对于多组件 query（all 3+、none 2+），开销线性增长。
+      位运算可以在 1~2 条指令内完成等价检查。
+
+    design:
+      approach: "per-entity bitmask，number 类型（53 bit 安全）"
+      component_limit: |
+        方案选择：
+        - number（推荐）：安全整数 53 bit，实际用 32 bit（位运算在 JS 中是 32 位整数）
+          → 最多 32 种组件类型。对于中小型游戏足够。
+        - 如果需要 > 32 种：用 Uint32Array，每 32 bit 一个 word
+          → componentMask[entityIndex] 变为 maskWords[entityIndex * wordCount + wordIndex]
+        - bigint：API 简洁但性能差（V8 中比 number 位运算慢 5-10x），不推荐
+
+        推荐先用 number（32 bit），预留扩展到 Uint32Array 的接口。
+
+      interface_draft: |
+        // ─── EcsWorld 新增 ───
+        // 每个实体的组件掩码（按 entityIndex 索引）
+        private _componentMasks: number[] = [];   // 或 Int32Array
+
+        // ComponentType 注册时验证
+        // 在 ComponentType 构造函数中：if (typeId >= 32) throw ...
+
+        // query 编译掩码
+        function buildQueryMask(types: ComponentType<unknown>[]): number {
+            let mask = 0;
+            for (const t of types) { mask |= (1 << t.typeId); }
+            return mask;
+        }
+
+      key_changes: |
+        1. addComponent 时：
+           _componentMasks[entityIndex] |= (1 << type.typeId);
+
+        2. removeComponent 时：
+           _componentMasks[entityIndex] &= ~(1 << type.typeId);
+
+        3. destroyEntity 时：
+           _componentMasks[entityIndex] = 0;
+
+        4. query 快速路径：
+           const allMask = buildQueryMask(allTypes);
+           // all 检查: (entityMask & allMask) === allMask
+           // none 检查: (entityMask & noneMask) === 0
+           // any 检查: (entityMask & anyMask) !== 0
+
+           只需 3 条位运算 + 3 次比较，替代 N 次 storage.has()
+
+        5. 仍然需要最小 storage 遍历策略（确定候选集），
+           但过滤阶段用位运算替代逐个 has 检查
+
+      scaling_strategy: |
+        当 ComponentType.typeId >= 32 时：
+        - 切换到 Uint32Array 多 word 方案
+        - 每个实体的 mask 占 ceil(maxTypeId / 32) 个 word
+        - 可以在运行时按需扩展 word 数
+
+      backward_compatibility: |
+        - 对外 API 不变
+        - ComponentType 增加一个静态检查（typeId < 32 或 < maxBits）
+
+  # ─────────────────────────────────────────────────────
+  # 3. Query 缓存
+  # ─────────────────────────────────────────────────────
+  - id: query-cache
+    title: "Query 缓存"
+    priority_order: 3
+    depends_on:
+      - bitwise-component-mask  # 缓存键用 mask 比较更高效，脏标记也依赖 mask 变化
+    problem: |
+      每帧每个 System 调用 query/queryAdvanced，即使组件组合没有变化也要重新遍历。
+      对于 100+ System、1000+ 实体的场景，重复遍历是主要瓶颈。
+
+    design:
+      approach: "基于 QueryDescriptor 的缓存 + component 变更时脏标记"
+
+      cache_key_design: |
+        方案 A — Mask 三元组（推荐，配合 Bitwise Mask）：
+          key = `${allMask}|${noneMask}|${anyMask}`
+          或直接用三个 number 做 Map 复合键
+
+        方案 B — typeId 排序拼接（无 Mask 时的退路）：
+          key = allIds.sort().join(',') + '|' + noneIds.sort().join(',') + '|' + anyIds.sort().join(',')
+
+        推荐方案 A：计算快、无字符串分配、无 GC 压力。
+
+      interface_draft: |
+        // ─── 新增 QueryCache 类 ───
+        interface CachedQuery {
+            descriptor: QueryDescriptor;
+            allMask: number;
+            noneMask: number;
+            anyMask: number;
+            result: EcsEntityId[];
+            dirty: boolean;
+        }
+
+        class QueryCache {
+            private _caches: Map<string, CachedQuery> = new Map();
+
+            /** 注册一个查询（通常在 System.onInit 中调用） */
+            register(descriptor: QueryDescriptor): CachedQuery;
+
+            /** 获取查询结果（脏时重新计算） */
+            resolve(cache: CachedQuery): readonly EcsEntityId[];
+
+            /** 标记受影响的缓存为脏 */
+            markDirty(changedTypeId: number): void;
+
+            /** 全部标记为脏（entity 创建/销毁时） */
+            markAllDirty(): void;
+        }
+
+      dirty_flag_strategy: |
+        触发脏标记的时机：
+        1. addComponent(entityId, type) → markDirty(type.typeId)
+           - 遍历所有 CachedQuery，检查 typeId 是否出现在 allMask / noneMask / anyMask 中
+           - 若 (1 << typeId) & (allMask | noneMask | anyMask) !== 0 → dirty = true
+
+        2. removeComponent(entityId, type) → 同上
+
+        3. createEntity() → markAllDirty()（新实体可能影响 none 条件的缓存）
+
+        4. destroyEntity() → markAllDirty()
+
+        优化：
+        - 维护 typeId → CachedQuery[] 反向映射，add/remove 时精确通知
+        - 避免遍历所有 cache
+
+      query_lifecycle: |
+        1. System.onInit 中调用 world.registerQuery(descriptor) → 返回 CachedQuery handle
+        2. System.update 中调用 world.resolveQuery(handle) → 若 dirty 则重新计算
+        3. 现有 query/queryAdvanced 作为便捷方法保留（内部走 cache 或不走）
+        
+        IEcsWorldAccess 扩展：
+          registerQuery(descriptor: QueryDescriptor): QueryHandle;
+          resolveQuery(handle: QueryHandle): readonly EcsEntityId[];
+
+      cache_invalidation_granularity: |
+        粗粒度（推荐先实现）：component 变更 → 标记所有相关 cache dirty
+        细粒度（优化方向）：增量更新结果集（add 时尝试 push / remove 时 swap-remove）
+
+  # ─────────────────────────────────────────────────────
+  # 4. Deferred Command Buffer
+  # ─────────────────────────────────────────────────────
+  - id: deferred-command-buffer
+    title: "Deferred Command Buffer"
+    priority_order: 4
+    depends_on: []  # 逻辑独立，但建议在 Query Cache 之后实现（flush 时统一触发脏标记更高效）
+    problem: |
+      System.update 中若直接调用 createEntity / destroyEntity / addComponent / removeComponent，
+      会导致正在遍历的 query 结果被修改（遍历安全问题）。
+      当前没有任何保护机制。
+
+    design:
+      approach: "延迟命令队列，帧末批量 flush"
+
+      interface_draft: |
+        // ─── 命令类型 ───
+        enum CommandKind {
+            CreateEntity,
+            DestroyEntity,
+            AddComponent,
+            RemoveComponent,
+        }
+
+        interface Command {
+            kind: CommandKind;
+            entityId?: EcsEntityId;      // destroy/add/remove 用
+            componentTypeId?: number;     // add/remove 用
+            componentData?: unknown;      // add 用
+        }
+
+        // ─── CommandBuffer 类 ───
+        class CommandBuffer {
+            private _commands: Command[] = [];
+            private _pendingCreates: number = 0;
+
+            /** 延迟创建实体（返回临时 ID，flush 后替换为真实 ID） */
+            createEntity(): EcsEntityId;
+
+            /** 延迟销毁实体 */
+            destroyEntity(entityId: EcsEntityId): void;
+
+            /** 延迟添加组件 */
+            addComponent<T>(entityId: EcsEntityId, type: ComponentType<T>, data: T): void;
+
+            /** 延迟移除组件 */
+            removeComponent<T>(entityId: EcsEntityId, type: ComponentType<T>): void;
+
+            /** 批量执行所有命令 */
+            flush(world: EcsWorld): void;
+
+            /** 清空缓冲区 */
+            clear(): void;
+        }
+
+      flush_timing: |
+        方案 A — 帧末统一 flush（推荐）：
+          world.update(dt) 内部流程：
+          1. systemManager.update(dt)  // 所有 System 执行完
+          2. commandBuffer.flush(this) // 批量执行延迟命令
+          3. queryCache.resolveAll()   // 可选：提前刷新热门 cache
+
+        方案 B — 每个 System 之间 flush：
+          更及时但开销更大，且破坏了 System 之间的数据快照一致性。
+          不推荐。
+
+        方案 C — 混合：
+          world.update 结束后 flush 主 buffer。
+          允许 System 手动 flush（高级用法，需要用户自行负责安全性）。
+
+      pending_create_handling: |
+        createEntity 在 buffer 中需要返回一个"临时 ID"：
+        - 方案：使用负数作为临时 ID（-1, -2, -3...）
+        - flush 时按顺序调用 world.createEntity()，建立 tempId → realId 映射
+        - 后续 addComponent 命令中的 tempId 替换为 realId
+        - INVALID_ENTITY 保持 -1，临时 ID 从 -(INVALID_ENTITY + 1) 即 -2 开始递减
+
+      world_access_pattern: |
+        方案 A — System 通过 CommandBuffer 操作（推荐）：
+          - System.onInit 接收 world（只读查询）+ commandBuffer（写操作）
+          - ISystem.update 签名不变，但 System 内部使用 this._cmd.xxx()
+          - world 的 createEntity/destroyEntity/addComponent/removeComponent 仍可直接调用
+            （向后兼容，但不推荐在 System.update 中使用）
+
+        方案 B — 扩展 IEcsWorldAccess 加 defer 前缀：
+          - deferCreateEntity / deferDestroyEntity / ...
+          - 更显式但 API 膨胀
+
+        推荐方案 A：
+          ISystem 扩展（可选属性）：
+            onInit?(world: IEcsWorldAccess, commands?: ICommandBuffer): void;
+          
+          ICommandBuffer 接口：
+            createEntity(): EcsEntityId;
+            destroyEntity(entityId: EcsEntityId): void;
+            addComponent<T>(entityId: EcsEntityId, type: ComponentType<T>, data: T): void;
+            removeComponent<T>(entityId: EcsEntityId, type: ComponentType<T>): void;
+
+      nested_handling: |
+        flush 过程中产生的新命令：
+        - 禁止在 flush 中再次 flush（设 _flushing 标志，抛错）
+        - flush 过程中若 System 注册了 onComponentAdded 之类的回调并触发新操作：
+          当前方案无事件回调，暂不需要处理。未来扩展时需考虑。
+
+  # ─────────────────────────────────────────────────────
+  # 5. System 分组 / Phase
+  # ─────────────────────────────────────────────────────
+  - id: system-phase
+    title: "System 分组 / Phase"
+    priority_order: 5
+    depends_on: []  # 完全独立，但建议在 Command Buffer 之后（phase 边界是 flush 的自然位置）
+    problem: |
+      当前所有 System 在同一个列表按 priority 排序执行。
+      无法区分 "逻辑更新" 和 "物理更新" 和 "渲染准备" 等阶段。
+      一些 System 需要在所有逻辑 System 完成后才执行（如 Physics → Render）。
+
+    design:
+      approach: "SystemPhase 枚举 + per-phase 排序执行"
+
+      interface_draft: |
+        // ─── 新增 SystemPhase 枚举（EcsDefs.ts）───
+        enum SystemPhase {
+            PreUpdate  = 0,    // 输入处理、帧开始准备
+            Update     = 100,  // 主逻辑更新
+            PostUpdate = 200,  // 物理、碰撞检测
+            LateUpdate = 300,  // 相机跟随、UI 同步
+        }
+
+        // ─── ISystem 扩展 ───
+        interface ISystem {
+            readonly name: string;
+            readonly priority: number;
+            readonly phase?: SystemPhase;  // 可选，默认 Update
+            enabled: boolean;
+            update(deltaTime: number): void;
+            onInit?(world: IEcsWorldAccess): void;
+            onDestroy?(): void;
+        }
+
+      key_changes: |
+        SystemManager 改动：
+
+        方案 A — 多列表（推荐）：
+          private _phases: Map<SystemPhase, ISystem[]> = new Map();
+          private _phaseOrder: SystemPhase[] = [
+              SystemPhase.PreUpdate,
+              SystemPhase.Update,
+              SystemPhase.PostUpdate,
+              SystemPhase.LateUpdate,
+          ];
+          private _dirtyPhases: Set<SystemPhase> = new Set();
+
+          addSystem(system):
+            phase = system.phase ?? SystemPhase.Update
+            _phases.get(phase).push(system)
+            _dirtyPhases.add(phase)
+
+          update(deltaTime):
+            for phase of _phaseOrder:
+              if _dirtyPhases has phase:
+                sort phase list by priority
+                _dirtyPhases.delete(phase)
+              for system of _phases[phase]:
+                if system.enabled: system.update(deltaTime)
+
+        方案 B — 单列表 + 复合排序键：
+          排序键 = phase * 10000 + priority
+          更简单但无法在 phase 边界插入操作（如 flush command buffer）。
+
+        推荐方案 A：支持 phase 边界 hook。
+
+      command_buffer_integration: |
+        System Phase 与 Command Buffer 的协同：
+        - 每个 phase 结束后可选 flush command buffer
+        - 或仅在所有 phase 结束后 flush（更简单，推荐先实现）
+        
+        world.update(dt) 流程：
+          for phase of _phaseOrder:
+            systemManager.updatePhase(phase, dt)
+            // 可选: commandBuffer.flush(this)
+          commandBuffer.flush(this)  // 帧末统一 flush
+
+      backward_compatibility: |
+        - ISystem.phase 为可选属性，默认 SystemPhase.Update
+        - 现有 System 无需修改即可工作
+        - SystemManager 外部 API 不变（update 签名不变）
+        - 新增 updatePhase(phase, dt) 内部方法
+
+# ===================================================================
+# 第四部分：依赖关系与实现顺序
+# ===================================================================
+
+implementation_order:
+  summary: |
+    推荐顺序：① → ② → ③ → ④ → ⑤
+    其中 ④⑤ 逻辑独立，可与 ①②③ 并行开发，但建议串行以降低集成风险。
+
+  sequence:
+    - step: 1
+      optimization: generational-entity-id
+      reason: |
+        无依赖，基础设施级改动。后续所有优化都建立在稳定的 entity index 基础上。
+        Bitwise Mask 需要用 entityIndex 索引 mask 数组，必须先有 index 提取函数。
+      estimated_scope: "EcsDefs.ts + EcsWorld.ts + 所有测试"
+      breaking_changes: "测试中 entity ID 值会变化（带 generation），需更新断言"
+
+    - step: 2
+      optimization: bitwise-component-mask
+      reason: |
+        依赖 step 1 的 entityIndex。为 step 3 Query Cache 提供高效的 mask 比较基础。
+        独立收益：query 过滤阶段用位运算替代逐个 has 检查。
+      estimated_scope: "EcsDefs.ts（typeId 上限检查）+ EcsWorld.ts + 新增 mask 数组"
+      breaking_changes: "ComponentType 数量限制 32"
+
+    - step: 3
+      optimization: query-cache
+      reason: |
+        依赖 step 2 的 mask（cache key 和 dirty 判断都用 mask）。
+        独立收益很高：消除每帧重复遍历，是性能提升最大的优化。
+      estimated_scope: "新增 QueryCache.ts + EcsWorld 集成 + IEcsWorldAccess 扩展"
+      breaking_changes: "IEcsWorldAccess 新增可选方法"
+
+    - step: 4
+      optimization: deferred-command-buffer
+      reason: |
+        逻辑独立，但在 Query Cache 之后实现效果更好：
+        flush 时统一触发 markDirty 比每次 add/remove 都触发更高效。
+      estimated_scope: "新增 CommandBuffer.ts + ICommandBuffer 接口 + EcsWorld/ISystem 扩展"
+      breaking_changes: "ISystem.onInit 签名扩展（可选参数，向后兼容）"
+
+    - step: 5
+      optimization: system-phase
+      reason: |
+        完全独立，最后实现。与 Command Buffer 的 phase 边界 flush 有协同。
+      estimated_scope: "EcsDefs.ts（枚举）+ SystemManager 重构"
+      breaking_changes: "ISystem 新增可选 phase 属性（向后兼容）"
+
+  dependency_graph: |
+    generational-entity-id
+         ↓
+    bitwise-component-mask
+         ↓
+    query-cache
+         ↓ (建议顺序，非强依赖)
+    deferred-command-buffer
+         ↓ (建议顺序，非强依赖)
+    system-phase
+
+# ===================================================================
+# 第五部分：开放问题与风险
+# ===================================================================
+
+open_questions:
+  - question: "32 bit 组件上限是否足够？"
+    context: "当前组件类型通过全局自增分配 typeId。如果未来需要 > 32 种组件，需要切换到 Uint32Array 多 word 方案"
+    type: decision_blocker
+    affects: ["bitwise-component-mask"]
+
+  - question: "query/queryAdvanced 的现有调用方是否需要迁移到 registerQuery？"
+    context: "Query Cache 引入后，直接调用 query() 不走缓存。需要决定是否自动缓存所有 query 还是只缓存注册的"
+    type: decision_blocker
+    affects: ["query-cache"]
+
+  - question: "CommandBuffer 的 createEntity 返回临时 ID 是否会带来类型混淆？"
+    context: "临时 ID 是负数，与正常 EcsEntityId（正数/打包后仍为正数）不同。需要确保 System 不会拿临时 ID 去 query"
+    type: research
+    affects: ["deferred-command-buffer"]
+
+gaps:
+  - area: "性能基准测试"
+    description: "缺少优化前后的性能对比基准。建议每步优化前后都跑 benchmark"
+    impact: nice_to_know
+    affects: ["all"]
+
+  - area: "多 world 场景"
+    description: "ComponentType.typeId 是全局自增的。如果有多个 EcsWorld 实例，typeId 空间是共享的。目前不影响功能但 mask 可能浪费位"
+    impact: nice_to_know
+    affects: ["bitwise-component-mask"]
