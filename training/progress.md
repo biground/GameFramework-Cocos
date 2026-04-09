@@ -3,9 +3,9 @@
 ## 基本信息
 
 - 开始日期：2026-03-23
-- 当前日期：2026-04-08
+- 当前日期：2026-04-09
 - 当前周次：Week 3 / 8
-- 总完成度：48%
+- 总完成度：50%
 
 ## 模块开发进度
 
@@ -74,9 +74,8 @@
 
 ## 上次会话断点
 
-- 最后操作：Week 3 Day 4 — EntityManager 完成（EntityDefs + EntityBase + EntityGroup + EntityManager，31 个测试全绿，95/100）+ UIManager allowMultiple bug 修复
-- Review 评分：EntityManager 95/100（\_entityGroupMap O(1) 反查设计、快照遍历、状态重置）
-- 下次继续：Week 4 Day 1 — NetworkManager 教学与实现
+- 最后操作：Week 3 Day 5 — gfc-ecs 插件 BitMask 多字掩码 + ReactiveGroup 响应式分组实现完成，README 文档更新（+289 行，新增 6 个章节）
+- 下次继续：Week 4 Day 1 — gfc-ecs 剩余优化或 NetworkManager 教学与实现
 - 未完成事项：无
-- 额外成就：hideAllEntities 快照遍历安全、onInit 多次重置支持、entityId 自增 + 重置设计权衡
-- 更新日期：2026-04-08
+- 额外成就：BitMask Uint32Array 突破 32 种组件限制、ReactiveGroup 即时匹配 + Enter/Remove 事件追踪、SystemManager 自动派发生命周期
+- 更新日期：2026-04-09
