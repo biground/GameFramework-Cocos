@@ -10,8 +10,8 @@ import {
     entityIndex,
     packEntityId,
     buildComponentMask,
-    MAX_COMPONENT_TYPES,
 } from '../src/EcsDefs';
+import { BitMask } from '../src/BitMask';
 
 // ─── 测试用组件类型 ─────────────────────────────────
 
@@ -439,23 +439,32 @@ describe('EcsWorld — System', () => {
 describe('buildComponentMask', () => {
     it('单个类型生成正确掩码', () => {
         const mask = buildComponentMask(Position);
-        expect(mask).toBe(1 << Position.typeId);
+        expect(mask).toBeInstanceOf(BitMask);
+        expect(mask.has(Position.typeId)).toBe(true);
     });
 
     it('多个类型生成合并掩码', () => {
         const mask = buildComponentMask(Position, Velocity, Health);
-        const expected = (1 << Position.typeId) | (1 << Velocity.typeId) | (1 << Health.typeId);
-        expect(mask).toBe(expected);
+        expect(mask.has(Position.typeId)).toBe(true);
+        expect(mask.has(Velocity.typeId)).toBe(true);
+        expect(mask.has(Health.typeId)).toBe(true);
     });
 
-    it('空参数返回 0', () => {
-        expect(buildComponentMask()).toBe(0);
+    it('空参数返回空 BitMask', () => {
+        const mask = buildComponentMask();
+        expect(mask.isEmpty()).toBe(true);
     });
 });
 
-describe('ComponentType — MAX_COMPONENT_TYPES 限制', () => {
-    it('MAX_COMPONENT_TYPES 为 32', () => {
-        expect(MAX_COMPONENT_TYPES).toBe(32);
+describe('ComponentType — 无数量限制', () => {
+    it('可以创建超过 32 种组件类型', () => {
+        const types: ComponentType<number>[] = [];
+        for (let i = 0; i < 64; i++) {
+            types.push(new ComponentType<number>(`Extra_${i}`));
+        }
+        expect(types.length).toBe(64);
+        // 最后一个 typeId 应该是起始值 + 63
+        expect(types[63].typeId).toBe(types[0].typeId + 63);
     });
 });
 
@@ -475,11 +484,11 @@ describe('EcsWorld — Component Mask', () => {
         world.addComponent(e, Position, { x: 0, y: 0 });
         world.addComponent(e, Velocity, { vx: 1, vy: 0 });
         /* eslint-disable @typescript-eslint/no-explicit-any */
-        const masks = (world as any)._componentMasks as number[];
+        const masks = (world as any)._componentMasks as BitMask[];
         /* eslint-enable @typescript-eslint/no-explicit-any */
         const idx = entityIndex(e);
-        const expected = (1 << Position.typeId) | (1 << Velocity.typeId);
-        expect(masks[idx]).toBe(expected);
+        expect(masks[idx].has(Position.typeId)).toBe(true);
+        expect(masks[idx].has(Velocity.typeId)).toBe(true);
     });
 
     it('removeComponent 后 mask 正确清除对应位', () => {
@@ -488,10 +497,11 @@ describe('EcsWorld — Component Mask', () => {
         world.addComponent(e, Velocity, { vx: 1, vy: 0 });
         world.removeComponent(e, Velocity);
         /* eslint-disable @typescript-eslint/no-explicit-any */
-        const masks = (world as any)._componentMasks as number[];
+        const masks = (world as any)._componentMasks as BitMask[];
         /* eslint-enable @typescript-eslint/no-explicit-any */
         const idx = entityIndex(e);
-        expect(masks[idx]).toBe(1 << Position.typeId);
+        expect(masks[idx].has(Position.typeId)).toBe(true);
+        expect(masks[idx].has(Velocity.typeId)).toBe(false);
     });
 
     it('destroyEntity 后 mask 清零', () => {
@@ -501,17 +511,17 @@ describe('EcsWorld — Component Mask', () => {
         const idx = entityIndex(e);
         world.destroyEntity(e);
         /* eslint-disable @typescript-eslint/no-explicit-any */
-        const masks = (world as any)._componentMasks as number[];
+        const masks = (world as any)._componentMasks as BitMask[];
         /* eslint-enable @typescript-eslint/no-explicit-any */
-        expect(masks[idx]).toBe(0);
+        expect(masks[idx].isEmpty()).toBe(true);
     });
 
-    it('createEntity 新 index mask 为 0', () => {
+    it('createEntity 新 index mask 为空', () => {
         const e = world.createEntity();
         /* eslint-disable @typescript-eslint/no-explicit-any */
-        const masks = (world as any)._componentMasks as number[];
+        const masks = (world as any)._componentMasks as BitMask[];
         /* eslint-enable @typescript-eslint/no-explicit-any */
-        expect(masks[entityIndex(e)]).toBe(0);
+        expect(masks[entityIndex(e)].isEmpty()).toBe(true);
     });
 
     it('query 使用位掩码过滤仍返回正确结果', () => {
@@ -532,7 +542,7 @@ describe('EcsWorld — Component Mask', () => {
         world.addComponent(e, Position, { x: 0, y: 0 });
         world.destroy();
         /* eslint-disable @typescript-eslint/no-explicit-any */
-        const masks = (world as any)._componentMasks as number[];
+        const masks = (world as any)._componentMasks as BitMask[];
         /* eslint-enable @typescript-eslint/no-explicit-any */
         expect(masks.length).toBe(0);
     });

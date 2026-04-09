@@ -13,8 +13,7 @@
  * const pos = world.getComponent(entity, Position); // 类型推断为 Position
  * ```
  */
-/** 最大支持的组件类型数量（受 32-bit 掩码限制） */
-export const MAX_COMPONENT_TYPES = 32;
+import { BitMask } from './BitMask';
 
 export class ComponentType<T> {
     /** 幻影属性，确保不同 T 的 ComponentType 在结构类型上不兼容 */
@@ -30,23 +29,20 @@ export class ComponentType<T> {
     private static _nextTypeId = 0;
 
     constructor(name: string) {
-        if (ComponentType._nextTypeId >= MAX_COMPONENT_TYPES) {
-            throw new Error(`[ComponentType] 最多支持 ${MAX_COMPONENT_TYPES} 种组件类型`);
-        }
         this.name = name;
         this.typeId = ComponentType._nextTypeId++;
     }
 }
 
 /**
- * 构建组件掩码（将多个 ComponentType 的 typeId 合并为 32-bit 位掩码）
+ * 构建组件掩码（将多个 ComponentType 的 typeId 合并为 BitMask 多字掩码）
  * @param types 组件类型列表
- * @returns 合并后的掩码
+ * @returns 合并后的 BitMask
  */
-export function buildComponentMask(...types: ComponentType<unknown>[]): number {
-    let mask = 0;
+export function buildComponentMask(...types: ComponentType<unknown>[]): BitMask {
+    const mask = new BitMask();
     for (const t of types) {
-        mask |= 1 << t.typeId;
+        mask.set(t.typeId);
     }
     return mask;
 }

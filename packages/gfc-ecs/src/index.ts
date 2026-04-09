@@ -5,7 +5,6 @@ export {
     INDEX_BITS,
     INDEX_MASK,
     GENERATION_MASK,
-    MAX_COMPONENT_TYPES,
     packEntityId,
     entityIndex,
     entityGeneration,
@@ -17,6 +16,7 @@ export {
     QueryHandle,
     ICommandBuffer,
 } from './EcsDefs';
+export { BitMask } from './BitMask';
 export { SparseSet } from './SparseSet';
 export { ComponentStorage } from './ComponentStorage';
 export { SystemManager } from './SystemManager';

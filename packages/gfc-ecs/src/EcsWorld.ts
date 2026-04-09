@@ -12,6 +12,7 @@ import {
     entityIndex,
     packEntityId,
 } from './EcsDefs';
+import { BitMask } from './BitMask';
 import { CommandBuffer } from './CommandBuffer';
 import { ComponentStorage } from './ComponentStorage';
 import { SystemManager } from './SystemManager';
@@ -45,8 +46,8 @@ export class EcsWorld implements IEcsWorldAccess {
     /** 当前存活实体数量 */
     private _aliveCount = 0;
 
-    /** 按 entity index 索引的 32-bit 组件掩码 */
-    private readonly _componentMasks: number[] = [];
+    /** 按 entity index 索引的多字组件掩码 */
+    private readonly _componentMasks: BitMask[] = [];
 
     /** 组件存储：typeId → ComponentStorage */
     private readonly _storages: Map<number, ComponentStorage<unknown>> = new Map();
@@ -81,7 +82,7 @@ export class EcsWorld implements IEcsWorldAccess {
         }
         const packedId = packEntityId(index, generation);
         this._packedIds[index] = packedId;
-        this._componentMasks[index] = 0;
+        this._componentMasks[index] = new BitMask();
         this._aliveCount++;
         this._queryCache.markAllDirty();
         return packedId;
@@ -100,7 +101,7 @@ export class EcsWorld implements IEcsWorldAccess {
         for (const storage of this._storages.values()) {
             storage.remove(index);
         }
-        this._componentMasks[index] = 0;
+        this._componentMasks[index].reset();
         this._generations[index] = (gen + 1) & GENERATION_MASK;
         this._recycledIds.push(index);
         this._aliveCount--;
@@ -142,7 +143,7 @@ export class EcsWorld implements IEcsWorldAccess {
         const index = entityIndex(entityId);
         const storage = this._getOrCreateStorage(type);
         storage.set(index, data);
-        this._componentMasks[index] |= 1 << type.typeId;
+        this._componentMasks[index].set(type.typeId);
         this._queryCache.markDirtyByType(type.typeId);
     }
 
@@ -156,7 +157,7 @@ export class EcsWorld implements IEcsWorldAccess {
         const index = entityIndex(entityId);
         const storage = this._getOrCreateStorage(type);
         storage.remove(index);
-        this._componentMasks[index] &= ~(1 << type.typeId);
+        this._componentMasks[index].clear(type.typeId);
         this._queryCache.markDirtyByType(type.typeId);
     }
 
@@ -208,7 +209,7 @@ export class EcsWorld implements IEcsWorldAccess {
         const allMask = buildComponentMask(...types);
         const result: EcsEntityId[] = [];
         for (const idx of smallestStorage.entities) {
-            if ((this._componentMasks[idx] & allMask) === allMask) {
+            if (this._componentMasks[idx].containsAll(allMask)) {
                 result.push(this._packedIds[idx]);
             }
         }
@@ -350,20 +351,17 @@ export class EcsWorld implements IEcsWorldAccess {
             candidateIndices = alive;
         }
 
-        let allMask = 0;
-        for (const t of allTypes) allMask |= 1 << t.typeId;
-        let noneMask = 0;
-        for (const t of noneTypes) noneMask |= 1 << t.typeId;
-        let anyMask = 0;
-        for (const t of anyTypes) anyMask |= 1 << t.typeId;
+        const allMask = buildComponentMask(...allTypes);
+        const noneMask = buildComponentMask(...noneTypes);
+        const anyMask = buildComponentMask(...anyTypes);
 
         const result: EcsEntityId[] = [];
         for (const idx of candidateIndices) {
             const mask = this._componentMasks[idx];
-            if ((mask & allMask) !== allMask) continue;
-            if ((mask & noneMask) !== 0) continue;
+            if (!mask.containsAll(allMask)) continue;
+            if (mask.containsAny(noneMask)) continue;
             if (allTypes.length > 0 && anyTypes.length > 0) {
-                if ((mask & anyMask) === 0) continue;
+                if (!mask.containsAny(anyMask)) continue;
             }
             result.push(this._packedIds[idx]);
         }
