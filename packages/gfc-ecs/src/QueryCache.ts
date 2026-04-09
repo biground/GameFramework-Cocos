@@ -1,15 +1,16 @@
 import { QueryDescriptor, EcsEntityId, buildComponentMask, QueryHandle } from './EcsDefs';
+import { BitMask } from './BitMask';
 
 /** 缓存条目 */
 interface CacheEntry {
     /** 原始查询描述符（浅拷贝） */
     descriptor: QueryDescriptor;
     /** 必须拥有组件的掩码 */
-    allMask: number;
+    allMask: BitMask;
     /** 不能拥有组件的掩码 */
-    noneMask: number;
+    noneMask: BitMask;
     /** 至少拥有其中一个的掩码 */
-    anyMask: number;
+    anyMask: BitMask;
     /** 缓存的查询结果 */
     result: EcsEntityId[];
     /** 是否需要重新计算 */
