@@ -8,8 +8,8 @@ import {
     QueryDescriptor,
     QueryHandle,
     SystemPhase,
+    ICommandBuffer,
 } from '../src/EcsDefs';
-import { ICommandBuffer } from '../src/CommandBuffer';
 
 // ─── Mock World ─────────────────────────────────────
 
@@ -58,6 +58,9 @@ const mockWorld: IEcsWorldAccess = {
     },
     resolveQuery(_handle: QueryHandle): readonly EcsEntityId[] {
         return [];
+    },
+    removeQuery(_handle: QueryHandle): boolean {
+        return false;
     },
     commands: mockCommandBuffer,
 };

@@ -2,6 +2,7 @@ import {
     ComponentType,
     EcsEntityId,
     GENERATION_MASK,
+    ICommandBuffer,
     IEcsWorldAccess,
     ISystem,
     QueryDescriptor,
@@ -11,7 +12,7 @@ import {
     entityIndex,
     packEntityId,
 } from './EcsDefs';
-import { CommandBuffer, ICommandBuffer } from './CommandBuffer';
+import { CommandBuffer } from './CommandBuffer';
 import { ComponentStorage } from './ComponentStorage';
 import { SystemManager } from './SystemManager';
 import { QueryCache } from './QueryCache';
@@ -246,6 +247,15 @@ export class EcsWorld implements IEcsWorldAccess {
         return this._queryCache.resolve(handle);
     }
 
+    /**
+     * 删除已注册的查询
+     * @param handle 查询句柄
+     * @returns 是否成功删除
+     */
+    public removeQuery(handle: QueryHandle): boolean {
+        return this._queryCache.removeQuery(handle);
+    }
+
     // ─── System 管理 ──────────────────────────────────
 
     /**
@@ -340,9 +350,12 @@ export class EcsWorld implements IEcsWorldAccess {
             candidateIndices = alive;
         }
 
-        const allMask = buildComponentMask(...allTypes);
-        const noneMask = buildComponentMask(...noneTypes);
-        const anyMask = buildComponentMask(...anyTypes);
+        let allMask = 0;
+        for (const t of allTypes) allMask |= 1 << t.typeId;
+        let noneMask = 0;
+        for (const t of noneTypes) noneMask |= 1 << t.typeId;
+        let anyMask = 0;
+        for (const t of anyTypes) anyMask |= 1 << t.typeId;
 
         const result: EcsEntityId[] = [];
         for (const idx of candidateIndices) {

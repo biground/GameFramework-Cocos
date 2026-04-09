@@ -1,4 +1,4 @@
-import { ComponentType, EcsEntityId } from './EcsDefs';
+import { ComponentType, EcsEntityId, ICommandBuffer } from './EcsDefs';
 import type { EcsWorld } from './EcsWorld';
 
 /**
@@ -12,33 +12,23 @@ const enum CommandKind {
 }
 
 /**
- * 延迟命令结构体
+ * 延迟命令联合类型（Tagged Union）
+ * 通过 kind 字段区分不同命令，避免可选属性的非空断言
  */
-interface Command {
-    kind: CommandKind;
-    /** CreateEntity 使用的临时 ID */
-    tempId?: EcsEntityId;
-    /** Destroy/Add/Remove 使用的实体 ID */
-    entityId?: EcsEntityId;
-    /** Add/Remove 使用的组件类型 */
-    componentType?: ComponentType<unknown>;
-    /** Add 使用的组件数据 */
-    componentData?: unknown;
-}
-
-/**
- * 命令缓冲区接口（System 使用）
- */
-export interface ICommandBuffer {
-    /** 延迟创建实体（返回临时 ID） */
-    createEntity(): EcsEntityId;
-    /** 延迟销毁实体 */
-    destroyEntity(entityId: EcsEntityId): void;
-    /** 延迟添加组件 */
-    addComponent<T>(entityId: EcsEntityId, type: ComponentType<T>, data: T): void;
-    /** 延迟移除组件 */
-    removeComponent<T>(entityId: EcsEntityId, type: ComponentType<T>): void;
-}
+type Command =
+    | { kind: CommandKind.CreateEntity; tempId: EcsEntityId }
+    | { kind: CommandKind.DestroyEntity; entityId: EcsEntityId }
+    | {
+          kind: CommandKind.AddComponent;
+          entityId: EcsEntityId;
+          componentType: ComponentType<unknown>;
+          componentData: unknown;
+      }
+    | {
+          kind: CommandKind.RemoveComponent;
+          entityId: EcsEntityId;
+          componentType: ComponentType<unknown>;
+      };
 
 /**
  * 延迟命令缓冲区
@@ -127,21 +117,21 @@ export class CommandBuffer implements ICommandBuffer {
                 switch (cmd.kind) {
                     case CommandKind.CreateEntity: {
                         const realId = world.createEntity();
-                        tempToReal.set(cmd.tempId!, realId);
+                        tempToReal.set(cmd.tempId, realId);
                         break;
                     }
                     case CommandKind.DestroyEntity:
-                        world.destroyEntity(resolveId(cmd.entityId!));
+                        world.destroyEntity(resolveId(cmd.entityId));
                         break;
                     case CommandKind.AddComponent:
                         world.addComponent(
-                            resolveId(cmd.entityId!),
-                            cmd.componentType!,
+                            resolveId(cmd.entityId),
+                            cmd.componentType,
                             cmd.componentData,
                         );
                         break;
                     case CommandKind.RemoveComponent:
-                        world.removeComponent(resolveId(cmd.entityId!), cmd.componentType!);
+                        world.removeComponent(resolveId(cmd.entityId), cmd.componentType);
                         break;
                 }
             }

@@ -13,7 +13,6 @@
  * const pos = world.getComponent(entity, Position); // 类型推断为 Position
  * ```
  */
-import type { ICommandBuffer } from './CommandBuffer';
 /** 最大支持的组件类型数量（受 32-bit 掩码限制） */
 export const MAX_COMPONENT_TYPES = 32;
 
@@ -185,11 +184,26 @@ export interface IEcsWorldAccess {
     /** 解析缓存查询结果 */
     resolveQuery(handle: QueryHandle): readonly EcsEntityId[];
 
+    /** 删除已注册的查询 */
+    removeQuery(handle: QueryHandle): boolean;
+
     /** 命令缓冲区（用于延迟操作） */
     readonly commands: ICommandBuffer;
 }
 
-export type { ICommandBuffer };
+/**
+ * 命令缓冲区接口（System 使用）
+ */
+export interface ICommandBuffer {
+    /** 延迟创建实体（返回临时 ID） */
+    createEntity(): EcsEntityId;
+    /** 延迟销毁实体 */
+    destroyEntity(entityId: EcsEntityId): void;
+    /** 延迟添加组件 */
+    addComponent<T>(entityId: EcsEntityId, type: ComponentType<T>, data: T): void;
+    /** 延迟移除组件 */
+    removeComponent<T>(entityId: EcsEntityId, type: ComponentType<T>): void;
+}
 
 /**
  * 缓存的查询句柄

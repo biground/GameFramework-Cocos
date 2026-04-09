@@ -15,10 +15,11 @@ export {
     SystemPhase,
     QueryDescriptor,
     QueryHandle,
+    ICommandBuffer,
 } from './EcsDefs';
 export { SparseSet } from './SparseSet';
 export { ComponentStorage } from './ComponentStorage';
 export { SystemManager } from './SystemManager';
 export { QueryCache } from './QueryCache';
-export { CommandBuffer, ICommandBuffer } from './CommandBuffer';
+export { CommandBuffer } from './CommandBuffer';
 export { EcsWorld } from './EcsWorld';
