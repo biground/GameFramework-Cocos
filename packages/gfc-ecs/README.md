@@ -1,6 +1,6 @@
 # @gfc/ecs
 
-> GameFramework-Cocos 的高性能 ECS 插件，基于 SparseSet 架构。Generational Entity ID、32-bit 组件掩码、查询缓存、命令缓冲区——为游戏逻辑提供数据驱动的开发范式。
+> GameFramework-Cocos 的高性能 ECS 插件，基于 SparseSet 架构。Generational Entity ID、多字位掩码（BitMask）、查询缓存、响应式分组（ReactiveGroup）、命令缓冲区——为游戏逻辑提供数据驱动的开发范式。
 
 ## 安装
 
@@ -169,21 +169,77 @@ if (world.isAlive(this.targetId)) {
 
 ---
 
-### 组件管理与位掩码
+### 组件管理与 BitMask 多字掩码
 
-每个 `ComponentType` 在构造时自动分配递增的 `typeId`。每个实体维护一个 **32-bit 组件掩码**，第 N 位为 1 表示拥有 `typeId = N` 的组件。
+每个 `ComponentType` 在构造时自动分配递增的 `typeId`。每个实体维护一个 **BitMask 多字掩码**（基于 `Uint32Array`），第 N 位为 1 表示拥有 `typeId = N` 的组件。
 
-查询时用位运算一步完成多组件匹配：
+> **v2 升级：** 旧版使用 JavaScript `number`（32-bit），最多支持 32 种 ComponentType。新版采用 `Uint32Array` 实现的多字掩码，按需自动扩展，**不再有组件类型数量限制**。
+
+查询时用位运算完成多组件匹配：
 
 ```typescript
 // 内部原理（用户不需要手动操作）：
-// entity.mask & queryAllMask === queryAllMask
-// 一次位运算 = O(1) 判断实体是否同时拥有 Position + Velocity
+// mask.containsAll(queryAllMask) === true
+// O(n) 位运算（n = word 数），判断实体是否同时拥有 Position + Velocity
 ```
 
-**限制：最多 32 种 ComponentType。** 超出时 `new ComponentType()` 会抛出异常。
+#### BitMask API 详解
 
-> 32 种在实际游戏项目中通常够用（Position、Velocity、Health、Sprite、Collider...），如果真不够说明可能需要拆分 ECS world 或重新设计组件粒度。
+`BitMask` 是底层多字位掩码实现，用户通常不需要直接操作——框架内部用于组件掩码和查询匹配。了解其原理有助于理解 ECS 查询性能特征。
+
+**构造：**
+
+```typescript
+import { BitMask } from '@gfc/ecs';
+
+// 默认容量 64 位（2 个 Uint32 word）
+const mask = new BitMask();
+
+// 指定初始容量（自动按 32 对齐）
+const largeMask = new BitMask(256); // 8 个 word，支持 256 种组件
+```
+
+**位操作：**
+
+```typescript
+const mask = new BitMask();
+
+mask.set(0);    // 设置第 0 位
+mask.set(100);  // 设置第 100 位——自动扩展容量
+mask.has(100);  // true
+mask.clear(100);
+mask.has(100);  // false
+
+mask.reset();   // 清零所有位
+mask.isEmpty(); // true
+```
+
+**子集与交集检查：**
+
+```typescript
+const entity = new BitMask();
+entity.set(0);  // Position
+entity.set(1);  // Velocity
+entity.set(5);  // Health
+
+const allQuery = new BitMask();
+allQuery.set(0); // Position
+allQuery.set(1); // Velocity
+
+entity.containsAll(allQuery);   // true — entity 拥有 query 要求的所有组件
+entity.containsAny(allQuery);   // true — entity 和 query 有交集
+entity.containsNone(allQuery);  // false — entity 和 query 有交集
+```
+
+**与旧版 number 掩码的区别：**
+
+| 特性 | 旧版（number） | 新版（BitMask） |
+|------|----------------|------------------|
+| 存储 | 单个 `number`（32-bit） | `Uint32Array`（N × 32-bit） |
+| 组件类型上限 | 32 种 | **无限制**（按需扩展） |
+| 查询性能 | O(1) 单次位运算 | O(n) n = word 数（64 种组件仅 2 次运算） |
+| 内存占用 | 8 字节 | 8 + 4n 字节 |
+| API | `&` `\|` `~` 位运算符 | `containsAll()` / `containsAny()` / `containsNone()` |
 
 ---
 
@@ -265,10 +321,115 @@ class DamageSystem implements ISystem {
 
 **何时用哪种：**
 
-| 场景                      | 推荐                             |
-| ------------------------- | -------------------------------- |
-| System 每帧执行的查询     | `registerQuery` + `resolveQuery` |
-| 一次性查询（调试/初始化） | `query()` 或 `queryAdvanced()`   |
+| 场景                      | 推荐                                   |
+| ------------------------- | -------------------------------------- |
+| System 每帧执行的查询     | `registerQuery` + `resolveQuery`       |
+| 一次性查询（调试/初始化） | `query()` 或 `queryAdvanced()`         |
+| 需要 Enter/Remove 事件    | `registerGroup`（ReactiveGroup）        |
+
+---
+
+### ReactiveGroup 响应式分组
+
+QueryCache 是 **lazy** 模式——查询时按需重算（脏标记优化）。ReactiveGroup 是 **reactive** 模式——组件增删时**即时**更新组内实体集合，并追踪每帧的 Enter/Remove 事件。
+
+**核心差异：**
+
+| 特性 | QueryCache（`registerQuery`） | ReactiveGroup（`registerGroup`） |
+|------|-------------------------------|----------------------------------|
+| 更新时机 | `resolveQuery()` 时按需重算 | 组件变动时即时更新 |
+| 返回类型 | `EcsEntityId[]`（packed ID） | `Set<number>`（entity index） |
+| Enter/Remove 追踪 | 不支持 | `drainEntered()` / `drainRemoved()` |
+| 适用场景 | 每帧遍历所有匹配实体 | 需要知道“谁进来了/谁离开了” |
+
+#### 创建分组
+
+在 `System.onInit()` 中通过 `world.registerGroup()` 创建，参数与 `registerQuery()` 相同：
+
+```typescript
+onInit(world: IEcsWorldAccess): void {
+    this._group = world.registerGroup({
+        all: [Position, Velocity],
+        none: [Frozen],
+        any: [Health, Shield],
+    });
+}
+```
+
+`registerGroup()` 会立即扫描当前存活实体进行初始匹配。后续组件增删时自动维护。
+
+#### 使用分组
+
+```typescript
+// 当前匹配实体数量
+console.log(group.count);
+
+// 遍历匹配的 entity index
+for (const index of group.matchedIndices) {
+    // index 是 entity 的内部索引（非 packed ID）
+}
+
+// 检查某实体是否在组内
+if (group.has(entityIndex(someEntityId))) {
+    // ...
+}
+```
+
+#### Enter/Remove 追踪
+
+每帧调用 `drainEntered()` / `drainRemoved()` 获取变动列表（调用后自动清空）：
+
+```typescript
+update(deltaTime: number): void {
+    // 获取本帧新进入的实体
+    const entered = this._group.drainEntered();
+    for (const index of entered) {
+        // 初始化效果、播放入场动画等
+    }
+
+    // 获取本帧离开的实体
+    const removed = this._group.drainRemoved();
+    for (const index of removed) {
+        // 清理效果、播放离场动画等
+    }
+
+    // 正常遍历匹配实体
+    for (const index of this._group.matchedIndices) {
+        // 每帧逻辑
+    }
+}
+```
+
+#### 完整示例
+
+```typescript
+import { ComponentType, EcsWorld, entityIndex } from '@gfc/ecs';
+
+const Position = new ComponentType<{ x: number; y: number }>('Position');
+const Velocity = new ComponentType<{ dx: number; dy: number }>('Velocity');
+
+const world = new EcsWorld();
+const group = world.registerGroup({ all: [Position, Velocity] });
+
+// 创建实体并添加组件
+const e1 = world.createEntity();
+world.addComponent(e1, Position, { x: 0, y: 0 });
+world.addComponent(e1, Velocity, { dx: 1, dy: 0 });
+
+// e1 满足 all: [Position, Velocity]，已自动进入 group
+console.log(group.count);                // 1
+console.log(group.has(entityIndex(e1))); // true
+
+// drain 获取进入事件
+const entered = group.drainEntered();
+console.log(entered.length);             // 1
+
+// 销毁实体
+world.destroyEntity(e1);
+const removed = group.drainRemoved();
+console.log(removed.length);             // 1
+console.log(group.count);                // 0
+```
 
 ---
 
@@ -362,6 +523,82 @@ class CameraFollowSystem implements ISystem {
 
 ---
 
+### System Enter/Remove 生命周期
+
+`ISystem` 新增三个可选属性，与 ReactiveGroup 配合实现实体进出事件自动派发：
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `group?` | `IReactiveGroup` | System 关联的响应式分组 |
+| `onEntityEnter?` | `(indices: readonly number[]) => void` | 新实体进入分组时调用 |
+| `onEntityRemove?` | `(indices: readonly number[]) => void` | 实体离开分组时调用 |
+
+**自动派发机制：** `SystemManager` 在每个 System 的 `update()` 之前，自动检查其 `group` 属性。若存在，依次调用 `drainEntered()` → `onEntityEnter()`、`drainRemoved()` → `onEntityRemove()`。**System 无需手动 drain。**
+
+#### 完整 System 示例
+
+```typescript
+import {
+    ISystem, IEcsWorldAccess, IReactiveGroup,
+    SystemPhase, ComponentType,
+} from '@gfc/ecs';
+
+const Position = new ComponentType<{ x: number; y: number }>('Position');
+const Velocity = new ComponentType<{ dx: number; dy: number }>('Velocity');
+
+class MovementSystem implements ISystem {
+    readonly name = 'MovementSystem';
+    readonly priority = 0;
+    readonly phase = SystemPhase.Update;
+    enabled = true;
+
+    // 关联的响应式分组——SystemManager 自动派发 enter/remove
+    group?: IReactiveGroup;
+
+    private _world!: IEcsWorldAccess;
+
+    onInit(world: IEcsWorldAccess): void {
+        this._world = world;
+        // 注册 group 并绑定到 system
+        this.group = world.registerGroup({
+            all: [Position, Velocity],
+        });
+    }
+
+    // 新实体满足条件时自动调用（在 update 之前）
+    onEntityEnter(enteredIndices: readonly number[]): void {
+        for (const index of enteredIndices) {
+            console.log(`实体 ${index} 进入移动系统`);
+        }
+    }
+
+    // 实体不再满足条件时自动调用（在 update 之前）
+    onEntityRemove(removedIndices: readonly number[]): void {
+        for (const index of removedIndices) {
+            console.log(`实体 ${index} 离开移动系统`);
+        }
+    }
+
+    update(deltaTime: number): void {
+        // 直接遍历 group 中的匹配实体
+        for (const index of this.group!.matchedIndices) {
+            // index 是 entity 内部索引，可通过 world 访问组件
+        }
+    }
+}
+```
+
+#### 选择指南：QueryCache vs ReactiveGroup
+
+| 需求 | 推荐方案 | 理由 |
+|------|----------|------|
+| 每帧遍历匹配实体执行逻辑 | `registerQuery` | 返回 packed ID，可直接 `getComponent` |
+| 需要知道哪些实体刚进入/离开 | `registerGroup` + Enter/Remove | 追踪 enter/remove 事件 |
+| 两者兼需（遍历 + 事件） | `registerGroup` + `registerQuery` | group 管事件，query 管遍历 |
+| 一次性查询 | `query()` / `queryAdvanced()` | 无缓存开销 |
+
+---
+
 ## API 速查
 
 ### EcsWorld — 世界容器
@@ -381,6 +618,7 @@ class CameraFollowSystem implements ISystem {
 | `registerQuery(descriptor)`    | 注册缓存查询                            | `QueryHandle`            |
 | `resolveQuery(handle)`         | 解析缓存查询（脏时自动重算）            | `readonly EcsEntityId[]` |
 | `removeQuery(handle)`          | 删除已注册的查询                        | `boolean`                |
+| `registerGroup(descriptor)`    | 注册响应式分组（组件变动时即时更新）    | `IReactiveGroup`         |
 | `addSystem(system)`            | 注册 System（立即调用 onInit）          | `void`                   |
 | `removeSystem(system)`         | 移除 System                             | `void`                   |
 | `update(deltaTime)`            | 执行所有 System + flush 命令缓冲区      | `void`                   |
@@ -409,7 +647,7 @@ class CameraFollowSystem implements ISystem {
 | 属性/构造                    | 说明                          |
 | ---------------------------- | ----------------------------- |
 | `new ComponentType<T>(name)` | 创建组件类型，自动分配 typeId |
-| `.typeId`                    | 唯一数字标识（0 ~ 31）        |
+| `.typeId`                    | 唯一数字标识（自动递增）      |
 | `.name`                      | 调试用描述名                  |
 
 ### SystemPhase — 执行阶段枚举
@@ -428,7 +666,42 @@ class CameraFollowSystem implements ISystem {
 | `packEntityId(index, generation)` | 打包 Entity ID       |
 | `entityIndex(id)`                 | 提取 index 部分      |
 | `entityGeneration(id)`            | 提取 generation 部分 |
-| `buildComponentMask(...types)`    | 构建组件掩码         |
+| `buildComponentMask(...types)`    | 构建多字组件掩码（返回 BitMask） |
+
+### BitMask — 多字位掩码
+
+| 方法/属性 | 说明 | 返回 |
+|-----------|------|------|
+| `new BitMask(bitCount?)` | 构造，默认 64 位容量 | `BitMask` |
+| `capacity` | 当前位数容量（getter） | `number` |
+| `set(bit)` | 设置指定位为 1（超出自动扩展） | `void` |
+| `clear(bit)` | 清除指定位 | `void` |
+| `has(bit)` | 检查指定位是否为 1 | `boolean` |
+| `containsAll(other)` | other 的所有位 this 都有（子集检查） | `boolean` |
+| `containsAny(other)` | this 和 other 有交集 | `boolean` |
+| `containsNone(other)` | this 和 other 无交集 | `boolean` |
+| `reset()` | 清零所有位 | `void` |
+| `clone()` | 克隆副本 | `BitMask` |
+| `isEmpty()` | 是否所有位都是 0 | `boolean` |
+
+### IReactiveGroup — 响应式分组
+
+| 方法/属性 | 说明 | 返回 |
+|-----------|------|------|
+| `descriptor` | 查询描述符（getter） | `QueryDescriptor` |
+| `count` | 当前匹配实体数量（getter） | `number` |
+| `matchedIndices` | 匹配的 entity index 集合 | `ReadonlySet<number>` |
+| `drainEntered()` | 获取并清空已进入实体列表 | `readonly number[]` |
+| `drainRemoved()` | 获取并清空已离开实体列表 | `readonly number[]` |
+| `has(index)` | 检查 entity index 是否在组内 | `boolean` |
+
+### ISystem 新增属性（Enter/Remove 生命周期）
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `group?` | `IReactiveGroup` | 关联的响应式分组 |
+| `onEntityEnter?(indices)` | `(readonly number[]) => void` | 实体进入分组回调 |
+| `onEntityRemove?(indices)` | `(readonly number[]) => void` | 实体离开分组回调 |
 
 ---
 
@@ -436,10 +709,10 @@ class CameraFollowSystem implements ISystem {
 
 | 限制                              | 原因                                     | 影响                                                                                             |
 | --------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| **最多 32 种 ComponentType**      | JS 位运算限制在 32-bit 整数              | 超出时 `new ComponentType()` 抛异常。实际项目中通常足够；如果不够需拆分 world 或合并组件         |
+| ~~最多 32 种 ComponentType~~      | ~~JS 位运算限制在 32-bit 整数~~          | **已解除**：v2 升级为 `BitMask`（`Uint32Array`），支持任意数量组件类型                            |
 | **纯 none 查询遍历全部 slot**     | 没有 `all` 或 `any` 约束时无法缩小候选集 | 避免使用纯 `none` 查询，或搭配 `all` / `any` 缩小范围                                            |
 | **generation 有限回绕**           | 12-bit generation 最大 4096 次复用       | 同一 index 被回收 4096 次后 generation 归零，极端情况下 `isAlive` 可能误判。实际场景几乎不会遇到 |
-| **ComponentType typeId 全局递增** | 静态计数器，跨 world 共享                | 多个 EcsWorld 实例共享 typeId 空间，注意总量不超过 32                                            |
+| **ComponentType typeId 全局递增** | 静态计数器，跨 world 共享                | 多个 EcsWorld 实例共享 typeId 空间（BitMask 已无上限，但仍共享计数器）                            |
 
 ---
 
