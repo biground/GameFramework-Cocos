@@ -9,9 +9,9 @@
 ```jsonc
 // package.json
 {
-  "peerDependencies": {
-    "@gfc/core": ">=0.1.0"
-  }
+    "peerDependencies": {
+        "@gfc/core": ">=0.1.0",
+    },
 }
 ```
 
@@ -32,13 +32,22 @@ import { ComponentType } from '@gfc/ecs';
 
 // 每个 ComponentType 实例自动分配唯一 typeId
 // phantom type <T> 确保 addComponent / getComponent 的数据类型正确
-interface Position { x: number; y: number; }
-interface Velocity { dx: number; dy: number; }
-interface Health { current: number; max: number; }
+interface Position {
+    x: number;
+    y: number;
+}
+interface Velocity {
+    dx: number;
+    dy: number;
+}
+interface Health {
+    current: number;
+    max: number;
+}
 
 const Position = new ComponentType<Position>('Position');
 const Velocity = new ComponentType<Velocity>('Velocity');
-const Health   = new ComponentType<Health>('Health');
+const Health = new ComponentType<Health>('Health');
 ```
 
 ### 2. 创建世界和实体
@@ -154,6 +163,7 @@ if (world.isAlive(this.targetId)) {
 - `addComponent()` / `removeComponent()` 对已销毁实体会抛出异常——这是设计意图，强制调用方先检查
 
 **容量说明：**
+
 - 最大同时存活实体数：2^20 = 1,048,576
 - 同一 index 最大复用次数：2^12 = 4,096（超出后 generation 归零，理论上可能碰撞）
 
@@ -199,19 +209,20 @@ const movers = world.query(Position, Velocity);
 ```typescript
 // 有 Position 和 Velocity，没有 Frozen，且至少有 Health 或 Shield
 const targets = world.queryAdvanced({
-    all:  [Position, Velocity],
+    all: [Position, Velocity],
     none: [Frozen],
-    any:  [Health, Shield],
+    any: [Health, Shield],
 });
 ```
 
-| 条件 | 含义 | 为空时 |
-|------|------|--------|
-| `all` | 必须全部拥有 | 无 all 约束 |
-| `none` | 必须全部不拥有 | 无排除 |
-| `any` | 至少拥有一个 | 无 any 约束 |
+| 条件   | 含义           | 为空时      |
+| ------ | -------------- | ----------- |
+| `all`  | 必须全部拥有   | 无 all 约束 |
+| `none` | 必须全部不拥有 | 无排除      |
+| `any`  | 至少拥有一个   | 无 any 约束 |
 
 **候选集策略：**
+
 - 有 `all` → 最小 all storage 作为遍历起点
 - 无 `all` 有 `any` → 合并所有 any storage 的实体作为候选
 - 纯 `none` → 遍历全部存活实体（**慎用**，性能差）
@@ -254,10 +265,10 @@ class DamageSystem implements ISystem {
 
 **何时用哪种：**
 
-| 场景 | 推荐 |
-|------|------|
-| System 每帧执行的查询 | `registerQuery` + `resolveQuery` |
-| 一次性查询（调试/初始化） | `query()` 或 `queryAdvanced()` |
+| 场景                      | 推荐                             |
+| ------------------------- | -------------------------------- |
+| System 每帧执行的查询     | `registerQuery` + `resolveQuery` |
+| 一次性查询（调试/初始化） | `query()` 或 `queryAdvanced()`   |
 
 ---
 
@@ -301,6 +312,7 @@ class SpawnOnDeathSystem implements ISystem {
 ```
 
 **临时 ID 原理：**
+
 - `commands.createEntity()` 返回**负数**临时 ID（从 -2 递减，-1 保留为 `INVALID_ENTITY`）
 - flush 时按命令入队顺序执行，遇到 CreateEntity 分配真实 ID 并建立映射
 - 后续命令中的临时 ID 自动替换为真实 ID
@@ -317,11 +329,11 @@ System 按 `SystemPhase` 分组执行，同 phase 内按 `priority` 升序排列
 PreUpdate(0) → Update(100) → PostUpdate(200) → LateUpdate(300)
 ```
 
-| Phase | 值 | 适合放什么 | 示例 |
-|-------|----|-----------|------|
-| `PreUpdate` | 0 | 输入处理、帧准备、网络接收 | InputSystem |
-| `Update` | 100 | 核心游戏逻辑（默认值） | MovementSystem, CombatSystem |
-| `PostUpdate` | 200 | 物理计算、碰撞检测 | PhysicsSystem, CollisionSystem |
+| Phase        | 值  | 适合放什么                  | 示例                              |
+| ------------ | --- | --------------------------- | --------------------------------- |
+| `PreUpdate`  | 0   | 输入处理、帧准备、网络接收  | InputSystem                       |
+| `Update`     | 100 | 核心游戏逻辑（默认值）      | MovementSystem, CombatSystem      |
+| `PostUpdate` | 200 | 物理计算、碰撞检测          | PhysicsSystem, CollisionSystem    |
 | `LateUpdate` | 300 | 相机跟随、UI 同步、渲染准备 | CameraFollowSystem, HudSyncSystem |
 
 ```typescript
@@ -330,7 +342,9 @@ class InputSystem implements ISystem {
     readonly priority = 0;
     readonly phase = SystemPhase.PreUpdate; // 在所有逻辑之前
     enabled = true;
-    update(dt: number) { /* 读取输入 */ }
+    update(dt: number) {
+        /* 读取输入 */
+    }
 }
 
 class CameraFollowSystem implements ISystem {
@@ -338,7 +352,9 @@ class CameraFollowSystem implements ISystem {
     readonly priority = 0;
     readonly phase = SystemPhase.LateUpdate; // 在所有逻辑之后
     enabled = true;
-    update(dt: number) { /* 跟随目标实体 */ }
+    update(dt: number) {
+        /* 跟随目标实体 */
+    }
 }
 ```
 
@@ -350,80 +366,80 @@ class CameraFollowSystem implements ISystem {
 
 ### EcsWorld — 世界容器
 
-| 方法 | 用途 | 返回 |
-|------|------|------|
-| `createEntity()` | 创建实体（优先复用回收 index） | `EcsEntityId` |
-| `destroyEntity(id)` | 销毁实体（回收 index，递增 generation） | `void` |
-| `isAlive(id)` | 验证实体是否存活 | `boolean` |
-| `entityCount` | 当前存活实体数量（getter） | `number` |
-| `addComponent(id, type, data)` | 添加组件（不存活则抛异常） | `void` |
-| `removeComponent(id, type)` | 移除组件（不存活则抛异常） | `void` |
-| `getComponent(id, type)` | 获取组件数据（不存活返回 undefined） | `T \| undefined` |
-| `hasComponent(id, type)` | 是否拥有组件（不存活返回 false） | `boolean` |
-| `query(...types)` | 即时查询（all 语义） | `readonly EcsEntityId[]` |
-| `queryAdvanced(descriptor)` | 高级查询（all/none/any） | `readonly EcsEntityId[]` |
-| `registerQuery(descriptor)` | 注册缓存查询 | `QueryHandle` |
-| `resolveQuery(handle)` | 解析缓存查询（脏时自动重算） | `readonly EcsEntityId[]` |
-| `removeQuery(handle)` | 删除已注册的查询 | `boolean` |
-| `addSystem(system)` | 注册 System（立即调用 onInit） | `void` |
-| `removeSystem(system)` | 移除 System | `void` |
-| `update(deltaTime)` | 执行所有 System + flush 命令缓冲区 | `void` |
-| `commands` | 命令缓冲区（getter） | `ICommandBuffer` |
-| `destroy()` | 销毁整个世界 | `void` |
+| 方法                           | 用途                                    | 返回                     |
+| ------------------------------ | --------------------------------------- | ------------------------ |
+| `createEntity()`               | 创建实体（优先复用回收 index）          | `EcsEntityId`            |
+| `destroyEntity(id)`            | 销毁实体（回收 index，递增 generation） | `void`                   |
+| `isAlive(id)`                  | 验证实体是否存活                        | `boolean`                |
+| `entityCount`                  | 当前存活实体数量（getter）              | `number`                 |
+| `addComponent(id, type, data)` | 添加组件（不存活则抛异常）              | `void`                   |
+| `removeComponent(id, type)`    | 移除组件（不存活则抛异常）              | `void`                   |
+| `getComponent(id, type)`       | 获取组件数据（不存活返回 undefined）    | `T \| undefined`         |
+| `hasComponent(id, type)`       | 是否拥有组件（不存活返回 false）        | `boolean`                |
+| `query(...types)`              | 即时查询（all 语义）                    | `readonly EcsEntityId[]` |
+| `queryAdvanced(descriptor)`    | 高级查询（all/none/any）                | `readonly EcsEntityId[]` |
+| `registerQuery(descriptor)`    | 注册缓存查询                            | `QueryHandle`            |
+| `resolveQuery(handle)`         | 解析缓存查询（脏时自动重算）            | `readonly EcsEntityId[]` |
+| `removeQuery(handle)`          | 删除已注册的查询                        | `boolean`                |
+| `addSystem(system)`            | 注册 System（立即调用 onInit）          | `void`                   |
+| `removeSystem(system)`         | 移除 System                             | `void`                   |
+| `update(deltaTime)`            | 执行所有 System + flush 命令缓冲区      | `void`                   |
+| `commands`                     | 命令缓冲区（getter）                    | `ICommandBuffer`         |
+| `destroy()`                    | 销毁整个世界                            | `void`                   |
 
 ### ICommandBuffer — 命令缓冲区
 
-| 方法 | 用途 | 返回 |
-|------|------|------|
-| `createEntity()` | 延迟创建（返回临时负数 ID） | `EcsEntityId` |
-| `destroyEntity(id)` | 延迟销毁（支持临时 ID） | `void` |
-| `addComponent(id, type, data)` | 延迟添加组件（支持临时 ID） | `void` |
-| `removeComponent(id, type)` | 延迟移除组件 | `void` |
+| 方法                           | 用途                        | 返回          |
+| ------------------------------ | --------------------------- | ------------- |
+| `createEntity()`               | 延迟创建（返回临时负数 ID） | `EcsEntityId` |
+| `destroyEntity(id)`            | 延迟销毁（支持临时 ID）     | `void`        |
+| `addComponent(id, type, data)` | 延迟添加组件（支持临时 ID） | `void`        |
+| `removeComponent(id, type)`    | 延迟移除组件                | `void`        |
 
 ### QueryDescriptor — 查询条件
 
-| 字段 | 类型 | 含义 |
-|------|------|------|
-| `all?` | `ComponentType<unknown>[]` | 必须全部拥有 |
+| 字段    | 类型                       | 含义           |
+| ------- | -------------------------- | -------------- |
+| `all?`  | `ComponentType<unknown>[]` | 必须全部拥有   |
 | `none?` | `ComponentType<unknown>[]` | 必须全部不拥有 |
-| `any?` | `ComponentType<unknown>[]` | 至少拥有一个 |
+| `any?`  | `ComponentType<unknown>[]` | 至少拥有一个   |
 
 ### ComponentType\<T\> — 组件类型标识
 
-| 属性/构造 | 说明 |
-|----------|------|
+| 属性/构造                    | 说明                          |
+| ---------------------------- | ----------------------------- |
 | `new ComponentType<T>(name)` | 创建组件类型，自动分配 typeId |
-| `.typeId` | 唯一数字标识（0 ~ 31） |
-| `.name` | 调试用描述名 |
+| `.typeId`                    | 唯一数字标识（0 ~ 31）        |
+| `.name`                      | 调试用描述名                  |
 
 ### SystemPhase — 执行阶段枚举
 
-| 枚举值 | 数值 | 用途 |
-|--------|------|------|
-| `PreUpdate` | 0 | 输入处理、帧准备 |
-| `Update` | 100 | 主逻辑更新（默认） |
-| `PostUpdate` | 200 | 物理、碰撞检测 |
-| `LateUpdate` | 300 | 相机跟随、UI 同步 |
+| 枚举值       | 数值 | 用途               |
+| ------------ | ---- | ------------------ |
+| `PreUpdate`  | 0    | 输入处理、帧准备   |
+| `Update`     | 100  | 主逻辑更新（默认） |
+| `PostUpdate` | 200  | 物理、碰撞检测     |
+| `LateUpdate` | 300  | 相机跟随、UI 同步  |
 
 ### 工具函数
 
-| 函数 | 用途 |
-|------|------|
-| `packEntityId(index, generation)` | 打包 Entity ID |
-| `entityIndex(id)` | 提取 index 部分 |
-| `entityGeneration(id)` | 提取 generation 部分 |
-| `buildComponentMask(...types)` | 构建组件掩码 |
+| 函数                              | 用途                 |
+| --------------------------------- | -------------------- |
+| `packEntityId(index, generation)` | 打包 Entity ID       |
+| `entityIndex(id)`                 | 提取 index 部分      |
+| `entityGeneration(id)`            | 提取 generation 部分 |
+| `buildComponentMask(...types)`    | 构建组件掩码         |
 
 ---
 
 ## 已知限制
 
-| 限制 | 原因 | 影响 |
-|------|------|------|
-| **最多 32 种 ComponentType** | JS 位运算限制在 32-bit 整数 | 超出时 `new ComponentType()` 抛异常。实际项目中通常足够；如果不够需拆分 world 或合并组件 |
-| **纯 none 查询遍历全部 slot** | 没有 `all` 或 `any` 约束时无法缩小候选集 | 避免使用纯 `none` 查询，或搭配 `all` / `any` 缩小范围 |
-| **generation 有限回绕** | 12-bit generation 最大 4096 次复用 | 同一 index 被回收 4096 次后 generation 归零，极端情况下 `isAlive` 可能误判。实际场景几乎不会遇到 |
-| **ComponentType typeId 全局递增** | 静态计数器，跨 world 共享 | 多个 EcsWorld 实例共享 typeId 空间，注意总量不超过 32 |
+| 限制                              | 原因                                     | 影响                                                                                             |
+| --------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| **最多 32 种 ComponentType**      | JS 位运算限制在 32-bit 整数              | 超出时 `new ComponentType()` 抛异常。实际项目中通常足够；如果不够需拆分 world 或合并组件         |
+| **纯 none 查询遍历全部 slot**     | 没有 `all` 或 `any` 约束时无法缩小候选集 | 避免使用纯 `none` 查询，或搭配 `all` / `any` 缩小范围                                            |
+| **generation 有限回绕**           | 12-bit generation 最大 4096 次复用       | 同一 index 被回收 4096 次后 generation 归零，极端情况下 `isAlive` 可能误判。实际场景几乎不会遇到 |
+| **ComponentType typeId 全局递增** | 静态计数器，跨 world 共享                | 多个 EcsWorld 实例共享 typeId 空间，注意总量不超过 32                                            |
 
 ---
 

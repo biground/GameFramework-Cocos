@@ -4,6 +4,7 @@ import {
     GENERATION_MASK,
     ICommandBuffer,
     IEcsWorldAccess,
+    IReactiveGroup,
     ISystem,
     QueryDescriptor,
     QueryHandle,
@@ -12,6 +13,7 @@ import {
     entityIndex,
     packEntityId,
 } from './EcsDefs';
+import { ReactiveGroup } from './ReactiveGroup';
 import { BitMask } from './BitMask';
 import { CommandBuffer } from './CommandBuffer';
 import { ComponentStorage } from './ComponentStorage';
@@ -63,6 +65,11 @@ export class EcsWorld implements IEcsWorldAccess {
     /** 延迟命令缓冲区 */
     private readonly _commandBuffer: CommandBuffer = new CommandBuffer();
 
+    /** 所有注册的响应式分组 */
+    private readonly _groups: ReactiveGroup[] = [];
+    /** typeId → 受影响的 group 列表（反向映射） */
+    private readonly _typeToGroups: Map<number, ReactiveGroup[]> = new Map();
+
     // ─── Entity 管理 ──────────────────────────────────
 
     /**
@@ -97,6 +104,10 @@ export class EcsWorld implements IEcsWorldAccess {
         // 验证 index 有效且 generation 匹配（防止悬挂引用）
         if (index >= this._nextIndex || this._generations[index] !== gen) {
             return;
+        }
+        // 通知 groups（在清理 mask 之前，因为 _onEntityDestroyed 只需要 index）
+        for (const group of this._groups) {
+            group._onEntityDestroyed(index);
         }
         for (const storage of this._storages.values()) {
             storage.remove(index);
@@ -145,6 +156,7 @@ export class EcsWorld implements IEcsWorldAccess {
         storage.set(index, data);
         this._componentMasks[index].set(type.typeId);
         this._queryCache.markDirtyByType(type.typeId);
+        this._notifyGroups(type.typeId, index);
     }
 
     /**
@@ -159,6 +171,7 @@ export class EcsWorld implements IEcsWorldAccess {
         storage.remove(index);
         this._componentMasks[index].clear(type.typeId);
         this._queryCache.markDirtyByType(type.typeId);
+        this._notifyGroups(type.typeId, index);
     }
 
     /**
@@ -293,6 +306,11 @@ export class EcsWorld implements IEcsWorldAccess {
         this._systemManager.destroyAll();
         this._commandBuffer.clear();
         this._queryCache.clear();
+        for (const group of this._groups) {
+            group._clear();
+        }
+        this._groups.length = 0;
+        this._typeToGroups.clear();
         this._storages.forEach((s) => s.clear());
         this._storages.clear();
         this._generations.length = 0;
@@ -366,6 +384,54 @@ export class EcsWorld implements IEcsWorldAccess {
             result.push(this._packedIds[idx]);
         }
         return result;
+    }
+
+    /**
+     * 注册响应式分组
+     * 组件变动时即时更新组内实体集，并追踪 Enter/Remove 事件
+     * @param descriptor 查询条件
+     * @returns 响应式分组实例
+     */
+    public registerGroup(descriptor: QueryDescriptor): IReactiveGroup {
+        const group = new ReactiveGroup(descriptor);
+        this._groups.push(group);
+
+        // 建立 typeId → group 反向映射
+        for (const typeId of group.involvedTypeIds) {
+            let list = this._typeToGroups.get(typeId);
+            if (!list) {
+                list = [];
+                this._typeToGroups.set(typeId, list);
+            }
+            list.push(group);
+        }
+
+        // 遍历当前存活实体，初始匹配
+        for (let i = 0; i < this._nextIndex; i++) {
+            if (
+                this._packedIds[i] !== undefined &&
+                this._generations[i] === ((this._packedIds[i] >>> 20) & 0xfff)
+            ) {
+                const mask = this._componentMasks[i];
+                if (mask) {
+                    group._onComponentChanged(i, mask);
+                }
+            }
+        }
+
+        return group;
+    }
+
+    /**
+     * 通知相关 ReactiveGroup 实体组件发生变动
+     */
+    private _notifyGroups(typeId: number, index: number): void {
+        const groups = this._typeToGroups.get(typeId);
+        if (!groups) return;
+        const mask = this._componentMasks[index];
+        for (const group of groups) {
+            group._onComponentChanged(index, mask);
+        }
     }
 
     /**

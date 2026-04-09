@@ -143,6 +143,24 @@ export interface ISystem {
      * 系统销毁
      */
     onDestroy?(): void;
+
+    /**
+     * System 关联的响应式分组
+     * 在 onInit() 中通过 world.registerGroup() 获取
+     */
+    readonly group?: IReactiveGroup;
+
+    /**
+     * 当新实体进入分组时调用（在 update 之前）
+     * @param enteredIndices 新进入的实体 index 列表
+     */
+    onEntityEnter?(enteredIndices: readonly number[]): void;
+
+    /**
+     * 当实体离开分组时调用（在 update 之前）
+     * @param removedIndices 离开的实体 index 列表
+     */
+    onEntityRemove?(removedIndices: readonly number[]): void;
 }
 
 /**
@@ -185,6 +203,9 @@ export interface IEcsWorldAccess {
 
     /** 命令缓冲区（用于延迟操作） */
     readonly commands: ICommandBuffer;
+
+    /** 注册响应式分组（组件变动时即时更新） */
+    registerGroup(descriptor: QueryDescriptor): IReactiveGroup;
 }
 
 /**
@@ -220,4 +241,32 @@ export interface QueryDescriptor {
     none?: ComponentType<unknown>[];
     /** 至少拥有其中一个 */
     any?: ComponentType<unknown>[];
+}
+
+/**
+ * 响应式分组接口
+ *
+ * 与 QueryCache 的 lazy 模式不同，ReactiveGroup 在组件变动时即时更新组内实体集合，
+ * 并记录每帧进入/离开的实体，供 System 使用 Enter/Remove 生命周期回调。
+ */
+export interface IReactiveGroup {
+    /** 查询描述符 */
+    readonly descriptor: QueryDescriptor;
+    /** 当前匹配的实体数量 */
+    readonly count: number;
+    /** 当前匹配的实体 index 集合（只读迭代） */
+    readonly matchedIndices: ReadonlySet<number>;
+    /**
+     * 获取并清空已进入的实体 index 列表
+     * System 在 update() 开头调用
+     */
+    drainEntered(): readonly number[];
+    /**
+     * 获取并清空已离开的实体 index 列表
+     */
+    drainRemoved(): readonly number[];
+    /**
+     * 检查某个 entity index 是否在组内
+     */
+    has(index: number): boolean;
 }

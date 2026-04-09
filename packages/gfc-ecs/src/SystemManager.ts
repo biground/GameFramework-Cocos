@@ -80,9 +80,21 @@ export class SystemManager {
             }
 
             for (const system of list) {
-                if (system.enabled) {
-                    system.update(deltaTime);
+                if (!system.enabled) continue;
+
+                // 自动派发 Enter/Remove 生命周期
+                if (system.group) {
+                    const entered = system.group.drainEntered();
+                    if (entered.length > 0 && system.onEntityEnter) {
+                        system.onEntityEnter(entered);
+                    }
+                    const removed = system.group.drainRemoved();
+                    if (removed.length > 0 && system.onEntityRemove) {
+                        system.onEntityRemove(removed);
+                    }
                 }
+
+                system.update(deltaTime);
             }
         }
     }
