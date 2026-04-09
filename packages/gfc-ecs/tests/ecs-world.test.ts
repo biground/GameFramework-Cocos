@@ -63,23 +63,36 @@ describe('EcsWorld — Entity', () => {
     });
 
     it('createEntity 返回递增 ID', () => {
-        // TODO: 实现
+        const e1 = world.createEntity();
+        const e2 = world.createEntity();
+        expect(e2).toBe(e1 + 1);
     });
 
     it('entityCount 随 create/destroy 变化', () => {
-        // TODO: 实现
+        expect(world.entityCount).toBe(0);
+        const e1 = world.createEntity();
+        world.createEntity();
+        expect(world.entityCount).toBe(2);
+        world.destroyEntity(e1);
+        expect(world.entityCount).toBe(1);
     });
 
     it('destroy 后 isAlive 返回 false', () => {
-        // TODO: 实现
+        const e = world.createEntity();
+        expect(world.isAlive(e)).toBe(true);
+        world.destroyEntity(e);
+        expect(world.isAlive(e)).toBe(false);
     });
 
     it('销毁后 ID 被回收复用', () => {
-        // TODO: create → destroy → create，新 ID 等于旧 ID
+        const e1 = world.createEntity();
+        world.destroyEntity(e1);
+        const e2 = world.createEntity();
+        expect(e2).toBe(e1);
     });
 
     it('destroy 不存在的实体不报错', () => {
-        // TODO: 实现
+        expect(() => world.destroyEntity(999)).not.toThrow();
     });
 });
 
@@ -97,23 +110,42 @@ describe('EcsWorld — Component', () => {
     });
 
     it('addComponent + getComponent 正常工作', () => {
-        // TODO: 实现
+        const e = world.createEntity();
+        const pos = { x: 10, y: 20 };
+        world.addComponent(e, Position, pos);
+        expect(world.getComponent(e, Position)).toBe(pos);
     });
 
     it('hasComponent 正确反映组件是否存在', () => {
-        // TODO: 实现
+        const e = world.createEntity();
+        expect(world.hasComponent(e, Position)).toBe(false);
+        world.addComponent(e, Position, { x: 0, y: 0 });
+        expect(world.hasComponent(e, Position)).toBe(true);
     });
 
     it('removeComponent 后 getComponent 返回 undefined', () => {
-        // TODO: 实现
+        const e = world.createEntity();
+        world.addComponent(e, Position, { x: 1, y: 2 });
+        world.removeComponent(e, Position);
+        expect(world.getComponent(e, Position)).toBeUndefined();
     });
 
     it('destroyEntity 自动移除所有组件', () => {
-        // TODO: 实现
+        const e = world.createEntity();
+        world.addComponent(e, Position, { x: 1, y: 2 });
+        world.addComponent(e, Velocity, { vx: 3, vy: 4 });
+        world.destroyEntity(e);
+        // 实体已死，重新创建同 ID 说明被回收
+        const e2 = world.createEntity();
+        expect(e2).toBe(e);
+        expect(world.hasComponent(e2, Position)).toBe(false);
+        expect(world.hasComponent(e2, Velocity)).toBe(false);
     });
 
     it('对已销毁实体 addComponent 应抛错', () => {
-        // TODO: 实现
+        const e = world.createEntity();
+        world.destroyEntity(e);
+        expect(() => world.addComponent(e, Position, { x: 0, y: 0 })).toThrow();
     });
 });
 
@@ -131,16 +163,46 @@ describe('EcsWorld — Query', () => {
     });
 
     it('query 返回同时拥有指定组件的实体', () => {
-        // TODO: 创建 3 个实体，1 只有 Position，2 有 Position+Velocity，query 返回 2 个
+        const e1 = world.createEntity();
+        world.addComponent(e1, Position, { x: 0, y: 0 });
+
+        const e2 = world.createEntity();
+        world.addComponent(e2, Position, { x: 1, y: 1 });
+        world.addComponent(e2, Velocity, { vx: 1, vy: 0 });
+
+        const e3 = world.createEntity();
+        world.addComponent(e3, Position, { x: 2, y: 2 });
+        world.addComponent(e3, Velocity, { vx: 2, vy: 0 });
+
+        const result = world.query(Position, Velocity);
+        expect(result.length).toBe(2);
+        expect(result).toContain(e2);
+        expect(result).toContain(e3);
+        expect(result).not.toContain(e1);
     });
 
     it('空 query 返回空数组', () => {
-        // TODO: 实现
+        world.createEntity();
+        expect(world.query()).toEqual([]);
     });
 
     it('queryAdvanced all + none 过滤', () => {
-        // TODO: 3 个实体，2 有 Position+Velocity，1 多了 Health
-        // queryAdvanced({ all: [Position, Velocity], none: [Health] }) 返回 1 个
+        const e1 = world.createEntity();
+        world.addComponent(e1, Position, { x: 0, y: 0 });
+        world.addComponent(e1, Velocity, { vx: 1, vy: 0 });
+
+        const e2 = world.createEntity();
+        world.addComponent(e2, Position, { x: 1, y: 1 });
+        world.addComponent(e2, Velocity, { vx: 2, vy: 0 });
+        world.addComponent(e2, Health, { hp: 100, maxHp: 100 });
+
+        // all: Position+Velocity, none: Health → 只返回 e1
+        const result = world.queryAdvanced({
+            all: [Position, Velocity],
+            none: [Health],
+        });
+        expect(result.length).toBe(1);
+        expect(result).toContain(e1);
     });
 });
 
@@ -158,18 +220,56 @@ describe('EcsWorld — System', () => {
     });
 
     it('addSystem 后 update 调用 system.update', () => {
-        // TODO: 实现
+        const sys = new MockMovementSystem();
+        world.addSystem(sys);
+        world.update(0.016);
+        expect(sys.updateCount).toBe(1);
     });
 
     it('MovementSystem 正确更新 Position', () => {
-        // TODO: 创建 entity + Position + Velocity，update(1)，验证 pos 变化
+        const sys = new MockMovementSystem();
+        world.addSystem(sys);
+
+        const e = world.createEntity();
+        world.addComponent(e, Position, { x: 0, y: 0 });
+        world.addComponent(e, Velocity, { vx: 10, vy: 5 });
+
+        world.update(1);
+
+        const pos = world.getComponent(e, Position)!;
+        expect(pos.x).toBe(10);
+        expect(pos.y).toBe(5);
     });
 
     it('disabled system 不执行', () => {
-        // TODO: 实现
+        const sys = new MockMovementSystem();
+        sys.enabled = false;
+        world.addSystem(sys);
+        world.update(0.016);
+        expect(sys.updateCount).toBe(0);
     });
 
     it('System 按 priority 顺序执行', () => {
-        // TODO: 注册两个不同 priority 的 system，验证执行顺序
+        const order: string[] = [];
+        const sysA: ISystem = {
+            name: 'A',
+            priority: 10,
+            enabled: true,
+            update() {
+                order.push('A');
+            },
+        };
+        const sysB: ISystem = {
+            name: 'B',
+            priority: 0,
+            enabled: true,
+            update() {
+                order.push('B');
+            },
+        };
+        world.addSystem(sysA);
+        world.addSystem(sysB);
+        world.update(0.016);
+        expect(order).toEqual(['B', 'A']);
     });
 });
