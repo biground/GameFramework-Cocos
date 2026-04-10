@@ -4,6 +4,7 @@ import { INetworkManager } from '../interfaces/INetworkManager';
 import { NetworkChannel, NetworkChannelCallbacks } from './NetworkChannel';
 import {
     NetworkChannelConfig,
+    NetworkPacket,
     INetworkSocket,
     IPacketHandler,
     IHeartbeatHandler,
@@ -43,7 +44,10 @@ export class NetworkManager extends ModuleBase implements INetworkManager, Netwo
     // ─── 生命周期 ──────────────────────────────────────
 
     public onInit(): void {
-        // 初始化状态重置
+        // 如果二次 init（模块重启），先关闭已有通道防止 Socket 泄漏
+        for (const channel of this._channels.values()) {
+            channel.shutdown();
+        }
         this._channels.clear();
     }
 
@@ -183,7 +187,7 @@ export class NetworkManager extends ModuleBase implements INetworkManager, Netwo
     /**
      * 通道收到消息回调
      */
-    public onMessage(channelName: string, packet: { id: number; data: Uint8Array }): void {
+    public onMessage(channelName: string, packet: NetworkPacket): void {
         this._eventManager?.emit(NETWORK_MESSAGE, { channelName, packet });
     }
 
