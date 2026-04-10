@@ -3,9 +3,9 @@
 ## 基本信息
 
 - 开始日期：2026-03-23
-- 当前日期：2026-04-09
-- 当前周次：Week 3 / 8
-- 总完成度：50%
+- 当前日期：2026-04-10
+- 当前周次：Week 4 / 8
+- 总完成度：55%
 
 ## 模块开发进度
 
@@ -21,7 +21,7 @@
 | ResourceManager（资源管理器）               | ✅ 已完成 | 2026-04-07 | 95          | Week 3 Day 2；ResourceDefs + IResourceManager + ResourceManager，26 个测试；补 ReadonlyAssetInfo 修复          |
 | UIManager（UI管理器）                       | ✅ 已完成 | 2026-04-08 | 92          | Week 3 Day 3；UIDefs + UIFormBase + IUIManager + UIManager，33 个测试（含 allowMultiple bug 修复）             |
 | EntityManager（实体管理器）                 | ✅ 已完成 | 2026-04-08 | 95          | Week 3 Day 4；EntityDefs + EntityBase + EntityGroup + EntityManager，31 个测试；\_entityGroupMap O(1) 反查设计 |
-| NetworkManager（网络管理器）                | ⬜ 未开始 | -          | -           | Week 4 Day 3-4                                                                                                 |
+| NetworkManager（网络管理器）                | ✅ 已完成 | 2026-04-10 | -           | Week 4 Day 1；NetworkDefs + NetworkChannel + NetworkManager，41 个测试；双策略注入 + 指数退避重连 |
 | AudioManager（音频管理器）                  | ⬜ 未开始 | -          | -           | Week 4 Day 5                                                                                                   |
 | SceneManager（场景管理器）                  | ⬜ 未开始 | -          | -           | Week 4 Day 5                                                                                                   |
 | TimerManager（定时器管理器）                | ⬜ 未开始 | -          | -           | Week 6                                                                                                         |
@@ -67,6 +67,10 @@
 - [x] ✅ allowMultiple 多实例管理：Map<string, UIFormBase[]> + LIFO 关闭顺序
 - [x] ✅ 实体管理模式：EntityGroup 双池（活跃/等待）+ EntityManager O(1) 反查表 + IEntityFactory 策略注入
 - [x] ✅ 对象复用进阶：hide 不销毁回等待池，show 优先复用，从 ObjectPool 到 EntityGroup 的思维迁移
+- [x] ✅ 网络层架构：多通道管理 + 双策略注入（INetworkSocket + IPacketHandler）+ 主循环驱动心跳
+- [x] ✅ 指数退避重连：baseDelay * 2^(n-1)，避免雷鸣群效应
+- [x] ✅ 网络协议原理：TCP 队头阻塞 / 粘包拆包 / WebSocket 帧边界 / Protobuf vs JSON
+- [x] ✅ 帧同步 vs 状态同步：理解两种架构的适用场景和优缺点
 
 ## 面试题积累
 
@@ -74,8 +78,8 @@
 
 ## 上次会话断点
 
-- 最后操作：Week 3 Day 5 — gfc-ecs 插件 BitMask 多字掩码 + ReactiveGroup 响应式分组实现完成，README 文档更新（+289 行，新增 6 个章节）
-- 下次继续：Week 4 Day 1 — gfc-ecs 剩余优化或 NetworkManager 教学与实现
+- 最后操作：Week 4 Day 1 — NetworkManager 模块实现完成（NetworkDefs + NetworkChannel + NetworkManager + INetworkManager），41 个测试全绿
+- 下次继续：Week 4 Day 2 — NetworkManager Code Review + AudioManager 或 SceneManager 教学与实现
 - 未完成事项：无
-- 额外成就：BitMask Uint32Array 突破 32 种组件限制、ReactiveGroup 即时匹配 + Enter/Remove 事件追踪、SystemManager 自动派发生命周期
-- 更新日期：2026-04-09
+- 额外成就：网络层原理深度教学（TCP/UDP/WebSocket、粘包拆包、帧同步 vs 状态同步、服务端架构速览）
+- 更新日期：2026-04-10
