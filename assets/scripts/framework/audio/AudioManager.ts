@@ -64,14 +64,30 @@ export class AudioManager extends ModuleBase implements IAudioManager {
     }
 
     public onUpdate(_deltaTime: number): void {
-        // TODO: 遍历 _sounds，清理已结束的音效实例
-        // TODO: 检查音乐实例是否已结束，若结束则重置 _currentMusicId
-        void this._sounds;
-        void this._currentMusic;
+        // 遍历 _sounds，清理已结束的音效实例
+        for (const [soundId, instances] of this._sounds) {
+            const alive = instances.filter((inst) => inst.isPlaying);
+            if (alive.length === 0) {
+                this._sounds.delete(soundId);
+            } else {
+                this._sounds.set(soundId, alive);
+            }
+        }
+
+        // 检查音乐实例是否已自然结束
+        if (this._currentMusic && !this._currentMusic.isPlaying && !this._currentMusic.isPaused) {
+            this._currentMusic = null;
+            this._currentMusicId = null;
+        }
     }
 
     public onShutdown(): void {
-        // TODO: 停止所有音乐和音效，清理资源
+        if (this._audioPlayer) {
+            this._audioPlayer.stopAll();
+        }
+        this._currentMusic = null;
+        this._currentMusicId = null;
+        this._sounds.clear();
     }
 
     // ─── IAudioManager 实现 ────────────────────────────
@@ -91,37 +107,49 @@ export class AudioManager extends ModuleBase implements IAudioManager {
     /**
      * 播放背景音乐
      */
-    public playMusic(_musicId: string, _config?: AudioPlayConfig): void {
-        // TODO: 实现
-        // 1. 检查 _audioPlayer 是否已设置
-        // 2. 如果 musicId 与当前相同，不做操作
-        // 3. 如果有旧音乐，先停止
-        // 4. 调用 _audioPlayer.play() 创建新实例
-        // 5. 设置音量为 _calculateMusicVolume()
-        // 6. 更新 _currentMusic 和 _currentMusicId
-        void this._audioPlayer;
-        void this._calculateMusicVolume;
+    public playMusic(musicId: string, config?: AudioPlayConfig): void {
+        if (!this._audioPlayer) {
+            throw new Error('[AudioManager] 未设置 audioPlayer');
+        }
+        if (musicId === this._currentMusicId) {
+            return;
+        }
+        if (this._currentMusic) {
+            this._currentMusic.stop();
+        }
+        const instance = this._audioPlayer.play(musicId, config ?? {});
+        instance.setVolume(this._calculateMusicVolume());
+        this._currentMusic = instance;
+        this._currentMusicId = musicId;
     }
 
     /**
      * 停止当前背景音乐
      */
     public stopMusic(): void {
-        // TODO: 实现
+        if (this._currentMusic) {
+            this._currentMusic.stop();
+            this._currentMusic = null;
+            this._currentMusicId = null;
+        }
     }
 
     /**
      * 暂停当前背景音乐
      */
     public pauseMusic(): void {
-        // TODO: 实现
+        if (this._currentMusic) {
+            this._currentMusic.pause();
+        }
     }
 
     /**
      * 恢复当前背景音乐
      */
     public resumeMusic(): void {
-        // TODO: 实现
+        if (this._currentMusic) {
+            this._currentMusic.resume();
+        }
     }
 
     // ─── 音效控制 ──────────────────────────────────────
@@ -129,27 +157,40 @@ export class AudioManager extends ModuleBase implements IAudioManager {
     /**
      * 播放音效
      */
-    public playSound(_soundId: string, _config?: AudioPlayConfig): void {
-        // TODO: 实现
-        // 1. 检查 _audioPlayer 是否已设置
-        // 2. 调用 _audioPlayer.play() 创建实例
-        // 3. 设置音量为 _calculateSoundVolume()
-        // 4. 将实例加入 _sounds 映射
-        void this._calculateSoundVolume;
+    public playSound(soundId: string, config?: AudioPlayConfig): void {
+        if (!this._audioPlayer) {
+            throw new Error('[AudioManager] 未设置 audioPlayer');
+        }
+        const instance = this._audioPlayer.play(soundId, config ?? {});
+        instance.setVolume(this._calculateSoundVolume());
+        const list = this._sounds.get(soundId) ?? [];
+        list.push(instance);
+        this._sounds.set(soundId, list);
     }
 
     /**
      * 停止指定音效的所有实例
      */
-    public stopSound(_soundId: string): void {
-        // TODO: 实现
+    public stopSound(soundId: string): void {
+        const instances = this._sounds.get(soundId);
+        if (instances) {
+            for (const inst of instances) {
+                inst.stop();
+            }
+            this._sounds.delete(soundId);
+        }
     }
 
     /**
      * 停止所有音效
      */
     public stopAllSounds(): void {
-        // TODO: 实现
+        for (const [, instances] of this._sounds) {
+            for (const inst of instances) {
+                inst.stop();
+            }
+        }
+        this._sounds.clear();
     }
 
     // ─── 音量控制 ──────────────────────────────────────
@@ -157,26 +198,27 @@ export class AudioManager extends ModuleBase implements IAudioManager {
     /**
      * 设置主音量
      */
-    public setMasterVolume(_volume: number): void {
-        // TODO: 实现
-        // 1. clamp 到 [0, 1]
-        // 2. 更新 _masterVolume
-        // 3. 更新所有正在播放的实例音量
-        void this._clampVolume;
+    public setMasterVolume(volume: number): void {
+        this._masterVolume = this._clampVolume(volume);
+        this._updateAllVolumes();
     }
 
     /**
      * 设置音乐音量
      */
-    public setMusicVolume(_volume: number): void {
-        // TODO: 实现
+    public setMusicVolume(volume: number): void {
+        this._musicVolume = this._clampVolume(volume);
+        if (this._currentMusic) {
+            this._currentMusic.setVolume(this._calculateMusicVolume());
+        }
     }
 
     /**
      * 设置音效音量
      */
-    public setSoundVolume(_volume: number): void {
-        // TODO: 实现
+    public setSoundVolume(volume: number): void {
+        this._soundVolume = this._clampVolume(volume);
+        this._updateSoundVolumes();
     }
 
     /**
@@ -205,10 +247,9 @@ export class AudioManager extends ModuleBase implements IAudioManager {
     /**
      * 设置全局静音状态
      */
-    public setMuted(_muted: boolean): void {
-        // TODO: 实现
-        // 1. 更新 _muted
-        // 2. 更新所有正在播放的实例音量（静音时为 0，取消静音时恢复）
+    public setMuted(muted: boolean): void {
+        this._muted = muted;
+        this._updateAllVolumes();
     }
 
     /**
@@ -219,6 +260,28 @@ export class AudioManager extends ModuleBase implements IAudioManager {
     }
 
     // ─── 内部方法 ──────────────────────────────────────
+
+    /**
+     * 更新所有正在播放的实例音量
+     */
+    private _updateAllVolumes(): void {
+        if (this._currentMusic) {
+            this._currentMusic.setVolume(this._calculateMusicVolume());
+        }
+        this._updateSoundVolumes();
+    }
+
+    /**
+     * 更新所有音效实例音量
+     */
+    private _updateSoundVolumes(): void {
+        const vol = this._calculateSoundVolume();
+        for (const [, instances] of this._sounds) {
+            for (const inst of instances) {
+                inst.setVolume(vol);
+            }
+        }
+    }
 
     /**
      * 计算音乐实际音量
