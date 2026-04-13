@@ -3,7 +3,7 @@
 ## 基本信息
 
 - 开始日期：2026-03-23
-- 当前日期：2026-04-10
+- 当前日期：2026-04-13
 - 当前周次：Week 4 / 8
 - 总完成度：55%
 
@@ -22,7 +22,7 @@
 | UIManager（UI管理器）                       | ✅ 已完成 | 2026-04-08 | 92          | Week 3 Day 3；UIDefs + UIFormBase + IUIManager + UIManager，33 个测试（含 allowMultiple bug 修复）             |
 | EntityManager（实体管理器）                 | ✅ 已完成 | 2026-04-08 | 95          | Week 3 Day 4；EntityDefs + EntityBase + EntityGroup + EntityManager，31 个测试；\_entityGroupMap O(1) 反查设计 |
 | NetworkManager（网络管理器）                | ✅ 已完成 | 2026-04-10 | -           | Week 4 Day 1；NetworkDefs + NetworkChannel + NetworkManager，41 个测试；双策略注入 + 指数退避重连 |
-| AudioManager（音频管理器）                  | ⬜ 未开始 | -          | -           | Week 4 Day 5                                                                                                   |
+| AudioManager（音频管理器）                  | ✅ 已完成 | 2026-04-13 | 88          | Week 4 Day 2；音量乘法链 + IAudioPlayer 策略注入，27 个测试                                                    |
 | SceneManager（场景管理器）                  | ⬜ 未开始 | -          | -           | Week 4 Day 5                                                                                                   |
 | TimerManager（定时器管理器）                | ⬜ 未开始 | -          | -           | Week 6                                                                                                         |
 | DataTable（数据表）                         | ⬜ 未开始 | -          | -           | Week 6                                                                                                         |
@@ -71,6 +71,8 @@
 - [x] ✅ 指数退避重连：baseDelay * 2^(n-1)，避免雷鸣群效应
 - [x] ✅ 网络协议原理：TCP 队头阻塞 / 粘包拆包 / WebSocket 帧边界 / Protobuf vs JSON
 - [x] ✅ 帧同步 vs 状态同步：理解两种架构的适用场景和优缺点
+- [x] ✅ 音频管理模式：Music 单实例 + Sound 多实例叠加 + 三级音量乘法链 + 静音不改属性
+- [x] ✅ IAudioPlayer 策略注入：与 IResourceLoader / IUIFormFactory 一致的 Framework→Runtime 解耦模式
 
 ## 面试题积累
 
@@ -78,8 +80,8 @@
 
 ## 上次会话断点
 
-- 最后操作：Week 4 Day 1 — NetworkManager 模块实现完成（NetworkDefs + NetworkChannel + NetworkManager + INetworkManager），41 个测试全绿
-- 下次继续：Week 4 Day 2 — NetworkManager Code Review + AudioManager 或 SceneManager 教学与实现
+- 最后操作：Week 4 Day 2 — AudioManager 模块实现完成，27 个测试全绿，Review 88 分
+- 下次继续：Week 4 Day 3 — SceneManager 教学与实现
 - 未完成事项：无
-- 额外成就：网络层原理深度教学（TCP/UDP/WebSocket、粘包拆包、帧同步 vs 状态同步、服务端架构速览）
-- 更新日期：2026-04-10
+- 额外成就：三级音量乘法链设计 + IAudioPlayer 策略注入 + onUpdate 零 GC 清理
+- 更新日期：2026-04-13

@@ -37,7 +37,7 @@ GameEntry（框架入口）
 | UI         | framework/ui/         | setUIFormFactory() / registerForm() / openForm() / closeForm() / closeAllForms() / getForm() / hasForm()                         | Resource, Event, ObjectPool | ✅ 已完成 |
 | Entity     | framework/entity/     | showEntity() / hideEntity() / getEntity()                                                                                            | Resource, Event, ObjectPool | ⬜ 待开发 |
 | Network    | framework/network/    | createChannel() / destroyChannel() / getChannel() / setHeartbeatHandler() / setEventManager() / Channel: connect() / send() / close() | Event                       | ✅ 已完成 |
-| Audio      | framework/audio/      | playMusic() / playSound() / stop()                                                                                                   | Resource                    | ⬜ 待开发 |
+| Audio      | framework/audio/      | setAudioPlayer() / playMusic() / stopMusic() / pauseMusic() / resumeMusic() / playSound() / stopSound() / stopAllSounds() / set/getMasterVolume() / set/getMusicVolume() / set/getSoundVolume() / setMuted() / isMuted() | Resource                    | ✅ 已完成 |
 | Scene      | framework/scene/      | loadScene() / unloadScene()                                                                                                          | Resource, Event             | ⬜ 待开发 |
 | Timer      | framework/timer/      | addTimer() / removeTimer() / pause()                                                                                                 | 无                          | ⬜ 待开发 |
 | Data       | framework/data/       | loadTable\<T\>() / getRow() / getAllRows()                                                                                           | Resource                    | ⬜ 待开发 |
@@ -76,3 +76,4 @@ GameEntry（框架入口）
 | 2026-04-07 | Procedure 模块完成（ProcedureBase + ProcedureManager），13 个测试全绿，94/100         | 大圆   |
 | 2026-04-07 | Resource 模块完成（ResourceDefs + IResourceManager + ResourceManager），26 个测试全绿 | 大圆   |
 | 2026-04-08 | UI 模块完成（UIDefs + UIFormBase + IUIManager + UIManager），31 个测试全绿                 | 大圆   |
+| 2026-04-13 | Audio 模块完成（AudioDefs + IAudioManager + AudioManager），三级音量乘法链 + IAudioPlayer 策略注入，27 个测试全绿，Review 88 分 | 大圆   |
