@@ -133,6 +133,7 @@ export interface MuteChangedData {
 
 /**
  * 音频事件键（用于 EventManager 通知）
+ * @todo Runtime 层集成 EventManager 后启用事件通知
  */
 export const AudioEvents = {
     /** 背景音乐切换 */

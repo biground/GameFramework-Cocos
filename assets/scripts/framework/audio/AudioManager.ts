@@ -2,8 +2,6 @@ import { ModuleBase } from '../core/ModuleBase';
 import { IAudioManager } from './IAudioManager';
 import { AudioPlayConfig, IAudioInstance, IAudioPlayer } from './AudioDefs';
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 /**
  * 音频管理器
  * 统一管理游戏音频的播放、暂停、音量和静音控制
@@ -64,13 +62,15 @@ export class AudioManager extends ModuleBase implements IAudioManager {
     }
 
     public onUpdate(_deltaTime: number): void {
-        // 遍历 _sounds，清理已结束的音效实例
+        // 遍历 _sounds，清理已结束的音效实例（原地逆序 splice，零分配）
         for (const [soundId, instances] of this._sounds) {
-            const alive = instances.filter((inst) => inst.isPlaying);
-            if (alive.length === 0) {
+            for (let i = instances.length - 1; i >= 0; i--) {
+                if (!instances[i].isPlaying) {
+                    instances.splice(i, 1);
+                }
+            }
+            if (instances.length === 0) {
                 this._sounds.delete(soundId);
-            } else {
-                this._sounds.set(soundId, alive);
             }
         }
 
@@ -117,7 +117,8 @@ export class AudioManager extends ModuleBase implements IAudioManager {
         if (this._currentMusic) {
             this._currentMusic.stop();
         }
-        const instance = this._audioPlayer.play(musicId, config ?? {});
+        const finalConfig: AudioPlayConfig = { loop: true, ...config };
+        const instance = this._audioPlayer.play(musicId, finalConfig);
         instance.setVolume(this._calculateMusicVolume());
         this._currentMusic = instance;
         this._currentMusicId = musicId;
