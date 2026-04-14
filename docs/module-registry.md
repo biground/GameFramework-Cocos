@@ -25,24 +25,24 @@ GameEntry（框架入口）
 
 ## 模块摘要
 
-| 模块       | 路径                  | 核心 API                                                                                                                             | 依赖                        | 状态      |
-| ---------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- | --------- |
-| Core       | framework/core/       | GameEntry.registerModule() / getModule() / update() / shutdown()                                                                     | 无                          | ✅ 已完成 |
-| Event      | framework/event/      | EventKey<T> / on() / once() / off() / offAll() / offByCaller() / emit()                                                              | 无                          | ✅ 已完成 |
-| ObjectPool | framework/objectpool/ | acquire\<T\>() / release() / clearPool() / clearAll() / getStats() / setMaxSize()                                                    | 无                          | ✅ 已完成 |
-| DI/IoC     | framework/di/         | @Injectable / @Inject / Container.resolve()                                                                                          | 无                          | ✅ 已完成 |
-| FSM        | framework/fsm/        | createFsm\<T\>() / destroyFsm() / getFsm() / hasFsm() / IFsm.changeState() / IFsm.start()                                            | 无                          | ✅ 已完成 |
-| Procedure  | framework/procedure/  | initialize() / startProcedure() / hasProcedure() / currentProcedure / changeProcedure()                                              | FSM                         | ✅ 已完成 |
-| Resource   | framework/resource/   | setResourceLoader() / loadAsset() / releaseAsset() / releaseByOwner() / preload() / hasAsset() / getAssetRefCount() / getAssetInfo() | Event, ObjectPool           | ✅ 已完成 |
-| UI         | framework/ui/         | setUIFormFactory() / registerForm() / openForm() / closeForm() / closeAllForms() / getForm() / hasForm()                         | Resource, Event, ObjectPool | ✅ 已完成 |
-| Entity     | framework/entity/     | showEntity() / hideEntity() / getEntity()                                                                                            | Resource, Event, ObjectPool | ⬜ 待开发 |
-| Network    | framework/network/    | createChannel() / destroyChannel() / getChannel() / setHeartbeatHandler() / setEventManager() / Channel: connect() / send() / close() | Event                       | ✅ 已完成 |
+| 模块       | 路径                  | 核心 API                                                                                                                                                                                                                 | 依赖                        | 状态      |
+| ---------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- | --------- |
+| Core       | framework/core/       | GameEntry.registerModule() / getModule() / update() / shutdown()                                                                                                                                                         | 无                          | ✅ 已完成 |
+| Event      | framework/event/      | EventKey<T> / on() / once() / off() / offAll() / offByCaller() / emit()                                                                                                                                                  | 无                          | ✅ 已完成 |
+| ObjectPool | framework/objectpool/ | acquire\<T\>() / release() / clearPool() / clearAll() / getStats() / setMaxSize()                                                                                                                                        | 无                          | ✅ 已完成 |
+| DI/IoC     | framework/di/         | @Injectable / @Inject / Container.resolve()                                                                                                                                                                              | 无                          | ✅ 已完成 |
+| FSM        | framework/fsm/        | createFsm\<T\>() / destroyFsm() / getFsm() / hasFsm() / IFsm.changeState() / IFsm.start()                                                                                                                                | 无                          | ✅ 已完成 |
+| Procedure  | framework/procedure/  | initialize() / startProcedure() / hasProcedure() / currentProcedure / changeProcedure()                                                                                                                                  | FSM                         | ✅ 已完成 |
+| Resource   | framework/resource/   | setResourceLoader() / loadAsset() / releaseAsset() / releaseByOwner() / preload() / hasAsset() / getAssetRefCount() / getAssetInfo()                                                                                     | Event, ObjectPool           | ✅ 已完成 |
+| UI         | framework/ui/         | setUIFormFactory() / registerForm() / openForm() / closeForm() / closeAllForms() / getForm() / hasForm()                                                                                                                 | Resource, Event, ObjectPool | ✅ 已完成 |
+| Entity     | framework/entity/     | showEntity() / hideEntity() / getEntity()                                                                                                                                                                                | Resource, Event, ObjectPool | ⬜ 待开发 |
+| Network    | framework/network/    | createChannel() / destroyChannel() / getChannel() / setHeartbeatHandler() / setEventManager() / Channel: connect() / send() / close()                                                                                    | Event                       | ✅ 已完成 |
 | Audio      | framework/audio/      | setAudioPlayer() / playMusic() / stopMusic() / pauseMusic() / resumeMusic() / playSound() / stopSound() / stopAllSounds() / set/getMasterVolume() / set/getMusicVolume() / set/getSoundVolume() / setMuted() / isMuted() | Resource                    | ✅ 已完成 |
-| Scene      | framework/scene/      | loadScene() / unloadScene()                                                                                                          | Resource, Event             | ⬜ 待开发 |
-| Timer      | framework/timer/      | addTimer() / removeTimer() / pause()                                                                                                 | 无                          | ⬜ 待开发 |
-| Data       | framework/data/       | loadTable\<T\>() / getRow() / getAllRows()                                                                                           | Resource                    | ⬜ 待开发 |
-| i18n       | framework/i18n/       | t() / setLanguage() / getLanguage()                                                                                                  | Resource, Event             | ⬜ 待开发 |
-| Debug      | framework/debug/      | Logger.info() / warn() / error() / DebugPanel                                                                                        | 无                          | ⬜ 待开发 |
+| Scene      | framework/scene/      | setSceneLoader() / loadScene() / currentScene / isLoading                                                                                                                                                                | Event（@todo 事件广播）     | ✅ 已完成 |
+| Timer      | framework/timer/      | addTimer() / removeTimer() / pause()                                                                                                                                                                                     | 无                          | ⬜ 待开发 |
+| Data       | framework/data/       | loadTable\<T\>() / getRow() / getAllRows()                                                                                                                                                                               | Resource                    | ⬜ 待开发 |
+| i18n       | framework/i18n/       | t() / setLanguage() / getLanguage()                                                                                                                                                                                      | Resource, Event             | ⬜ 待开发 |
+| Debug      | framework/debug/      | Logger.info() / warn() / error() / DebugPanel                                                                                                                                                                            | 无                          | ⬜ 待开发 |
 
 ## 模块间通信规则
 
@@ -64,16 +64,17 @@ GameEntry（框架入口）
 
 ## 变更日志
 
-| 日期       | 变更内容                                                                              | 操作人 |
-| ---------- | ------------------------------------------------------------------------------------- | ------ |
-| 2026-03-23 | 初始化模块注册表                                                                      | 系统   |
-| 2026-03-30 | Event 模块完成，含 EventKey<T> 类型安全事件系统                                       | 大圆   |
-| 2026-04-10 | Network 模块完成（NetworkDefs + NetworkChannel + NetworkManager），41 个测试全绿       | 大圆   |
-| 2026-03-31 | ObjectPool + ReferencePool 完成（91/100），插件化架构方案确定                         | 大圆   |
-| 2026-04-03 | DI Container 核心实现完成（10 个测试通过），装饰器待实现；更新模块状态                | 大圆   |
-| 2026-04-03 | DI 装饰器实现 + Container 自动注入集成（95/100），30 个测试全绿                       | 大圆   |
-| 2026-04-04 | FSM 模块完成（FsmDefs + FsmState + Fsm + FsmManager），52 个测试全绿                  | 大圆   |
-| 2026-04-07 | Procedure 模块完成（ProcedureBase + ProcedureManager），13 个测试全绿，94/100         | 大圆   |
-| 2026-04-07 | Resource 模块完成（ResourceDefs + IResourceManager + ResourceManager），26 个测试全绿 | 大圆   |
-| 2026-04-08 | UI 模块完成（UIDefs + UIFormBase + IUIManager + UIManager），31 个测试全绿                 | 大圆   |
+| 日期       | 变更内容                                                                                                                        | 操作人 |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 2026-03-23 | 初始化模块注册表                                                                                                                | 系统   |
+| 2026-03-30 | Event 模块完成，含 EventKey<T> 类型安全事件系统                                                                                 | 大圆   |
+| 2026-04-10 | Network 模块完成（NetworkDefs + NetworkChannel + NetworkManager），41 个测试全绿                                                | 大圆   |
+| 2026-03-31 | ObjectPool + ReferencePool 完成（91/100），插件化架构方案确定                                                                   | 大圆   |
+| 2026-04-03 | DI Container 核心实现完成（10 个测试通过），装饰器待实现；更新模块状态                                                          | 大圆   |
+| 2026-04-03 | DI 装饰器实现 + Container 自动注入集成（95/100），30 个测试全绿                                                                 | 大圆   |
+| 2026-04-04 | FSM 模块完成（FsmDefs + FsmState + Fsm + FsmManager），52 个测试全绿                                                            | 大圆   |
+| 2026-04-07 | Procedure 模块完成（ProcedureBase + ProcedureManager），13 个测试全绿，94/100                                                   | 大圆   |
+| 2026-04-07 | Resource 模块完成（ResourceDefs + IResourceManager + ResourceManager），26 个测试全绿                                           | 大圆   |
+| 2026-04-08 | UI 模块完成（UIDefs + UIFormBase + IUIManager + UIManager），31 个测试全绿                                                      | 大圆   |
 | 2026-04-13 | Audio 模块完成（AudioDefs + IAudioManager + AudioManager），三级音量乘法链 + IAudioPlayer 策略注入，27 个测试全绿，Review 88 分 | 大圆   |
+| 2026-04-14 | Scene 模块完成（SceneDefs + ISceneManager + SceneManager），三层加载去重 + ISceneLoader 策略注入，15 个测试全绿，Review 90 分，Phase 2 完成 | 大圆   |

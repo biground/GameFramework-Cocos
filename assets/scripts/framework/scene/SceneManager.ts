@@ -53,11 +53,16 @@ export class SceneManager extends ModuleBase implements ISceneManager {
     // ─── 生命周期 ──────────────────────────────────────
 
     public onInit(): void {
-        // TODO: 实现
+        this._currentScene = null;
+        this._loadingScene = null;
+        this._isLoading = false;
     }
 
     public onShutdown(): void {
-        // TODO: 实现
+        this._currentScene = null;
+        this._loadingScene = null;
+        this._isLoading = false;
+        this._sceneLoader = null;
     }
 
     // ─── ISceneManager 实现 ────────────────────────────
@@ -75,10 +80,51 @@ export class SceneManager extends ModuleBase implements ISceneManager {
      * @param sceneName 场景名称
      * @param options 加载选项（可选）
      */
-    public loadScene(_sceneName: string, _options?: LoadSceneOptions): void {
-        // TODO: 实现
-        // 占位引用，避免 TS6133（实现后移除）
-        void this._sceneLoader;
-        void this._loadingScene;
+    public loadScene(sceneName: string, options?: LoadSceneOptions): void {
+        // 异常：空场景名
+        if (!sceneName) {
+            // @todo 待 Logger 模块实现后替换为 Logger.warn
+            console.warn('[SceneManager] 场景名称不能为空');
+            return;
+        }
+
+        // 异常：未设置加载器
+        if (!this._sceneLoader) {
+            // @todo 待 Logger 模块实现后替换为 Logger.warn
+            console.warn('[SceneManager] 未设置场景加载器，请先调用 setSceneLoader');
+            return;
+        }
+
+        // 去重：已是当前场景
+        if (this._currentScene === sceneName) {
+            console.warn(`[SceneManager] 已在场景 ${sceneName} 中，忽略重复加载`);
+            return;
+        }
+
+        // 去重：正在加载中
+        if (this._isLoading) {
+            console.warn(
+                `[SceneManager] 正在加载场景 ${this._loadingScene}，忽略新请求 ${sceneName}`,
+            );
+            return;
+        }
+
+        this._isLoading = true;
+        this._loadingScene = sceneName;
+
+        this._sceneLoader.loadScene(sceneName, {
+            onProgress: (progress: number) => {
+                options?.onProgress?.(progress);
+            },
+            onSuccess: () => {
+                this._currentScene = sceneName;
+                this._loadingScene = null;
+                this._isLoading = false;
+            },
+            onFailure: () => {
+                this._loadingScene = null;
+                this._isLoading = false;
+            },
+        });
     }
 }

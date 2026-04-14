@@ -52,6 +52,8 @@ export interface ISceneLoader {
 /**
  * 场景模块事件常量
  * 使用 EventKey<T> 实现类型安全的事件订阅与分发
+ *
+ * @todo 当前 SceneManager 尚未集成 EventManager，事件定义预留待集成时使用
  */
 export const SceneEvents = {
     /** 场景加载中（携带进度） */
