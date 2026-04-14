@@ -1,4 +1,5 @@
 import { ModuleBase } from '../core/ModuleBase';
+import { Logger } from '../debug/Logger';
 import { ISceneManager } from './ISceneManager';
 import { ISceneLoader, LoadSceneOptions } from './SceneDefs';
 
@@ -83,28 +84,27 @@ export class SceneManager extends ModuleBase implements ISceneManager {
     public loadScene(sceneName: string, options?: LoadSceneOptions): void {
         // 异常：空场景名
         if (!sceneName) {
-            // @todo 待 Logger 模块实现后替换为 Logger.warn
-            console.warn('[SceneManager] 场景名称不能为空');
+            Logger.warn('SceneManager', '场景名称不能为空');
             return;
         }
 
         // 异常：未设置加载器
         if (!this._sceneLoader) {
-            // @todo 待 Logger 模块实现后替换为 Logger.warn
-            console.warn('[SceneManager] 未设置场景加载器，请先调用 setSceneLoader');
+            Logger.warn('SceneManager', '未设置场景加载器，请先调用 setSceneLoader');
             return;
         }
 
         // 去重：已是当前场景
         if (this._currentScene === sceneName) {
-            console.warn(`[SceneManager] 已在场景 ${sceneName} 中，忽略重复加载`);
+            Logger.warn('SceneManager', `已在场景 ${sceneName} 中，忽略重复加载`);
             return;
         }
 
         // 去重：正在加载中
         if (this._isLoading) {
-            console.warn(
-                `[SceneManager] 正在加载场景 ${this._loadingScene}，忽略新请求 ${sceneName}`,
+            Logger.warn(
+                'SceneManager',
+                `正在加载场景 ${this._loadingScene}，忽略新请求 ${sceneName}`,
             );
             return;
         }

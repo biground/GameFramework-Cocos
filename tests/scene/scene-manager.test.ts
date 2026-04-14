@@ -1,4 +1,5 @@
 import { SceneManager } from '@framework/scene/SceneManager';
+import { Logger } from '@framework/debug/Logger';
 import { ISceneLoader, LoadSceneCallbacks } from '@framework/scene/SceneDefs';
 
 // ─── Mock 工具 ──────────────────────────────────────
@@ -178,16 +179,22 @@ describe('SceneManager', () => {
         test('未设置 loader 时调用 loadScene 输出警告', () => {
             const fresh = new SceneManager();
             fresh.onInit();
-            const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+            const warnSpy = jest.spyOn(Logger, 'warn').mockImplementation();
             fresh.loadScene('TestScene');
-            expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[SceneManager]'));
+            expect(warnSpy).toHaveBeenCalledWith(
+                'SceneManager',
+                expect.stringContaining('setSceneLoader'),
+            );
             warnSpy.mockRestore();
         });
 
         test('空场景名调用 loadScene 输出警告', () => {
-            const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+            const warnSpy = jest.spyOn(Logger, 'warn').mockImplementation();
             manager.loadScene('');
-            expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[SceneManager]'));
+            expect(warnSpy).toHaveBeenCalledWith(
+                'SceneManager',
+                expect.stringContaining('不能为空'),
+            );
             warnSpy.mockRestore();
         });
     });
