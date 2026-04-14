@@ -1,5 +1,6 @@
 import { ModuleBase } from '../core/ModuleBase';
 import { EventKey, EventCallback, EventBinding } from './EventDefs';
+import { Logger } from '../debug/Logger';
 
 /**
  * 事件管理器
@@ -20,6 +21,7 @@ import { EventKey, EventCallback, EventBinding } from './EventDefs';
  * ```
  */
 export class EventManager extends ModuleBase {
+    private static readonly TAG = 'EventManager';
     /** 事件监听器映射表：EventKey → EventBinding 数组 */
     private _eventMap: Map<EventKey<unknown>, EventBinding<unknown>[]> = new Map();
 
@@ -34,10 +36,13 @@ export class EventManager extends ModuleBase {
     }
 
     /** 模块初始化 */
-    public onInit(): void {}
+    public onInit(): void {
+        Logger.info(EventManager.TAG, '事件管理器初始化');
+    }
 
     /** 模块销毁，清理所有事件监听 */
     public onShutdown(): void {
+        Logger.info(EventManager.TAG, `事件管理器关闭, 清理 ${this._eventMap.size} 个事件`);
         this.offAll();
     }
 
@@ -65,6 +70,7 @@ export class EventManager extends ModuleBase {
         for (let i = 0; i < bindings.length; i++) {
             const binding = bindings[i];
             if (binding.callback === callback && binding.caller === caller) {
+                Logger.debug(EventManager.TAG, `重复注册忽略: ${key.description}`);
                 return;
             }
         }
@@ -172,6 +178,7 @@ export class EventManager extends ModuleBase {
             return;
         }
 
+        Logger.debug(EventManager.TAG, `emit: ${key.description}, listeners=${bindings.length}`);
         const data = (args as unknown[])[0] as T;
         const onceBindings: EventBinding<T>[] = [];
         const snapshot = [...bindings];

@@ -1,4 +1,5 @@
 import { ModuleBase } from './ModuleBase';
+import { Logger } from '../debug/Logger';
 
 /**
  * 游戏模块管理器
@@ -7,6 +8,7 @@ import { ModuleBase } from './ModuleBase';
  * 设计参考：Unity GameFramework 的 GameEntry
  */
 export class GameModule {
+    private static readonly TAG = 'GameModule';
     private static _modules: Map<string, ModuleBase> = new Map();
     private static _sortedModules: ModuleBase[] = [];
     private static _isDirty: boolean = false;
@@ -23,10 +25,12 @@ export class GameModule {
             if (!allowReplace) {
                 throw new Error(`模块 "${name}" 已经注册。`);
             }
+            Logger.warn(GameModule.TAG, `模块替换: ${name}, 旧模块将被关闭`);
             this._modules.get(name)!.onShutdown();
         }
         this._modules.set(name, module);
         module.onInit();
+        Logger.info(GameModule.TAG, `模块注册: ${name}, priority=${module.priority}`);
         this._isDirty = true;
     }
     /**
@@ -62,6 +66,7 @@ export class GameModule {
                 (a, b) => a.priority - b.priority,
             );
             this._isDirty = false;
+            Logger.debug(GameModule.TAG, `模块重新排序, count=${GameModule._sortedModules.length}`);
         }
         for (const mod of this._sortedModules) {
             mod.onUpdate(deltaTime);
@@ -72,6 +77,7 @@ export class GameModule {
      * 关闭所有模块
      */
     public static shutdownAll(): void {
+        Logger.info(GameModule.TAG, `关闭所有模块, count=${GameModule._modules.size}`);
         // 按 priority 降序调用 onShutdown，倒序遍历已排序数组
         if (this._isDirty) {
             this._sortedModules = Array.from(this._modules.values()).sort(

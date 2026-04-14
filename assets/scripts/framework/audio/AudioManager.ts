@@ -1,4 +1,5 @@
 import { ModuleBase } from '../core/ModuleBase';
+import { Logger } from '../debug/Logger';
 import { IAudioManager } from './IAudioManager';
 import { AudioPlayConfig, IAudioInstance, IAudioPlayer } from './AudioDefs';
 
@@ -14,6 +15,8 @@ import { AudioPlayConfig, IAudioInstance, IAudioPlayer } from './AudioDefs';
  * - 通过 IAudioPlayer 策略注入，Framework 层不依赖引擎 API
  */
 export class AudioManager extends ModuleBase implements IAudioManager {
+    private static readonly TAG = 'AudioManager';
+
     public get moduleName(): string {
         return 'AudioManager';
     }
@@ -58,7 +61,7 @@ export class AudioManager extends ModuleBase implements IAudioManager {
     // ─── 生命周期 ──────────────────────────────────────
 
     public onInit(): void {
-        // 初始化无特殊操作
+        Logger.info(AudioManager.TAG, '音频管理器初始化');
     }
 
     public onUpdate(_deltaTime: number): void {
@@ -82,6 +85,7 @@ export class AudioManager extends ModuleBase implements IAudioManager {
     }
 
     public onShutdown(): void {
+        Logger.info(AudioManager.TAG, '音频管理器关闭，停止所有音频');
         if (this._audioPlayer) {
             this._audioPlayer.stopAll();
         }
@@ -112,11 +116,14 @@ export class AudioManager extends ModuleBase implements IAudioManager {
             throw new Error('[AudioManager] 未设置 audioPlayer');
         }
         if (musicId === this._currentMusicId) {
+            Logger.debug(AudioManager.TAG, `音乐已在播放, 忽略: ${musicId}`);
             return;
         }
         if (this._currentMusic) {
+            Logger.debug(AudioManager.TAG, `切换音乐: ${this._currentMusicId} → ${musicId}`);
             this._currentMusic.stop();
         }
+        Logger.debug(AudioManager.TAG, `播放音乐: ${musicId}`);
         const finalConfig: AudioPlayConfig = { loop: true, ...config };
         const instance = this._audioPlayer.play(musicId, finalConfig);
         instance.setVolume(this._calculateMusicVolume());
@@ -128,6 +135,7 @@ export class AudioManager extends ModuleBase implements IAudioManager {
      * 停止当前背景音乐
      */
     public stopMusic(): void {
+        Logger.debug(AudioManager.TAG, '停止音乐');
         if (this._currentMusic) {
             this._currentMusic.stop();
             this._currentMusic = null;
@@ -162,6 +170,7 @@ export class AudioManager extends ModuleBase implements IAudioManager {
         if (!this._audioPlayer) {
             throw new Error('[AudioManager] 未设置 audioPlayer');
         }
+        Logger.debug(AudioManager.TAG, `播放音效: ${soundId}`);
         const instance = this._audioPlayer.play(soundId, config ?? {});
         instance.setVolume(this._calculateSoundVolume());
         const list = this._sounds.get(soundId) ?? [];
@@ -200,6 +209,7 @@ export class AudioManager extends ModuleBase implements IAudioManager {
      * 设置主音量
      */
     public setMasterVolume(volume: number): void {
+        Logger.debug(AudioManager.TAG, `主音量: ${volume}`);
         this._masterVolume = this._clampVolume(volume);
         this._updateAllVolumes();
     }
@@ -249,6 +259,7 @@ export class AudioManager extends ModuleBase implements IAudioManager {
      * 设置全局静音状态
      */
     public setMuted(muted: boolean): void {
+        Logger.debug(AudioManager.TAG, `静音: ${muted}`);
         this._muted = muted;
         this._updateAllVolumes();
     }

@@ -1,3 +1,4 @@
+import { Logger } from '../debug/Logger';
 import { ServiceKey, Lifecycle, ServiceBinding, Newable } from './DITypes';
 import { getInjectMetadata } from './Decorators';
 
@@ -26,6 +27,8 @@ import { getInjectMetadata } from './Decorators';
  * ```
  */
 export class Container {
+    private static readonly TAG = 'Container';
+
     /** 服务绑定映射表 */
     private _bindings: Map<ServiceKey<unknown>, ServiceBinding<unknown>> = new Map();
     /** 父容器（用于层级查找） */
@@ -56,6 +59,7 @@ export class Container {
             lifecycle: Lifecycle.Transient, // 默认生命周期
         };
         this._bindings.set(key, binding as ServiceBinding<unknown>);
+        Logger.debug(Container.TAG, `绑定服务: ${key.description}`);
         return new BindingBuilder<T>(binding);
     }
 
@@ -70,15 +74,18 @@ export class Container {
      * @throws {Error} 如果服务未绑定
      */
     public resolve<T>(key: ServiceKey<T>): T {
+        Logger.debug(Container.TAG, `解析服务: ${key.description}`);
         const binding = this._bindings.get(key) as ServiceBinding<T> | undefined;
         if (!binding) {
             if (this._parent) {
+                Logger.debug(Container.TAG, `委托父容器解析: ${key.description}`);
                 return this._parent.resolve(key);
             }
             throw new Error(`Service not bound: ${key.description}`);
         }
 
         if (binding.lifecycle === Lifecycle.Singleton && binding.instance !== undefined) {
+            Logger.debug(Container.TAG, `单例缓存命中: ${key.description}`);
             return binding.instance;
         }
 
@@ -127,6 +134,7 @@ export class Container {
      * @param key 服务标识符
      */
     public unbind<T>(key: ServiceKey<T>): void {
+        Logger.debug(Container.TAG, `解除绑定: ${key.description}`);
         const binding = this._bindings.get(key) as ServiceBinding<T> | undefined;
         if (binding && binding.dispose) {
             binding.dispose();
@@ -140,6 +148,7 @@ export class Container {
      * @returns 子容器
      */
     public createChild(): Container {
+        Logger.debug(Container.TAG, '创建子容器');
         return new Container(this);
     }
 
@@ -147,6 +156,7 @@ export class Container {
      * 清除所有绑定和缓存
      */
     public clear(): void {
+        Logger.debug(Container.TAG, `清除所有绑定, count=${this._bindings.size}`);
         for (const binding of this._bindings.values()) {
             if (binding.dispose) {
                 binding.dispose();

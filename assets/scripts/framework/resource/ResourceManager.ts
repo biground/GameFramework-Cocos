@@ -1,4 +1,5 @@
 import { ModuleBase } from '../core/ModuleBase';
+import { Logger } from '../debug/Logger';
 import { IResourceManager } from '../interfaces/IResourceManager';
 import {
     AssetInfo,
@@ -19,6 +20,8 @@ import {
  * - 通过 IResourceLoader 策略注入，Framework 层不依赖引擎 API
  */
 export class ResourceManager extends ModuleBase implements IResourceManager {
+    private static readonly TAG = 'ResourceManager';
+
     public get moduleName(): string {
         return 'ResourceManager';
     }
@@ -41,12 +44,14 @@ export class ResourceManager extends ModuleBase implements IResourceManager {
     public onInit(): void {
         this._assets.clear();
         this._pendingCallbacks.clear();
+        Logger.info(ResourceManager.TAG, '资源管理器初始化');
     }
 
     public onShutdown(): void {
         // 先拷贝路径、清空内部状态，再释放底层资源
         // 确保即使 releaseAsset 有副作用也不会影响遍历
         const paths = [...this._assets.keys()];
+        Logger.info(ResourceManager.TAG, `资源管理器关闭，释放 ${paths.length} 个资源`);
         this._assets.clear();
         this._pendingCallbacks.clear();
         for (const path of paths) {
@@ -89,6 +94,7 @@ export class ResourceManager extends ModuleBase implements IResourceManager {
 
         // 情况 1：已加载 — 缓存命中
         if (existing && existing.state === LoadState.Loaded) {
+            Logger.debug(ResourceManager.TAG, `缓存命中: ${path}`);
             this._addOwner(existing, owner);
             callbacks?.onSuccess?.(path, existing.asset);
             return;
@@ -96,6 +102,7 @@ export class ResourceManager extends ModuleBase implements IResourceManager {
 
         // 情况 2：加载中 — 去重，追加回调
         if (existing && existing.state === LoadState.Loading) {
+            Logger.debug(ResourceManager.TAG, `加载去重, 追加回调: ${path}`);
             this._addOwner(existing, owner);
             if (callbacks) {
                 const pending = this._pendingCallbacks.get(path);
@@ -105,6 +112,7 @@ export class ResourceManager extends ModuleBase implements IResourceManager {
         }
 
         // 情况 3：未加载 — 发起新加载
+        Logger.debug(ResourceManager.TAG, `发起加载: ${path}`);
         const info = this._createAssetInfo(path);
         info.state = LoadState.Loading;
         this._assets.set(path, info);
@@ -120,11 +128,13 @@ export class ResourceManager extends ModuleBase implements IResourceManager {
         // 委托给实际加载器
         this._loader.loadAsset(path, {
             onSuccess: (p: string, asset: unknown) => {
+                Logger.debug(ResourceManager.TAG, `加载成功: ${p}`);
                 info.state = LoadState.Loaded;
                 info.asset = asset;
                 this._notifyPendingCallbacks(p, asset, null);
             },
             onFailure: (p: string, error: Error) => {
+                Logger.warn(ResourceManager.TAG, `加载失败: ${p}`, error);
                 info.state = LoadState.Failed;
                 this._notifyPendingCallbacks(p, null, error);
                 this._assets.delete(p);
@@ -151,11 +161,13 @@ export class ResourceManager extends ModuleBase implements IResourceManager {
         // 防重复释放：owner 不在持有者集合中
         if (!info.owners.has(owner)) return;
 
+        Logger.debug(ResourceManager.TAG, `释放: ${path}`);
         info.owners.delete(owner);
         info.refCount--;
 
         // 引用计数归零 → 真正释放
         if (info.refCount === 0) {
+            Logger.debug(ResourceManager.TAG, `引用归零，真正释放: ${path}`);
             this._loader?.releaseAsset(path);
             this._assets.delete(path);
         }
@@ -206,6 +218,8 @@ export class ResourceManager extends ModuleBase implements IResourceManager {
         // 去重
         const uniquePaths = [...new Set(paths)];
         const total = uniquePaths.length;
+
+        Logger.debug(ResourceManager.TAG, `预加载: ${total} 个资源`);
 
         // 空列表直接完成
         if (total === 0) {

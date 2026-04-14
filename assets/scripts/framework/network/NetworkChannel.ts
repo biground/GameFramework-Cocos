@@ -1,3 +1,4 @@
+import { Logger } from '../debug/Logger';
 import {
     NetworkState,
     NetworkPacket,
@@ -36,6 +37,8 @@ export interface NetworkChannelCallbacks {
  * - 通过 NetworkChannelCallbacks 向上层（NetworkManager）报告事件
  */
 export class NetworkChannel {
+    private static readonly TAG = 'NetworkChannel';
+
     // ─── 核心依赖 ──────────────────────────
 
     /** 通道名称 */
@@ -143,9 +146,11 @@ export class NetworkChannel {
      */
     public connect(url: string): void {
         if (this._state === NetworkState.Connected || this._state === NetworkState.Connecting) {
+            Logger.debug(NetworkChannel.TAG, `[${this._name}] 已连接或连接中, 忽略`);
             return;
         }
 
+        Logger.debug(NetworkChannel.TAG, `[${this._name}] 发起连接`);
         this._url = url;
         this._userClosed = false;
         this._state = NetworkState.Connecting;
@@ -162,6 +167,7 @@ export class NetworkChannel {
             throw new Error(`[NetworkChannel] 通道 '${this._name}' 未连接，无法发送消息`);
         }
 
+        Logger.debug(NetworkChannel.TAG, `[${this._name}] 发送消息`);
         const data = this._packetHandler.encode(packet);
         this._socket.send(data);
     }
@@ -174,6 +180,7 @@ export class NetworkChannel {
             return;
         }
 
+        Logger.debug(NetworkChannel.TAG, `[${this._name}] 用户主动关闭`);
         this._userClosed = true;
         this._resetHeartbeat();
         this._resetReconnect();
@@ -206,6 +213,7 @@ export class NetworkChannel {
      * 关闭连接并解绑所有回调
      */
     public shutdown(): void {
+        Logger.debug(NetworkChannel.TAG, `[${this._name}] 通道销毁`);
         this._userClosed = true;
         if (this._state !== NetworkState.Disconnected) {
             this._socket.close();
@@ -243,6 +251,7 @@ export class NetworkChannel {
      * Socket 连接成功
      */
     private _onSocketOpen(): void {
+        Logger.debug(NetworkChannel.TAG, `[${this._name}] Socket 已连接`);
         this._state = NetworkState.Connected;
         this._resetHeartbeat();
         this._resetReconnect();
@@ -253,6 +262,7 @@ export class NetworkChannel {
      * Socket 连接关闭
      */
     private _onSocketClose(code: number, reason: string): void {
+        Logger.debug(NetworkChannel.TAG, `[${this._name}] Socket 关闭`);
         this._resetHeartbeat();
 
         if (
@@ -288,6 +298,7 @@ export class NetworkChannel {
      * Socket 错误
      */
     private _onSocketError(error: Error): void {
+        Logger.warn(NetworkChannel.TAG, `[${this._name}] Socket 错误`, error);
         this._callbacks.onError(this._name, error);
     }
 
@@ -309,6 +320,7 @@ export class NetworkChannel {
 
             // 超过丢失次数阈值，判定断线
             if (this._missedHeartbeats >= this._config.missHeartbeatCountToClose) {
+                Logger.warn(NetworkChannel.TAG, `[${this._name}] 心跳超时, 断开连接`);
                 this._socket.close();
                 return;
             }
@@ -333,6 +345,7 @@ export class NetworkChannel {
      * 进入 Reconnecting 状态，计算指数退避延迟
      */
     private _startReconnect(): void {
+        Logger.info(NetworkChannel.TAG, `[${this._name}] 开始重连`);
         this._state = NetworkState.Reconnecting;
         this._reconnectAttempts++;
         // 指数退避：baseDelay * 2^(attempt - 1)
