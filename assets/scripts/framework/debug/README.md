@@ -47,10 +47,10 @@ if (Logger.isDebugEnabled) {
 
 ## 文件清单
 
-| 文件 | 职责 |
-|------|------|
-| `LoggerDefs.ts` | LogLevel 枚举定义 |
-| `Logger.ts` | Logger 类实现（静态 API + ModuleBase） |
+| 文件            | 职责                                   |
+| --------------- | -------------------------------------- |
+| `LoggerDefs.ts` | LogLevel 枚举定义                      |
+| `Logger.ts`     | Logger 类实现（静态 API + ModuleBase） |
 
 ## 对外 API
 
@@ -72,8 +72,8 @@ class Logger extends ModuleBase {
     getLogLevel(): LogLevel;
 
     // ModuleBase
-    readonly moduleName: string;  // "Logger"
-    readonly priority: number;    // 0
+    readonly moduleName: string; // "Logger"
+    readonly priority: number; // 0
     onInit(): void;
     onShutdown(): void;
 }
@@ -99,15 +99,15 @@ if (Logger.isDebugEnabled) {
 
 ## 设计决策
 
-| 决策 | 选择 | 原因 |
-|------|------|------|
-| priority = 0 | 基础设施最高优先级 | 其他所有模块可能在 onInit 中输出日志，Logger 必须最先就绪 |
-| 混合方案而非纯静态 | Static Singleton + Lifecycle | 既保留 `Logger.info()` 的便捷调用，又纳入框架生命周期管理 |
-| rest params | `...args: unknown[]` | 避免模板字符串 `${obj}` 在日志被过滤时仍触发 toString 求值 |
-| _levelLabels 静态常量 | `static readonly Record` | 避免 _log 每次调用都创建临时对象，减少 GC 压力 |
-| _consoleMethodNames 映射 | 字符串名而非引用 | 使用 `console[methodName]` 动态调用，确保 Jest mock 生效 |
-| _defaultLevel 降级 | 实例化前也能用 | `Logger._instance` 为 null 时回退到静态默认级别 |
-| onShutdown 重置 | 清理实例引用 + 重置默认级别 | 保证下次初始化时是干净状态 |
+| 决策                      | 选择                         | 原因                                                       |
+| ------------------------- | ---------------------------- | ---------------------------------------------------------- |
+| priority = 0              | 基础设施最高优先级           | 其他所有模块可能在 onInit 中输出日志，Logger 必须最先就绪  |
+| 混合方案而非纯静态        | Static Singleton + Lifecycle | 既保留 `Logger.info()` 的便捷调用，又纳入框架生命周期管理  |
+| rest params               | `...args: unknown[]`         | 避免模板字符串 `${obj}` 在日志被过滤时仍触发 toString 求值 |
+| \_levelLabels 静态常量    | `static readonly Record`     | 避免 \_log 每次调用都创建临时对象，减少 GC 压力            |
+| \_consoleMethodNames 映射 | 字符串名而非引用             | 使用 `console[methodName]` 动态调用，确保 Jest mock 生效   |
+| \_defaultLevel 降级       | 实例化前也能用               | `Logger._instance` 为 null 时回退到静态默认级别            |
+| onShutdown 重置           | 清理实例引用 + 重置默认级别  | 保证下次初始化时是干净状态                                 |
 
 ## 依赖
 

@@ -1,1030 +1,1030 @@
 plan_id: logger-integration
 objective: 调研框架所有模块中适合添加 Logger 运行时调试日志的位置
 focus_area: assets/scripts/framework/
-created_at: "2026-04-14"
+created_at: '2026-04-14'
 created_by: gem-researcher
 status: completed
 
 tldr: |
-  - 框架共 23 个实现文件（排除 debug/、interfaces/、*Defs.ts、I*.ts 后），仅 SceneManager 已集成 Logger（4 处 Logger.warn）
-  - 12 个 ModuleBase 子类 + 11 个核心辅助类均需添加 Logger 日志
-  - 建议日志点总计约 120+ 处，覆盖生命周期、状态变化、错误分支、关键操作
-  - 日志级别分配：onInit/onShutdown → info, 关键操作（创建/销毁/状态切换）→ debug, 异常分支 → warn/error
-  - 每个类应定义 private static TAG 常量，格式与错误消息前缀统一（如 'GameModule'、'Fsm' 等）
+    - 框架共 23 个实现文件（排除 debug/、interfaces/、*Defs.ts、I*.ts 后），仅 SceneManager 已集成 Logger（4 处 Logger.warn）
+    - 12 个 ModuleBase 子类 + 11 个核心辅助类均需添加 Logger 日志
+    - 建议日志点总计约 120+ 处，覆盖生命周期、状态变化、错误分支、关键操作
+    - 日志级别分配：onInit/onShutdown → info, 关键操作（创建/销毁/状态切换）→ debug, 异常分支 → warn/error
+    - 每个类应定义 private static TAG 常量，格式与错误消息前缀统一（如 'GameModule'、'Fsm' 等）
 
 research_metadata:
-  methodology: "hybrid retrieval: file_search + grep_search(Logger 使用情况) + read_file(全量阅读每个实现文件)"
-  scope: "assets/scripts/framework/ 下全部 .ts 文件，排除 debug/、interfaces/、*Defs.ts、I*.ts"
-  confidence: high
-  coverage: 100
-  decision_blockers: 0
-  research_blockers: 0
+    methodology: 'hybrid retrieval: file_search + grep_search(Logger 使用情况) + read_file(全量阅读每个实现文件)'
+    scope: 'assets/scripts/framework/ 下全部 .ts 文件，排除 debug/、interfaces/、*Defs.ts、I*.ts'
+    confidence: high
+    coverage: 100
+    decision_blockers: 0
+    research_blockers: 0
 
 files_analyzed:
-  # ────────────── core 层 ──────────────
-  - file: GameModule.ts
-    path: assets/scripts/framework/core/GameModule.ts
-    purpose: 游戏模块管理器，负责注册、获取、驱动所有框架模块的生命周期
-    has_logger: false
-    class_name: GameModule
-    is_module_base: false  # 静态工具类
-    lifecycle: []
-    key_elements:
-      - element: register
-        type: function
-        location: "GameModule.ts:22"
-        description: "注册模块（含 allowReplace 替换逻辑）"
-      - element: getModule
-        type: function
-        location: "GameModule.ts:38"
-        description: "按名称获取模块，不存在则抛异常"
-      - element: update
-        type: function
-        location: "GameModule.ts:62"
-        description: "驱动所有模块更新（含脏标记排序）"
-      - element: shutdownAll
-        type: function
-        location: "GameModule.ts:76"
-        description: "按 priority 降序关闭所有模块"
-    language: typescript
-    lines: 93
-    suggested_log_points:
-      - method: register
-        level: info
-        message: "Logger.info(TAG, `模块注册: ${name}, priority=${module.priority}`)"
-      - method: register (allowReplace)
-        level: warn
-        message: "Logger.warn(TAG, `模块替换: ${name}, 旧模块将被关闭`)"
-      - method: update (dirty sort)
-        level: debug
-        message: "Logger.debug(TAG, `模块重新排序, count=${this._sortedModules.length}`)"
-      - method: shutdownAll
-        level: info
-        message: "Logger.info(TAG, `关闭所有模块, count=${this._modules.size}`)"
+    # ────────────── core 层 ──────────────
+    - file: GameModule.ts
+      path: assets/scripts/framework/core/GameModule.ts
+      purpose: 游戏模块管理器，负责注册、获取、驱动所有框架模块的生命周期
+      has_logger: false
+      class_name: GameModule
+      is_module_base: false # 静态工具类
+      lifecycle: []
+      key_elements:
+          - element: register
+            type: function
+            location: 'GameModule.ts:22'
+            description: '注册模块（含 allowReplace 替换逻辑）'
+          - element: getModule
+            type: function
+            location: 'GameModule.ts:38'
+            description: '按名称获取模块，不存在则抛异常'
+          - element: update
+            type: function
+            location: 'GameModule.ts:62'
+            description: '驱动所有模块更新（含脏标记排序）'
+          - element: shutdownAll
+            type: function
+            location: 'GameModule.ts:76'
+            description: '按 priority 降序关闭所有模块'
+      language: typescript
+      lines: 93
+      suggested_log_points:
+          - method: register
+            level: info
+            message: 'Logger.info(TAG, `模块注册: ${name}, priority=${module.priority}`)'
+          - method: register (allowReplace)
+            level: warn
+            message: 'Logger.warn(TAG, `模块替换: ${name}, 旧模块将被关闭`)'
+          - method: update (dirty sort)
+            level: debug
+            message: 'Logger.debug(TAG, `模块重新排序, count=${this._sortedModules.length}`)'
+          - method: shutdownAll
+            level: info
+            message: 'Logger.info(TAG, `关闭所有模块, count=${this._modules.size}`)'
 
-  - file: ModuleBase.ts
-    path: assets/scripts/framework/core/ModuleBase.ts
-    purpose: 框架模块抽象基类
-    has_logger: false
-    class_name: ModuleBase
-    is_module_base: true  # 自身就是基类
-    lifecycle: [onInit, onUpdate, onShutdown]
-    key_elements: []
-    language: typescript
-    lines: 44
-    suggested_log_points: []  # 抽象基类不加日志，由子类负责
+    - file: ModuleBase.ts
+      path: assets/scripts/framework/core/ModuleBase.ts
+      purpose: 框架模块抽象基类
+      has_logger: false
+      class_name: ModuleBase
+      is_module_base: true # 自身就是基类
+      lifecycle: [onInit, onUpdate, onShutdown]
+      key_elements: []
+      language: typescript
+      lines: 44
+      suggested_log_points: [] # 抽象基类不加日志，由子类负责
 
-  - file: GameEntry.ts
-    path: assets/scripts/framework/core/GameEntry.ts
-    purpose: 游戏框架入口（门面模式），提供统一 API
-    has_logger: false
-    class_name: GameEntry
-    is_module_base: false
-    lifecycle: []
-    key_elements:
-      - element: registerModule
-        type: function
-        location: "GameEntry.ts:31"
-        description: "注册模块到框架（委托 GameModule）"
-      - element: shutdown
-        type: function
-        location: "GameEntry.ts:43"
-        description: "关闭所有模块（委托 GameModule）"
-    language: typescript
-    lines: 46
-    suggested_log_points: []  # 纯薄代理，日志在 GameModule 中打
+    - file: GameEntry.ts
+      path: assets/scripts/framework/core/GameEntry.ts
+      purpose: 游戏框架入口（门面模式），提供统一 API
+      has_logger: false
+      class_name: GameEntry
+      is_module_base: false
+      lifecycle: []
+      key_elements:
+          - element: registerModule
+            type: function
+            location: 'GameEntry.ts:31'
+            description: '注册模块到框架（委托 GameModule）'
+          - element: shutdown
+            type: function
+            location: 'GameEntry.ts:43'
+            description: '关闭所有模块（委托 GameModule）'
+      language: typescript
+      lines: 46
+      suggested_log_points: [] # 纯薄代理，日志在 GameModule 中打
 
-  # ────────────── event 模块 ──────────────
-  - file: EventManager.ts
-    path: assets/scripts/framework/event/EventManager.ts
-    purpose: 事件管理器，提供发布-订阅模式的跨模块事件通信
-    has_logger: false
-    class_name: EventManager
-    is_module_base: true
-    lifecycle: [onInit, onShutdown]
-    key_elements:
-      - element: on
-        type: function
-        location: "EventManager.ts:94"
-        description: "注册事件监听"
-      - element: once
-        type: function
-        location: "EventManager.ts:105"
-        description: "注册一次性事件监听"
-      - element: off
-        type: function
-        location: "EventManager.ts:115"
-        description: "移除指定回调"
-      - element: offAll
-        type: function
-        location: "EventManager.ts:139"
-        description: "清除事件监听（全部或指定 key）"
-      - element: offByCaller
-        type: function
-        location: "EventManager.ts:152"
-        description: "移除某 caller 的所有监听"
-      - element: emit
-        type: function
-        location: "EventManager.ts:170"
-        description: "触发事件"
-    language: typescript
-    lines: 193
-    suggested_log_points:
-      - method: onInit
-        level: info
-        message: "Logger.info(TAG, '事件管理器初始化')"
-      - method: onShutdown
-        level: info
-        message: "Logger.info(TAG, `事件管理器关闭, 清理 ${this._eventMap.size} 个事件`)"
-      - method: emit
-        level: debug
-        message: "Logger.debug(TAG, `emit: ${key.id}, listeners=${bindings.length}`)"
-      - method: on (重复注册被忽略)
-        level: debug
-        message: "Logger.debug(TAG, `重复注册忽略: ${key.id}`)"
-      - method: offByCaller
-        level: debug
-        message: "Logger.debug(TAG, `清理 caller 的所有监听`)"
+    # ────────────── event 模块 ──────────────
+    - file: EventManager.ts
+      path: assets/scripts/framework/event/EventManager.ts
+      purpose: 事件管理器，提供发布-订阅模式的跨模块事件通信
+      has_logger: false
+      class_name: EventManager
+      is_module_base: true
+      lifecycle: [onInit, onShutdown]
+      key_elements:
+          - element: on
+            type: function
+            location: 'EventManager.ts:94'
+            description: '注册事件监听'
+          - element: once
+            type: function
+            location: 'EventManager.ts:105'
+            description: '注册一次性事件监听'
+          - element: off
+            type: function
+            location: 'EventManager.ts:115'
+            description: '移除指定回调'
+          - element: offAll
+            type: function
+            location: 'EventManager.ts:139'
+            description: '清除事件监听（全部或指定 key）'
+          - element: offByCaller
+            type: function
+            location: 'EventManager.ts:152'
+            description: '移除某 caller 的所有监听'
+          - element: emit
+            type: function
+            location: 'EventManager.ts:170'
+            description: '触发事件'
+      language: typescript
+      lines: 193
+      suggested_log_points:
+          - method: onInit
+            level: info
+            message: "Logger.info(TAG, '事件管理器初始化')"
+          - method: onShutdown
+            level: info
+            message: 'Logger.info(TAG, `事件管理器关闭, 清理 ${this._eventMap.size} 个事件`)'
+          - method: emit
+            level: debug
+            message: 'Logger.debug(TAG, `emit: ${key.id}, listeners=${bindings.length}`)'
+          - method: on (重复注册被忽略)
+            level: debug
+            message: 'Logger.debug(TAG, `重复注册忽略: ${key.id}`)'
+          - method: offByCaller
+            level: debug
+            message: 'Logger.debug(TAG, `清理 caller 的所有监听`)'
 
-  # ────────────── objectpool 模块 ──────────────
-  - file: ObjectPool.ts
-    path: assets/scripts/framework/objectpool/ObjectPool.ts
-    purpose: 泛型单类型对象池
-    has_logger: false
-    class_name: ObjectPool
-    is_module_base: false
-    lifecycle: []
-    key_elements:
-      - element: acquire
-        type: function
-        location: "ObjectPool.ts:66"
-        description: "从池中获取对象（无则创建）"
-      - element: release
-        type: function
-        location: "ObjectPool.ts:82"
-        description: "回收对象入池（含防重复检查）"
-      - element: preload
-        type: function
-        location: "ObjectPool.ts:101"
-        description: "预热创建对象"
-      - element: clear
-        type: function
-        location: "ObjectPool.ts:113"
-        description: "清空池中空闲对象"
-    language: typescript
-    lines: 127
-    suggested_log_points:
-      - method: acquire (新建对象)
-        level: debug
-        message: "Logger.debug(TAG, `新建对象: ${this._ctor.name}, totalCreated=${this._totalCreated}`)"
-      - method: release (重复入池)
-        level: warn
-        message: "Logger.warn(TAG, `重复 release 被忽略: ${this._ctor.name}`)"
-      - method: release (池满丢弃)
-        level: debug
-        message: "Logger.debug(TAG, `池满丢弃: ${this._ctor.name}, maxSize=${this._maxSize}`)"
-      - method: preload
-        level: debug
-        message: "Logger.debug(TAG, `预热: ${this._ctor.name}, count=${createCount}`)"
-      - method: clear
-        level: debug
-        message: "Logger.debug(TAG, `清空池: ${this._ctor.name}, freed=${this._freeList.length}`)"
+    # ────────────── objectpool 模块 ──────────────
+    - file: ObjectPool.ts
+      path: assets/scripts/framework/objectpool/ObjectPool.ts
+      purpose: 泛型单类型对象池
+      has_logger: false
+      class_name: ObjectPool
+      is_module_base: false
+      lifecycle: []
+      key_elements:
+          - element: acquire
+            type: function
+            location: 'ObjectPool.ts:66'
+            description: '从池中获取对象（无则创建）'
+          - element: release
+            type: function
+            location: 'ObjectPool.ts:82'
+            description: '回收对象入池（含防重复检查）'
+          - element: preload
+            type: function
+            location: 'ObjectPool.ts:101'
+            description: '预热创建对象'
+          - element: clear
+            type: function
+            location: 'ObjectPool.ts:113'
+            description: '清空池中空闲对象'
+      language: typescript
+      lines: 127
+      suggested_log_points:
+          - method: acquire (新建对象)
+            level: debug
+            message: 'Logger.debug(TAG, `新建对象: ${this._ctor.name}, totalCreated=${this._totalCreated}`)'
+          - method: release (重复入池)
+            level: warn
+            message: 'Logger.warn(TAG, `重复 release 被忽略: ${this._ctor.name}`)'
+          - method: release (池满丢弃)
+            level: debug
+            message: 'Logger.debug(TAG, `池满丢弃: ${this._ctor.name}, maxSize=${this._maxSize}`)'
+          - method: preload
+            level: debug
+            message: 'Logger.debug(TAG, `预热: ${this._ctor.name}, count=${createCount}`)'
+          - method: clear
+            level: debug
+            message: 'Logger.debug(TAG, `清空池: ${this._ctor.name}, freed=${this._freeList.length}`)'
 
-  - file: ReferencePool.ts
-    path: assets/scripts/framework/objectpool/ReferencePool.ts
-    purpose: 引用池管理器（框架模块），全局管理多类型对象池
-    has_logger: false
-    class_name: ReferencePool
-    is_module_base: true
-    lifecycle: [onInit, onShutdown]
-    key_elements:
-      - element: acquire
-        type: function
-        location: "ReferencePool.ts:58"
-        description: "从对应类型池中获取对象"
-      - element: release
-        type: function
-        location: "ReferencePool.ts:70"
-        description: "回收对象到对应类型池"
-      - element: clearAll
-        type: function
-        location: "ReferencePool.ts:93"
-        description: "清空所有对象池"
-      - element: setMaxSize
-        type: function
-        location: "ReferencePool.ts:110"
-        description: "设置指定类型池的容量上限"
-    language: typescript
-    lines: 133
-    suggested_log_points:
-      - method: onInit
-        level: info
-        message: "Logger.info(TAG, '引用池管理器初始化')"
-      - method: onShutdown
-        level: info
-        message: "Logger.info(TAG, `引用池管理器关闭, 清理 ${this._poolMap.size} 个池`)"
-      - method: release (池不存在)
-        level: warn
-        message: "Logger.warn(TAG, `release 时找不到对应池: ${ctor.name}`)"
-      - method: _getOrCreatePool (新建池)
-        level: debug
-        message: "Logger.debug(TAG, `自动创建对象池: ${ctor.name}`)"
+    - file: ReferencePool.ts
+      path: assets/scripts/framework/objectpool/ReferencePool.ts
+      purpose: 引用池管理器（框架模块），全局管理多类型对象池
+      has_logger: false
+      class_name: ReferencePool
+      is_module_base: true
+      lifecycle: [onInit, onShutdown]
+      key_elements:
+          - element: acquire
+            type: function
+            location: 'ReferencePool.ts:58'
+            description: '从对应类型池中获取对象'
+          - element: release
+            type: function
+            location: 'ReferencePool.ts:70'
+            description: '回收对象到对应类型池'
+          - element: clearAll
+            type: function
+            location: 'ReferencePool.ts:93'
+            description: '清空所有对象池'
+          - element: setMaxSize
+            type: function
+            location: 'ReferencePool.ts:110'
+            description: '设置指定类型池的容量上限'
+      language: typescript
+      lines: 133
+      suggested_log_points:
+          - method: onInit
+            level: info
+            message: "Logger.info(TAG, '引用池管理器初始化')"
+          - method: onShutdown
+            level: info
+            message: 'Logger.info(TAG, `引用池管理器关闭, 清理 ${this._poolMap.size} 个池`)'
+          - method: release (池不存在)
+            level: warn
+            message: 'Logger.warn(TAG, `release 时找不到对应池: ${ctor.name}`)'
+          - method: _getOrCreatePool (新建池)
+            level: debug
+            message: 'Logger.debug(TAG, `自动创建对象池: ${ctor.name}`)'
 
-  # ────────────── fsm 模块 ──────────────
-  - file: FsmManager.ts
-    path: assets/scripts/framework/fsm/FsmManager.ts
-    purpose: 有限状态机管理器
-    has_logger: false
-    class_name: FsmManager
-    is_module_base: true
-    lifecycle: [onInit, onUpdate, onShutdown]
-    key_elements:
-      - element: createFsm
-        type: function
-        location: "FsmManager.ts:73"
-        description: "创建有限状态机"
-      - element: destroyFsm
-        type: function
-        location: "FsmManager.ts:95"
-        description: "销毁有限状态机"
-      - element: getFsm
-        type: function
-        location: "FsmManager.ts:108"
-        description: "获取状态机实例"
-    language: typescript
-    lines: 123
-    suggested_log_points:
-      - method: onInit
-        level: info
-        message: "Logger.info(TAG, '状态机管理器初始化')"
-      - method: onShutdown
-        level: info
-        message: "Logger.info(TAG, `状态机管理器关闭, 销毁 ${this._fsmMap.size} 个状态机`)"
-      - method: createFsm
-        level: debug
-        message: "Logger.debug(TAG, `创建状态机: ${name}, states=${states.length}`)"
-      - method: destroyFsm
-        level: debug
-        message: "Logger.debug(TAG, `销毁状态机: ${name}`)"
-      - method: destroyFsm (不存在)
-        level: debug
-        message: "Logger.debug(TAG, `状态机不存在，忽略销毁: ${name}`)"
+    # ────────────── fsm 模块 ──────────────
+    - file: FsmManager.ts
+      path: assets/scripts/framework/fsm/FsmManager.ts
+      purpose: 有限状态机管理器
+      has_logger: false
+      class_name: FsmManager
+      is_module_base: true
+      lifecycle: [onInit, onUpdate, onShutdown]
+      key_elements:
+          - element: createFsm
+            type: function
+            location: 'FsmManager.ts:73'
+            description: '创建有限状态机'
+          - element: destroyFsm
+            type: function
+            location: 'FsmManager.ts:95'
+            description: '销毁有限状态机'
+          - element: getFsm
+            type: function
+            location: 'FsmManager.ts:108'
+            description: '获取状态机实例'
+      language: typescript
+      lines: 123
+      suggested_log_points:
+          - method: onInit
+            level: info
+            message: "Logger.info(TAG, '状态机管理器初始化')"
+          - method: onShutdown
+            level: info
+            message: 'Logger.info(TAG, `状态机管理器关闭, 销毁 ${this._fsmMap.size} 个状态机`)'
+          - method: createFsm
+            level: debug
+            message: 'Logger.debug(TAG, `创建状态机: ${name}, states=${states.length}`)'
+          - method: destroyFsm
+            level: debug
+            message: 'Logger.debug(TAG, `销毁状态机: ${name}`)'
+          - method: destroyFsm (不存在)
+            level: debug
+            message: 'Logger.debug(TAG, `状态机不存在，忽略销毁: ${name}`)'
 
-  - file: Fsm.ts
-    path: assets/scripts/framework/fsm/Fsm.ts
-    purpose: 有限状态机，管理状态切换与共享数据
-    has_logger: false
-    class_name: Fsm
-    is_module_base: false
-    lifecycle: []
-    key_elements:
-      - element: start
-        type: function
-        location: "Fsm.ts:80"
-        description: "启动状态机，进入初始状态"
-      - element: changeState
-        type: function
-        location: "Fsm.ts:97"
-        description: "切换到指定状态（含反递归保护）"
-      - element: update
-        type: function
-        location: "Fsm.ts:122"
-        description: "驱动当前状态更新"
-      - element: shutdown
-        type: function
-        location: "Fsm.ts:132"
-        description: "关闭状态机，销毁所有状态"
-    language: typescript
-    lines: 175
-    suggested_log_points:
-      - method: start
-        level: debug
-        message: "Logger.debug(TAG, `[${this._name}] 启动, 初始状态=${stateType.name}`)"
-      - method: changeState
-        level: debug
-        message: "Logger.debug(TAG, `[${this._name}] 状态切换: ${this._currentState.constructor.name} → ${stateType.name}`)"
-      - method: shutdown
-        level: debug
-        message: "Logger.debug(TAG, `[${this._name}] 关闭, 清理 ${this._states.size} 个状态`)"
+    - file: Fsm.ts
+      path: assets/scripts/framework/fsm/Fsm.ts
+      purpose: 有限状态机，管理状态切换与共享数据
+      has_logger: false
+      class_name: Fsm
+      is_module_base: false
+      lifecycle: []
+      key_elements:
+          - element: start
+            type: function
+            location: 'Fsm.ts:80'
+            description: '启动状态机，进入初始状态'
+          - element: changeState
+            type: function
+            location: 'Fsm.ts:97'
+            description: '切换到指定状态（含反递归保护）'
+          - element: update
+            type: function
+            location: 'Fsm.ts:122'
+            description: '驱动当前状态更新'
+          - element: shutdown
+            type: function
+            location: 'Fsm.ts:132'
+            description: '关闭状态机，销毁所有状态'
+      language: typescript
+      lines: 175
+      suggested_log_points:
+          - method: start
+            level: debug
+            message: 'Logger.debug(TAG, `[${this._name}] 启动, 初始状态=${stateType.name}`)'
+          - method: changeState
+            level: debug
+            message: 'Logger.debug(TAG, `[${this._name}] 状态切换: ${this._currentState.constructor.name} → ${stateType.name}`)'
+          - method: shutdown
+            level: debug
+            message: 'Logger.debug(TAG, `[${this._name}] 关闭, 清理 ${this._states.size} 个状态`)'
 
-  - file: FsmState.ts
-    path: assets/scripts/framework/fsm/FsmState.ts
-    purpose: 有限状态机状态基类
-    has_logger: false
-    class_name: FsmState
-    is_module_base: false
-    lifecycle: []
-    key_elements:
-      - element: changeState
-        type: function
-        location: "FsmState.ts:47"
-        description: "便捷方法：在状态内部切换到另一个状态"
-    language: typescript
-    lines: 53
-    suggested_log_points: []  # 抽象基类，由具体状态子类自行决定
+    - file: FsmState.ts
+      path: assets/scripts/framework/fsm/FsmState.ts
+      purpose: 有限状态机状态基类
+      has_logger: false
+      class_name: FsmState
+      is_module_base: false
+      lifecycle: []
+      key_elements:
+          - element: changeState
+            type: function
+            location: 'FsmState.ts:47'
+            description: '便捷方法：在状态内部切换到另一个状态'
+      language: typescript
+      lines: 53
+      suggested_log_points: [] # 抽象基类，由具体状态子类自行决定
 
-  # ────────────── procedure 模块 ──────────────
-  - file: ProcedureManager.ts
-    path: assets/scripts/framework/procedure/ProcedureManager.ts
-    purpose: 流程管理器，通过内部 FSM 驱动游戏全局流程切换
-    has_logger: false
-    class_name: ProcedureManager
-    is_module_base: true
-    lifecycle: [onInit, onUpdate, onShutdown]
-    key_elements:
-      - element: initialize
-        type: function
-        location: "ProcedureManager.ts:60"
-        description: "注册流程列表并创建内部 FSM"
-      - element: startProcedure
-        type: function
-        location: "ProcedureManager.ts:79"
-        description: "启动流程管理器，进入入口流程"
-      - element: hasProcedure
-        type: function
-        location: "ProcedureManager.ts:92"
-        description: "检查是否包含指定流程"
-    language: typescript
-    lines: 115
-    suggested_log_points:
-      - method: onInit
-        level: info
-        message: "Logger.info(TAG, '流程管理器初始化')"
-      - method: onShutdown
-        level: info
-        message: "Logger.info(TAG, '流程管理器关闭')"
-      - method: initialize
-        level: info
-        message: "Logger.info(TAG, `注册 ${procedures.length} 个流程`)"
-      - method: startProcedure
-        level: info
-        message: "Logger.info(TAG, `启动入口流程: ${entryProcedure.name}`)"
+    # ────────────── procedure 模块 ──────────────
+    - file: ProcedureManager.ts
+      path: assets/scripts/framework/procedure/ProcedureManager.ts
+      purpose: 流程管理器，通过内部 FSM 驱动游戏全局流程切换
+      has_logger: false
+      class_name: ProcedureManager
+      is_module_base: true
+      lifecycle: [onInit, onUpdate, onShutdown]
+      key_elements:
+          - element: initialize
+            type: function
+            location: 'ProcedureManager.ts:60'
+            description: '注册流程列表并创建内部 FSM'
+          - element: startProcedure
+            type: function
+            location: 'ProcedureManager.ts:79'
+            description: '启动流程管理器，进入入口流程'
+          - element: hasProcedure
+            type: function
+            location: 'ProcedureManager.ts:92'
+            description: '检查是否包含指定流程'
+      language: typescript
+      lines: 115
+      suggested_log_points:
+          - method: onInit
+            level: info
+            message: "Logger.info(TAG, '流程管理器初始化')"
+          - method: onShutdown
+            level: info
+            message: "Logger.info(TAG, '流程管理器关闭')"
+          - method: initialize
+            level: info
+            message: 'Logger.info(TAG, `注册 ${procedures.length} 个流程`)'
+          - method: startProcedure
+            level: info
+            message: 'Logger.info(TAG, `启动入口流程: ${entryProcedure.name}`)'
 
-  - file: ProcedureBase.ts
-    path: assets/scripts/framework/procedure/ProcedureBase.ts
-    purpose: 流程基类，所有游戏流程必须继承此类
-    has_logger: false
-    class_name: ProcedureBase
-    is_module_base: false
-    lifecycle: []
-    key_elements:
-      - element: changeProcedure
-        type: function
-        location: "ProcedureBase.ts:35"
-        description: "切换到下一个流程"
-    language: typescript
-    lines: 41
-    suggested_log_points: []  # 抽象基类
+    - file: ProcedureBase.ts
+      path: assets/scripts/framework/procedure/ProcedureBase.ts
+      purpose: 流程基类，所有游戏流程必须继承此类
+      has_logger: false
+      class_name: ProcedureBase
+      is_module_base: false
+      lifecycle: []
+      key_elements:
+          - element: changeProcedure
+            type: function
+            location: 'ProcedureBase.ts:35'
+            description: '切换到下一个流程'
+      language: typescript
+      lines: 41
+      suggested_log_points: [] # 抽象基类
 
-  # ────────────── resource 模块 ──────────────
-  - file: ResourceManager.ts
-    path: assets/scripts/framework/resource/ResourceManager.ts
-    purpose: 资源管理器，统一管理资源的加载、释放、缓存与引用计数
-    has_logger: false
-    class_name: ResourceManager
-    is_module_base: true
-    lifecycle: [onInit, onShutdown]
-    key_elements:
-      - element: setResourceLoader
-        type: function
-        location: "ResourceManager.ts:53"
-        description: "设置资源加载器"
-      - element: loadAsset
-        type: function
-        location: "ResourceManager.ts:66"
-        description: "加载资源（三种情况：缓存命中/加载去重/新加载）"
-      - element: releaseAsset
-        type: function
-        location: "ResourceManager.ts:131"
-        description: "释放资源（引用计数管理）"
-      - element: releaseByOwner
-        type: function
-        location: "ResourceManager.ts:148"
-        description: "释放指定 owner 的所有资源"
-      - element: preload
-        type: function
-        location: "ResourceManager.ts:201"
-        description: "预加载一组资源"
-    language: typescript
-    lines: 280
-    suggested_log_points:
-      - method: onInit
-        level: info
-        message: "Logger.info(TAG, '资源管理器初始化')"
-      - method: onShutdown
-        level: info
-        message: "Logger.info(TAG, `资源管理器关闭, 释放 ${paths.length} 个资源`)"
-      - method: loadAsset (缓存命中)
-        level: debug
-        message: "Logger.debug(TAG, `缓存命中: ${path}, owner=${owner}`)"
-      - method: loadAsset (加载去重)
-        level: debug
-        message: "Logger.debug(TAG, `加载去重, 追加回调: ${path}, owner=${owner}`)"
-      - method: loadAsset (新加载)
-        level: debug
-        message: "Logger.debug(TAG, `发起加载: ${path}, owner=${owner}`)"
-      - method: loadAsset (onSuccess 回调)
-        level: debug
-        message: "Logger.debug(TAG, `加载成功: ${path}`)"
-      - method: loadAsset (onFailure 回调)
-        level: warn
-        message: "Logger.warn(TAG, `加载失败: ${path}`, error)"
-      - method: releaseAsset
-        level: debug
-        message: "Logger.debug(TAG, `释放: ${path}, owner=${owner}, refCount=${info.refCount-1}`)"
-      - method: releaseAsset (引用归零)
-        level: debug
-        message: "Logger.debug(TAG, `引用归零，真正释放: ${path}`)"
-      - method: preload
-        level: debug
-        message: "Logger.debug(TAG, `预加载: ${uniquePaths.length} 个资源, owner=${owner}`)"
+    # ────────────── resource 模块 ──────────────
+    - file: ResourceManager.ts
+      path: assets/scripts/framework/resource/ResourceManager.ts
+      purpose: 资源管理器，统一管理资源的加载、释放、缓存与引用计数
+      has_logger: false
+      class_name: ResourceManager
+      is_module_base: true
+      lifecycle: [onInit, onShutdown]
+      key_elements:
+          - element: setResourceLoader
+            type: function
+            location: 'ResourceManager.ts:53'
+            description: '设置资源加载器'
+          - element: loadAsset
+            type: function
+            location: 'ResourceManager.ts:66'
+            description: '加载资源（三种情况：缓存命中/加载去重/新加载）'
+          - element: releaseAsset
+            type: function
+            location: 'ResourceManager.ts:131'
+            description: '释放资源（引用计数管理）'
+          - element: releaseByOwner
+            type: function
+            location: 'ResourceManager.ts:148'
+            description: '释放指定 owner 的所有资源'
+          - element: preload
+            type: function
+            location: 'ResourceManager.ts:201'
+            description: '预加载一组资源'
+      language: typescript
+      lines: 280
+      suggested_log_points:
+          - method: onInit
+            level: info
+            message: "Logger.info(TAG, '资源管理器初始化')"
+          - method: onShutdown
+            level: info
+            message: 'Logger.info(TAG, `资源管理器关闭, 释放 ${paths.length} 个资源`)'
+          - method: loadAsset (缓存命中)
+            level: debug
+            message: 'Logger.debug(TAG, `缓存命中: ${path}, owner=${owner}`)'
+          - method: loadAsset (加载去重)
+            level: debug
+            message: 'Logger.debug(TAG, `加载去重, 追加回调: ${path}, owner=${owner}`)'
+          - method: loadAsset (新加载)
+            level: debug
+            message: 'Logger.debug(TAG, `发起加载: ${path}, owner=${owner}`)'
+          - method: loadAsset (onSuccess 回调)
+            level: debug
+            message: 'Logger.debug(TAG, `加载成功: ${path}`)'
+          - method: loadAsset (onFailure 回调)
+            level: warn
+            message: 'Logger.warn(TAG, `加载失败: ${path}`, error)'
+          - method: releaseAsset
+            level: debug
+            message: 'Logger.debug(TAG, `释放: ${path}, owner=${owner}, refCount=${info.refCount-1}`)'
+          - method: releaseAsset (引用归零)
+            level: debug
+            message: 'Logger.debug(TAG, `引用归零，真正释放: ${path}`)'
+          - method: preload
+            level: debug
+            message: 'Logger.debug(TAG, `预加载: ${uniquePaths.length} 个资源, owner=${owner}`)'
 
-  # ────────────── ui 模块 ──────────────
-  - file: UIManager.ts
-    path: assets/scripts/framework/ui/UIManager.ts
-    purpose: UI 管理器，统一管理 UI 表单的注册、加载、打开、关闭与生命周期
-    has_logger: false
-    class_name: UIManager
-    is_module_base: true
-    lifecycle: [onInit, onUpdate, onShutdown]
-    key_elements:
-      - element: setUIFormFactory
-        type: function
-        location: "UIManager.ts:64"
-        description: "设置 UI 表单工厂"
-      - element: registerForm
-        type: function
-        location: "UIManager.ts:73"
-        description: "注册表单配置"
-      - element: openForm
-        type: function
-        location: "UIManager.ts:89"
-        description: "打开表单（含重复检查、工厂创建、栈管理）"
-      - element: closeForm
-        type: function
-        location: "UIManager.ts:132"
-        description: "关闭表单（含栈弹出、onReveal 通知）"
-      - element: closeAllForms
-        type: function
-        location: "UIManager.ts:168"
-        description: "关闭所有表单（可指定层级）"
-    language: typescript
-    lines: 220
-    suggested_log_points:
-      - method: onInit
-        level: info
-        message: "Logger.info(TAG, 'UI 管理器初始化')"
-      - method: onShutdown
-        level: info
-        message: "Logger.info(TAG, `UI 管理器关闭, 清理 ${this._openForms.size} 个表单`)"
-      - method: registerForm
-        level: debug
-        message: "Logger.debug(TAG, `注册表单: ${formName}, layer=${config.layer}`)"
-      - method: openForm
-        level: debug
-        message: "Logger.debug(TAG, `打开表单: ${formName}, layer=${config.layer}`)"
-      - method: openForm (重复打开忽略)
-        level: debug
-        message: "Logger.debug(TAG, `表单已打开, 忽略: ${formName}`)"
-      - method: closeForm
-        level: debug
-        message: "Logger.debug(TAG, `关闭表单: ${formName}`)"
-      - method: closeForm (onReveal)
-        level: debug
-        message: "Logger.debug(TAG, `栈顶恢复: ${newTop.formName}`)"
-      - method: closeAllForms
-        level: info
-        message: "Logger.info(TAG, `关闭所有表单, layer=${layer ?? 'all'}`)"
+    # ────────────── ui 模块 ──────────────
+    - file: UIManager.ts
+      path: assets/scripts/framework/ui/UIManager.ts
+      purpose: UI 管理器，统一管理 UI 表单的注册、加载、打开、关闭与生命周期
+      has_logger: false
+      class_name: UIManager
+      is_module_base: true
+      lifecycle: [onInit, onUpdate, onShutdown]
+      key_elements:
+          - element: setUIFormFactory
+            type: function
+            location: 'UIManager.ts:64'
+            description: '设置 UI 表单工厂'
+          - element: registerForm
+            type: function
+            location: 'UIManager.ts:73'
+            description: '注册表单配置'
+          - element: openForm
+            type: function
+            location: 'UIManager.ts:89'
+            description: '打开表单（含重复检查、工厂创建、栈管理）'
+          - element: closeForm
+            type: function
+            location: 'UIManager.ts:132'
+            description: '关闭表单（含栈弹出、onReveal 通知）'
+          - element: closeAllForms
+            type: function
+            location: 'UIManager.ts:168'
+            description: '关闭所有表单（可指定层级）'
+      language: typescript
+      lines: 220
+      suggested_log_points:
+          - method: onInit
+            level: info
+            message: "Logger.info(TAG, 'UI 管理器初始化')"
+          - method: onShutdown
+            level: info
+            message: 'Logger.info(TAG, `UI 管理器关闭, 清理 ${this._openForms.size} 个表单`)'
+          - method: registerForm
+            level: debug
+            message: 'Logger.debug(TAG, `注册表单: ${formName}, layer=${config.layer}`)'
+          - method: openForm
+            level: debug
+            message: 'Logger.debug(TAG, `打开表单: ${formName}, layer=${config.layer}`)'
+          - method: openForm (重复打开忽略)
+            level: debug
+            message: 'Logger.debug(TAG, `表单已打开, 忽略: ${formName}`)'
+          - method: closeForm
+            level: debug
+            message: 'Logger.debug(TAG, `关闭表单: ${formName}`)'
+          - method: closeForm (onReveal)
+            level: debug
+            message: 'Logger.debug(TAG, `栈顶恢复: ${newTop.formName}`)'
+          - method: closeAllForms
+            level: info
+            message: "Logger.info(TAG, `关闭所有表单, layer=${layer ?? 'all'}`)"
 
-  - file: UIFormBase.ts
-    path: assets/scripts/framework/ui/UIFormBase.ts
-    purpose: UI 表单抽象基类
-    has_logger: false
-    class_name: UIFormBase
-    is_module_base: false
-    lifecycle: []
-    key_elements:
-      - element: onOpen
-        type: function
-        location: "UIFormBase.ts:49"
-        description: "表单打开时调用"
-      - element: onClose
-        type: function
-        location: "UIFormBase.ts:56"
-        description: "表单关闭时调用"
-      - element: onCover
-        type: function
-        location: "UIFormBase.ts:63"
-        description: "表单被覆盖时调用"
-      - element: onReveal
-        type: function
-        location: "UIFormBase.ts:70"
-        description: "表单重新可见时调用"
-    language: typescript
-    lines: 82
-    suggested_log_points: []  # 抽象基类
+    - file: UIFormBase.ts
+      path: assets/scripts/framework/ui/UIFormBase.ts
+      purpose: UI 表单抽象基类
+      has_logger: false
+      class_name: UIFormBase
+      is_module_base: false
+      lifecycle: []
+      key_elements:
+          - element: onOpen
+            type: function
+            location: 'UIFormBase.ts:49'
+            description: '表单打开时调用'
+          - element: onClose
+            type: function
+            location: 'UIFormBase.ts:56'
+            description: '表单关闭时调用'
+          - element: onCover
+            type: function
+            location: 'UIFormBase.ts:63'
+            description: '表单被覆盖时调用'
+          - element: onReveal
+            type: function
+            location: 'UIFormBase.ts:70'
+            description: '表单重新可见时调用'
+      language: typescript
+      lines: 82
+      suggested_log_points: [] # 抽象基类
 
-  # ────────────── entity 模块 ──────────────
-  - file: EntityManager.ts
-    path: assets/scripts/framework/entity/EntityManager.ts
-    purpose: 实体管理器，统一管理实体分组的注册、创建、隐藏与生命周期
-    has_logger: false
-    class_name: EntityManager
-    is_module_base: true
-    lifecycle: [onInit, onUpdate, onShutdown]
-    key_elements:
-      - element: setEntityFactory
-        type: function
-        location: "EntityManager.ts:57"
-        description: "设置实体工厂"
-      - element: registerGroup
-        type: function
-        location: "EntityManager.ts:66"
-        description: "注册实体分组"
-      - element: showEntity
-        type: function
-        location: "EntityManager.ts:81"
-        description: "显示（激活）实体"
-      - element: hideEntity
-        type: function
-        location: "EntityManager.ts:98"
-        description: "隐藏（回收）实体"
-      - element: hideAllEntities
-        type: function
-        location: "EntityManager.ts:109"
-        description: "隐藏所有实体"
-    language: typescript
-    lines: 138
-    suggested_log_points:
-      - method: onInit
-        level: info
-        message: "Logger.info(TAG, '实体管理器初始化')"
-      - method: onShutdown
-        level: info
-        message: "Logger.info(TAG, `实体管理器关闭, 销毁 ${this._groups.size} 个分组`)"
-      - method: registerGroup
-        level: debug
-        message: "Logger.debug(TAG, `注册分组: ${groupName}`)"
-      - method: showEntity
-        level: debug
-        message: "Logger.debug(TAG, `显示实体: group=${groupName}, id=${entityId}`)"
-      - method: hideEntity
-        level: debug
-        message: "Logger.debug(TAG, `隐藏实体: id=${entity.entityId}`)"
-      - method: hideEntity (不存在)
-        level: debug
-        message: "Logger.debug(TAG, `实体不在管理中, 忽略: id=${entity.entityId}`)"
-      - method: hideAllEntities
-        level: debug
-        message: "Logger.debug(TAG, `隐藏所有实体, group=${groupName ?? 'all'}`)"
+    # ────────────── entity 模块 ──────────────
+    - file: EntityManager.ts
+      path: assets/scripts/framework/entity/EntityManager.ts
+      purpose: 实体管理器，统一管理实体分组的注册、创建、隐藏与生命周期
+      has_logger: false
+      class_name: EntityManager
+      is_module_base: true
+      lifecycle: [onInit, onUpdate, onShutdown]
+      key_elements:
+          - element: setEntityFactory
+            type: function
+            location: 'EntityManager.ts:57'
+            description: '设置实体工厂'
+          - element: registerGroup
+            type: function
+            location: 'EntityManager.ts:66'
+            description: '注册实体分组'
+          - element: showEntity
+            type: function
+            location: 'EntityManager.ts:81'
+            description: '显示（激活）实体'
+          - element: hideEntity
+            type: function
+            location: 'EntityManager.ts:98'
+            description: '隐藏（回收）实体'
+          - element: hideAllEntities
+            type: function
+            location: 'EntityManager.ts:109'
+            description: '隐藏所有实体'
+      language: typescript
+      lines: 138
+      suggested_log_points:
+          - method: onInit
+            level: info
+            message: "Logger.info(TAG, '实体管理器初始化')"
+          - method: onShutdown
+            level: info
+            message: 'Logger.info(TAG, `实体管理器关闭, 销毁 ${this._groups.size} 个分组`)'
+          - method: registerGroup
+            level: debug
+            message: 'Logger.debug(TAG, `注册分组: ${groupName}`)'
+          - method: showEntity
+            level: debug
+            message: 'Logger.debug(TAG, `显示实体: group=${groupName}, id=${entityId}`)'
+          - method: hideEntity
+            level: debug
+            message: 'Logger.debug(TAG, `隐藏实体: id=${entity.entityId}`)'
+          - method: hideEntity (不存在)
+            level: debug
+            message: 'Logger.debug(TAG, `实体不在管理中, 忽略: id=${entity.entityId}`)'
+          - method: hideAllEntities
+            level: debug
+            message: "Logger.debug(TAG, `隐藏所有实体, group=${groupName ?? 'all'}`)"
 
-  - file: EntityGroup.ts
-    path: assets/scripts/framework/entity/EntityGroup.ts
-    purpose: 实体分组，管理同类型实体的生命周期与对象池复用
-    has_logger: false
-    class_name: EntityGroup
-    is_module_base: false
-    lifecycle: []
-    key_elements:
-      - element: showEntity
-        type: function
-        location: "EntityGroup.ts:61"
-        description: "取出/创建实体并激活"
-      - element: hideEntity
-        type: function
-        location: "EntityGroup.ts:77"
-        description: "隐藏实体并回收到等待池"
-      - element: destroyAll
-        type: function
-        location: "EntityGroup.ts:96"
-        description: "销毁分组内所有实体"
-    language: typescript
-    lines: 120
-    suggested_log_points:
-      - method: showEntity (从等待池复用)
-        level: debug
-        message: "Logger.debug(TAG, `[${this._groupName}] 复用实体: id=${entityId}`)"
-      - method: showEntity (新建)
-        level: debug
-        message: "Logger.debug(TAG, `[${this._groupName}] 新建实体: id=${entityId}`)"
-      - method: hideEntity
-        level: debug
-        message: "Logger.debug(TAG, `[${this._groupName}] 回收实体: id=${entity.entityId}`)"
-      - method: destroyAll
-        level: debug
-        message: "Logger.debug(TAG, `[${this._groupName}] 销毁全部: active=${this._activeList.length}, waiting=${this._waitingList.length}`)"
+    - file: EntityGroup.ts
+      path: assets/scripts/framework/entity/EntityGroup.ts
+      purpose: 实体分组，管理同类型实体的生命周期与对象池复用
+      has_logger: false
+      class_name: EntityGroup
+      is_module_base: false
+      lifecycle: []
+      key_elements:
+          - element: showEntity
+            type: function
+            location: 'EntityGroup.ts:61'
+            description: '取出/创建实体并激活'
+          - element: hideEntity
+            type: function
+            location: 'EntityGroup.ts:77'
+            description: '隐藏实体并回收到等待池'
+          - element: destroyAll
+            type: function
+            location: 'EntityGroup.ts:96'
+            description: '销毁分组内所有实体'
+      language: typescript
+      lines: 120
+      suggested_log_points:
+          - method: showEntity (从等待池复用)
+            level: debug
+            message: 'Logger.debug(TAG, `[${this._groupName}] 复用实体: id=${entityId}`)'
+          - method: showEntity (新建)
+            level: debug
+            message: 'Logger.debug(TAG, `[${this._groupName}] 新建实体: id=${entityId}`)'
+          - method: hideEntity
+            level: debug
+            message: 'Logger.debug(TAG, `[${this._groupName}] 回收实体: id=${entity.entityId}`)'
+          - method: destroyAll
+            level: debug
+            message: 'Logger.debug(TAG, `[${this._groupName}] 销毁全部: active=${this._activeList.length}, waiting=${this._waitingList.length}`)'
 
-  - file: EntityBase.ts
-    path: assets/scripts/framework/entity/EntityBase.ts
-    purpose: 实体抽象基类
-    has_logger: false
-    class_name: EntityBase
-    is_module_base: false
-    lifecycle: []
-    key_elements: []
-    language: typescript
-    lines: 86
-    suggested_log_points: []  # 抽象基类
+    - file: EntityBase.ts
+      path: assets/scripts/framework/entity/EntityBase.ts
+      purpose: 实体抽象基类
+      has_logger: false
+      class_name: EntityBase
+      is_module_base: false
+      lifecycle: []
+      key_elements: []
+      language: typescript
+      lines: 86
+      suggested_log_points: [] # 抽象基类
 
-  # ────────────── network 模块 ──────────────
-  - file: NetworkManager.ts
-    path: assets/scripts/framework/network/NetworkManager.ts
-    purpose: 网络管理器，统一管理多个网络通道的生命周期
-    has_logger: false
-    class_name: NetworkManager
-    is_module_base: true
-    lifecycle: [onInit, onUpdate, onShutdown]
-    key_elements:
-      - element: setEventManager
-        type: function
-        location: "NetworkManager.ts:70"
-        description: "设置事件管理器"
-      - element: createChannel
-        type: function
-        location: "NetworkManager.ts:82"
-        description: "创建网络通道"
-      - element: destroyChannel
-        type: function
-        location: "NetworkManager.ts:112"
-        description: "销毁网络通道"
-      - element: setHeartbeatHandler
-        type: function
-        location: "NetworkManager.ts:136"
-        description: "为通道设置心跳处理器"
-      - element: onConnected
-        type: function
-        location: "NetworkManager.ts:147"
-        description: "通道连接成功回调"
-      - element: onClosed
-        type: function
-        location: "NetworkManager.ts:154"
-        description: "通道关闭回调"
-      - element: onError
-        type: function
-        location: "NetworkManager.ts:164"
-        description: "通道错误回调"
-      - element: onMessage
-        type: function
-        location: "NetworkManager.ts:171"
-        description: "通道消息回调"
-      - element: onReconnecting
-        type: function
-        location: "NetworkManager.ts:178"
-        description: "通道重连回调"
-    language: typescript
-    lines: 186
-    suggested_log_points:
-      - method: onInit
-        level: info
-        message: "Logger.info(TAG, '网络管理器初始化')"
-      - method: onShutdown
-        level: info
-        message: "Logger.info(TAG, `网络管理器关闭, 关闭 ${this._channels.size} 个通道`)"
-      - method: createChannel
-        level: info
-        message: "Logger.info(TAG, `创建通道: ${name}`)"
-      - method: destroyChannel
-        level: info
-        message: "Logger.info(TAG, `销毁通道: ${name}`)"
-      - method: onConnected
-        level: info
-        message: "Logger.info(TAG, `通道已连接: ${channelName}`)"
-      - method: onClosed
-        level: warn
-        message: "Logger.warn(TAG, `通道已关闭: ${channelName}, code=${code}, reason=${reason}`)"
-      - method: onError
-        level: error
-        message: "Logger.error(TAG, `通道错误: ${channelName}`, error)"
-      - method: onReconnecting
-        level: warn
-        message: "Logger.warn(TAG, `通道重连中: ${channelName}, attempt=${attempt}/${maxAttempts}`)"
+    # ────────────── network 模块 ──────────────
+    - file: NetworkManager.ts
+      path: assets/scripts/framework/network/NetworkManager.ts
+      purpose: 网络管理器，统一管理多个网络通道的生命周期
+      has_logger: false
+      class_name: NetworkManager
+      is_module_base: true
+      lifecycle: [onInit, onUpdate, onShutdown]
+      key_elements:
+          - element: setEventManager
+            type: function
+            location: 'NetworkManager.ts:70'
+            description: '设置事件管理器'
+          - element: createChannel
+            type: function
+            location: 'NetworkManager.ts:82'
+            description: '创建网络通道'
+          - element: destroyChannel
+            type: function
+            location: 'NetworkManager.ts:112'
+            description: '销毁网络通道'
+          - element: setHeartbeatHandler
+            type: function
+            location: 'NetworkManager.ts:136'
+            description: '为通道设置心跳处理器'
+          - element: onConnected
+            type: function
+            location: 'NetworkManager.ts:147'
+            description: '通道连接成功回调'
+          - element: onClosed
+            type: function
+            location: 'NetworkManager.ts:154'
+            description: '通道关闭回调'
+          - element: onError
+            type: function
+            location: 'NetworkManager.ts:164'
+            description: '通道错误回调'
+          - element: onMessage
+            type: function
+            location: 'NetworkManager.ts:171'
+            description: '通道消息回调'
+          - element: onReconnecting
+            type: function
+            location: 'NetworkManager.ts:178'
+            description: '通道重连回调'
+      language: typescript
+      lines: 186
+      suggested_log_points:
+          - method: onInit
+            level: info
+            message: "Logger.info(TAG, '网络管理器初始化')"
+          - method: onShutdown
+            level: info
+            message: 'Logger.info(TAG, `网络管理器关闭, 关闭 ${this._channels.size} 个通道`)'
+          - method: createChannel
+            level: info
+            message: 'Logger.info(TAG, `创建通道: ${name}`)'
+          - method: destroyChannel
+            level: info
+            message: 'Logger.info(TAG, `销毁通道: ${name}`)'
+          - method: onConnected
+            level: info
+            message: 'Logger.info(TAG, `通道已连接: ${channelName}`)'
+          - method: onClosed
+            level: warn
+            message: 'Logger.warn(TAG, `通道已关闭: ${channelName}, code=${code}, reason=${reason}`)'
+          - method: onError
+            level: error
+            message: 'Logger.error(TAG, `通道错误: ${channelName}`, error)'
+          - method: onReconnecting
+            level: warn
+            message: 'Logger.warn(TAG, `通道重连中: ${channelName}, attempt=${attempt}/${maxAttempts}`)'
 
-  - file: NetworkChannel.ts
-    path: assets/scripts/framework/network/NetworkChannel.ts
-    purpose: 网络通道，封装连接、收发消息、心跳检测、断线重连
-    has_logger: false
-    class_name: NetworkChannel
-    is_module_base: false
-    lifecycle: []
-    key_elements:
-      - element: connect
-        type: function
-        location: "NetworkChannel.ts:139"
-        description: "发起连接"
-      - element: send
-        type: function
-        location: "NetworkChannel.ts:154"
-        description: "发送消息"
-      - element: close
-        type: function
-        location: "NetworkChannel.ts:165"
-        description: "关闭连接"
-      - element: shutdown
-        type: function
-        location: "NetworkChannel.ts:189"
-        description: "销毁通道"
-      - element: _onSocketOpen
-        type: function
-        location: "NetworkChannel.ts:218"
-        description: "Socket 连接成功"
-      - element: _onSocketClose
-        type: function
-        location: "NetworkChannel.ts:226"
-        description: "Socket 连接关闭"
-      - element: _onSocketMessage
-        type: function
-        location: "NetworkChannel.ts:243"
-        description: "Socket 收到数据"
-      - element: _onSocketError
-        type: function
-        location: "NetworkChannel.ts:256"
-        description: "Socket 错误"
-      - element: _startReconnect
-        type: function
-        location: "NetworkChannel.ts:337"
-        description: "开始重连流程（指数退避）"
-    language: typescript
-    lines: 378
-    suggested_log_points:
-      - method: connect
-        level: debug
-        message: "Logger.debug(TAG, `[${this._name}] 发起连接: ${url}`)"
-      - method: connect (忽略重复)
-        level: debug
-        message: "Logger.debug(TAG, `[${this._name}] 已连接或连接中, 忽略`)"
-      - method: send
-        level: debug
-        message: "Logger.debug(TAG, `[${this._name}] 发送消息: type=${packet.type}`)"
-      - method: close
-        level: debug
-        message: "Logger.debug(TAG, `[${this._name}] 用户主动关闭`)"
-      - method: shutdown
-        level: debug
-        message: "Logger.debug(TAG, `[${this._name}] 通道销毁`)"
-      - method: _onSocketOpen
-        level: debug
-        message: "Logger.debug(TAG, `[${this._name}] Socket 已连接`)"
-      - method: _onSocketClose
-        level: debug
-        message: "Logger.debug(TAG, `[${this._name}] Socket 关闭: code=${code}`)"
-      - method: _onSocketError
-        level: warn
-        message: "Logger.warn(TAG, `[${this._name}] Socket 错误`, error)"
-      - method: _updateHeartbeat (发送心跳)
-        level: debug
-        message: "Logger.debug(TAG, `[${this._name}] 发送心跳, missed=${this._missedHeartbeats}`)"
-      - method: _updateHeartbeat (超时断线)
-        level: warn
-        message: "Logger.warn(TAG, `[${this._name}] 心跳超时, 断开连接`)"
-      - method: _startReconnect
-        level: info
-        message: "Logger.info(TAG, `[${this._name}] 开始重连: attempt=${this._reconnectAttempts}, delay=${this._currentReconnectDelay}s`)"
+    - file: NetworkChannel.ts
+      path: assets/scripts/framework/network/NetworkChannel.ts
+      purpose: 网络通道，封装连接、收发消息、心跳检测、断线重连
+      has_logger: false
+      class_name: NetworkChannel
+      is_module_base: false
+      lifecycle: []
+      key_elements:
+          - element: connect
+            type: function
+            location: 'NetworkChannel.ts:139'
+            description: '发起连接'
+          - element: send
+            type: function
+            location: 'NetworkChannel.ts:154'
+            description: '发送消息'
+          - element: close
+            type: function
+            location: 'NetworkChannel.ts:165'
+            description: '关闭连接'
+          - element: shutdown
+            type: function
+            location: 'NetworkChannel.ts:189'
+            description: '销毁通道'
+          - element: _onSocketOpen
+            type: function
+            location: 'NetworkChannel.ts:218'
+            description: 'Socket 连接成功'
+          - element: _onSocketClose
+            type: function
+            location: 'NetworkChannel.ts:226'
+            description: 'Socket 连接关闭'
+          - element: _onSocketMessage
+            type: function
+            location: 'NetworkChannel.ts:243'
+            description: 'Socket 收到数据'
+          - element: _onSocketError
+            type: function
+            location: 'NetworkChannel.ts:256'
+            description: 'Socket 错误'
+          - element: _startReconnect
+            type: function
+            location: 'NetworkChannel.ts:337'
+            description: '开始重连流程（指数退避）'
+      language: typescript
+      lines: 378
+      suggested_log_points:
+          - method: connect
+            level: debug
+            message: 'Logger.debug(TAG, `[${this._name}] 发起连接: ${url}`)'
+          - method: connect (忽略重复)
+            level: debug
+            message: 'Logger.debug(TAG, `[${this._name}] 已连接或连接中, 忽略`)'
+          - method: send
+            level: debug
+            message: 'Logger.debug(TAG, `[${this._name}] 发送消息: type=${packet.type}`)'
+          - method: close
+            level: debug
+            message: 'Logger.debug(TAG, `[${this._name}] 用户主动关闭`)'
+          - method: shutdown
+            level: debug
+            message: 'Logger.debug(TAG, `[${this._name}] 通道销毁`)'
+          - method: _onSocketOpen
+            level: debug
+            message: 'Logger.debug(TAG, `[${this._name}] Socket 已连接`)'
+          - method: _onSocketClose
+            level: debug
+            message: 'Logger.debug(TAG, `[${this._name}] Socket 关闭: code=${code}`)'
+          - method: _onSocketError
+            level: warn
+            message: 'Logger.warn(TAG, `[${this._name}] Socket 错误`, error)'
+          - method: _updateHeartbeat (发送心跳)
+            level: debug
+            message: 'Logger.debug(TAG, `[${this._name}] 发送心跳, missed=${this._missedHeartbeats}`)'
+          - method: _updateHeartbeat (超时断线)
+            level: warn
+            message: 'Logger.warn(TAG, `[${this._name}] 心跳超时, 断开连接`)'
+          - method: _startReconnect
+            level: info
+            message: 'Logger.info(TAG, `[${this._name}] 开始重连: attempt=${this._reconnectAttempts}, delay=${this._currentReconnectDelay}s`)'
 
-  # ────────────── scene 模块 ──────────────
-  - file: SceneManager.ts
-    path: assets/scripts/framework/scene/SceneManager.ts
-    purpose: 场景管理器，统一管理游戏场景的加载、卸载和切换
-    has_logger: true  # ✅ 已有 4 处 Logger.warn
-    class_name: SceneManager
-    is_module_base: true
-    lifecycle: [onInit, onShutdown]
-    key_elements:
-      - element: setSceneLoader
-        type: function
-        location: "SceneManager.ts:74"
-        description: "设置场景加载器"
-      - element: loadScene
-        type: function
-        location: "SceneManager.ts:82"
-        description: "加载场景（含多重去重检查）"
-    language: typescript
-    lines: 130
-    existing_logger_calls:
-      - location: "SceneManager.ts:87"
-        call: "Logger.warn('SceneManager', '场景名称不能为空')"
-      - location: "SceneManager.ts:93"
-        call: "Logger.warn('SceneManager', '未设置场景加载器，请先调用 setSceneLoader')"
-      - location: "SceneManager.ts:99"
-        call: "Logger.warn('SceneManager', `已在场景 ${sceneName} 中，忽略重复加载`)"
-      - location: "SceneManager.ts:104"
-        call: "Logger.warn('SceneManager', `正在加载场景 ${this._loadingScene}，忽略新请求 ${sceneName}`)"
-    suggested_log_points:
-      - method: onInit
-        level: info
-        message: "Logger.info(TAG, '场景管理器初始化')"
-      - method: onShutdown
-        level: info
-        message: "Logger.info(TAG, '场景管理器关闭')"
-      - method: loadScene (开始)
-        level: info
-        message: "Logger.info(TAG, `开始加载场景: ${sceneName}`)"
-      - method: loadScene (onSuccess)
-        level: info
-        message: "Logger.info(TAG, `场景加载完成: ${sceneName}`)"
-      - method: loadScene (onFailure)
-        level: error
-        message: "Logger.error(TAG, `场景加载失败: ${sceneName}`)"
+    # ────────────── scene 模块 ──────────────
+    - file: SceneManager.ts
+      path: assets/scripts/framework/scene/SceneManager.ts
+      purpose: 场景管理器，统一管理游戏场景的加载、卸载和切换
+      has_logger: true # ✅ 已有 4 处 Logger.warn
+      class_name: SceneManager
+      is_module_base: true
+      lifecycle: [onInit, onShutdown]
+      key_elements:
+          - element: setSceneLoader
+            type: function
+            location: 'SceneManager.ts:74'
+            description: '设置场景加载器'
+          - element: loadScene
+            type: function
+            location: 'SceneManager.ts:82'
+            description: '加载场景（含多重去重检查）'
+      language: typescript
+      lines: 130
+      existing_logger_calls:
+          - location: 'SceneManager.ts:87'
+            call: "Logger.warn('SceneManager', '场景名称不能为空')"
+          - location: 'SceneManager.ts:93'
+            call: "Logger.warn('SceneManager', '未设置场景加载器，请先调用 setSceneLoader')"
+          - location: 'SceneManager.ts:99'
+            call: "Logger.warn('SceneManager', `已在场景 ${sceneName} 中，忽略重复加载`)"
+          - location: 'SceneManager.ts:104'
+            call: "Logger.warn('SceneManager', `正在加载场景 ${this._loadingScene}，忽略新请求 ${sceneName}`)"
+      suggested_log_points:
+          - method: onInit
+            level: info
+            message: "Logger.info(TAG, '场景管理器初始化')"
+          - method: onShutdown
+            level: info
+            message: "Logger.info(TAG, '场景管理器关闭')"
+          - method: loadScene (开始)
+            level: info
+            message: 'Logger.info(TAG, `开始加载场景: ${sceneName}`)'
+          - method: loadScene (onSuccess)
+            level: info
+            message: 'Logger.info(TAG, `场景加载完成: ${sceneName}`)'
+          - method: loadScene (onFailure)
+            level: error
+            message: 'Logger.error(TAG, `场景加载失败: ${sceneName}`)'
 
-  # ────────────── audio 模块 ──────────────
-  - file: AudioManager.ts
-    path: assets/scripts/framework/audio/AudioManager.ts
-    purpose: 音频管理器，统一管理音频播放、暂停、音量和静音控制
-    has_logger: false
-    class_name: AudioManager
-    is_module_base: true
-    lifecycle: [onInit, onUpdate, onShutdown]
-    key_elements:
-      - element: setAudioPlayer
-        type: function
-        location: "AudioManager.ts:79"
-        description: "设置音频播放器"
-      - element: playMusic
-        type: function
-        location: "AudioManager.ts:88"
-        description: "播放背景音乐（同 ID 去重，自动停旧曲）"
-      - element: stopMusic
-        type: function
-        location: "AudioManager.ts:104"
-        description: "停止当前背景音乐"
-      - element: pauseMusic
-        type: function
-        location: "AudioManager.ts:114"
-        description: "暂停背景音乐"
-      - element: resumeMusic
-        type: function
-        location: "AudioManager.ts:121"
-        description: "恢复背景音乐"
-      - element: playSound
-        type: function
-        location: "AudioManager.ts:129"
-        description: "播放音效（支持叠加）"
-      - element: stopSound
-        type: function
-        location: "AudioManager.ts:141"
-        description: "停止指定音效"
-      - element: stopAllSounds
-        type: function
-        location: "AudioManager.ts:152"
-        description: "停止所有音效"
-      - element: setMasterVolume
-        type: function
-        location: "AudioManager.ts:162"
-        description: "设置主音量"
-      - element: setMuted
-        type: function
-        location: "AudioManager.ts:198"
-        description: "设置全局静音"
-    language: typescript
-    lines: 280
-    suggested_log_points:
-      - method: onInit
-        level: info
-        message: "Logger.info(TAG, '音频管理器初始化')"
-      - method: onShutdown
-        level: info
-        message: "Logger.info(TAG, '音频管理器关闭，停止所有音频')"
-      - method: playMusic
-        level: debug
-        message: "Logger.debug(TAG, `播放音乐: ${musicId}, loop=${finalConfig.loop}`)"
-      - method: playMusic (同 ID 忽略)
-        level: debug
-        message: "Logger.debug(TAG, `音乐已在播放, 忽略: ${musicId}`)"
-      - method: playMusic (切换)
-        level: debug
-        message: "Logger.debug(TAG, `切换音乐: ${this._currentMusicId} → ${musicId}`)"
-      - method: stopMusic
-        level: debug
-        message: "Logger.debug(TAG, '停止音乐')"
-      - method: pauseMusic
-        level: debug
-        message: "Logger.debug(TAG, '暂停音乐')"
-      - method: resumeMusic
-        level: debug
-        message: "Logger.debug(TAG, '恢复音乐')"
-      - method: playSound
-        level: debug
-        message: "Logger.debug(TAG, `播放音效: ${soundId}`)"
-      - method: stopSound
-        level: debug
-        message: "Logger.debug(TAG, `停止音效: ${soundId}`)"
-      - method: setMasterVolume
-        level: debug
-        message: "Logger.debug(TAG, `主音量: ${volume}`)"
-      - method: setMuted
-        level: debug
-        message: "Logger.debug(TAG, `静音: ${muted}`)"
+    # ────────────── audio 模块 ──────────────
+    - file: AudioManager.ts
+      path: assets/scripts/framework/audio/AudioManager.ts
+      purpose: 音频管理器，统一管理音频播放、暂停、音量和静音控制
+      has_logger: false
+      class_name: AudioManager
+      is_module_base: true
+      lifecycle: [onInit, onUpdate, onShutdown]
+      key_elements:
+          - element: setAudioPlayer
+            type: function
+            location: 'AudioManager.ts:79'
+            description: '设置音频播放器'
+          - element: playMusic
+            type: function
+            location: 'AudioManager.ts:88'
+            description: '播放背景音乐（同 ID 去重，自动停旧曲）'
+          - element: stopMusic
+            type: function
+            location: 'AudioManager.ts:104'
+            description: '停止当前背景音乐'
+          - element: pauseMusic
+            type: function
+            location: 'AudioManager.ts:114'
+            description: '暂停背景音乐'
+          - element: resumeMusic
+            type: function
+            location: 'AudioManager.ts:121'
+            description: '恢复背景音乐'
+          - element: playSound
+            type: function
+            location: 'AudioManager.ts:129'
+            description: '播放音效（支持叠加）'
+          - element: stopSound
+            type: function
+            location: 'AudioManager.ts:141'
+            description: '停止指定音效'
+          - element: stopAllSounds
+            type: function
+            location: 'AudioManager.ts:152'
+            description: '停止所有音效'
+          - element: setMasterVolume
+            type: function
+            location: 'AudioManager.ts:162'
+            description: '设置主音量'
+          - element: setMuted
+            type: function
+            location: 'AudioManager.ts:198'
+            description: '设置全局静音'
+      language: typescript
+      lines: 280
+      suggested_log_points:
+          - method: onInit
+            level: info
+            message: "Logger.info(TAG, '音频管理器初始化')"
+          - method: onShutdown
+            level: info
+            message: "Logger.info(TAG, '音频管理器关闭，停止所有音频')"
+          - method: playMusic
+            level: debug
+            message: 'Logger.debug(TAG, `播放音乐: ${musicId}, loop=${finalConfig.loop}`)'
+          - method: playMusic (同 ID 忽略)
+            level: debug
+            message: 'Logger.debug(TAG, `音乐已在播放, 忽略: ${musicId}`)'
+          - method: playMusic (切换)
+            level: debug
+            message: 'Logger.debug(TAG, `切换音乐: ${this._currentMusicId} → ${musicId}`)'
+          - method: stopMusic
+            level: debug
+            message: "Logger.debug(TAG, '停止音乐')"
+          - method: pauseMusic
+            level: debug
+            message: "Logger.debug(TAG, '暂停音乐')"
+          - method: resumeMusic
+            level: debug
+            message: "Logger.debug(TAG, '恢复音乐')"
+          - method: playSound
+            level: debug
+            message: 'Logger.debug(TAG, `播放音效: ${soundId}`)'
+          - method: stopSound
+            level: debug
+            message: 'Logger.debug(TAG, `停止音效: ${soundId}`)'
+          - method: setMasterVolume
+            level: debug
+            message: 'Logger.debug(TAG, `主音量: ${volume}`)'
+          - method: setMuted
+            level: debug
+            message: 'Logger.debug(TAG, `静音: ${muted}`)'
 
-  # ────────────── di 模块 ──────────────
-  - file: Container.ts
-    path: assets/scripts/framework/di/Container.ts
-    purpose: IoC 容器，管理服务的注册、解析和生命周期
-    has_logger: false
-    class_name: Container
-    is_module_base: false
-    lifecycle: []
-    key_elements:
-      - element: bind
-        type: function
-        location: "Container.ts:50"
-        description: "绑定服务标识符"
-      - element: resolve
-        type: function
-        location: "Container.ts:67"
-        description: "解析服务实例（含循环依赖检测）"
-      - element: unbind
-        type: function
-        location: "Container.ts:111"
-        description: "解除服务绑定"
-      - element: createChild
-        type: function
-        location: "Container.ts:123"
-        description: "创建子容器"
-      - element: clear
-        type: function
-        location: "Container.ts:132"
-        description: "清除所有绑定"
-    language: typescript
-    lines: 200
-    suggested_log_points:
-      - method: bind
-        level: debug
-        message: "Logger.debug(TAG, `绑定服务: ${key.description}`)"
-      - method: resolve
-        level: debug
-        message: "Logger.debug(TAG, `解析服务: ${key.description}`)"
-      - method: resolve (单例命中)
-        level: debug
-        message: "Logger.debug(TAG, `单例缓存命中: ${key.description}`)"
-      - method: resolve (委托父容器)
-        level: debug
-        message: "Logger.debug(TAG, `委托父容器解析: ${key.description}`)"
-      - method: unbind
-        level: debug
-        message: "Logger.debug(TAG, `解除绑定: ${key.description}`)"
-      - method: createChild
-        level: debug
-        message: "Logger.debug(TAG, '创建子容器')"
-      - method: clear
-        level: debug
-        message: "Logger.debug(TAG, `清除所有绑定, count=${this._bindings.size}`)"
+    # ────────────── di 模块 ──────────────
+    - file: Container.ts
+      path: assets/scripts/framework/di/Container.ts
+      purpose: IoC 容器，管理服务的注册、解析和生命周期
+      has_logger: false
+      class_name: Container
+      is_module_base: false
+      lifecycle: []
+      key_elements:
+          - element: bind
+            type: function
+            location: 'Container.ts:50'
+            description: '绑定服务标识符'
+          - element: resolve
+            type: function
+            location: 'Container.ts:67'
+            description: '解析服务实例（含循环依赖检测）'
+          - element: unbind
+            type: function
+            location: 'Container.ts:111'
+            description: '解除服务绑定'
+          - element: createChild
+            type: function
+            location: 'Container.ts:123'
+            description: '创建子容器'
+          - element: clear
+            type: function
+            location: 'Container.ts:132'
+            description: '清除所有绑定'
+      language: typescript
+      lines: 200
+      suggested_log_points:
+          - method: bind
+            level: debug
+            message: 'Logger.debug(TAG, `绑定服务: ${key.description}`)'
+          - method: resolve
+            level: debug
+            message: 'Logger.debug(TAG, `解析服务: ${key.description}`)'
+          - method: resolve (单例命中)
+            level: debug
+            message: 'Logger.debug(TAG, `单例缓存命中: ${key.description}`)'
+          - method: resolve (委托父容器)
+            level: debug
+            message: 'Logger.debug(TAG, `委托父容器解析: ${key.description}`)'
+          - method: unbind
+            level: debug
+            message: 'Logger.debug(TAG, `解除绑定: ${key.description}`)'
+          - method: createChild
+            level: debug
+            message: "Logger.debug(TAG, '创建子容器')"
+          - method: clear
+            level: debug
+            message: 'Logger.debug(TAG, `清除所有绑定, count=${this._bindings.size}`)'
 
-  - file: Decorators.ts
-    path: assets/scripts/framework/di/Decorators.ts
-    purpose: DI 装饰器（@Injectable、@Inject）
-    has_logger: false
-    class_name: "(functions)"
-    is_module_base: false
-    lifecycle: []
-    key_elements:
-      - element: Injectable
-        type: function
-        location: "Decorators.ts:18"
-        description: "类装饰器，标记类为可注入"
-      - element: Inject
-        type: function
-        location: "Decorators.ts:42"
-        description: "参数装饰器，标记构造函数参数需要注入的服务"
-    language: typescript
-    lines: 92
-    suggested_log_points: []  # 装饰器在元数据阶段执行，不适合加运行时日志
+    - file: Decorators.ts
+      path: assets/scripts/framework/di/Decorators.ts
+      purpose: DI 装饰器（@Injectable、@Inject）
+      has_logger: false
+      class_name: '(functions)'
+      is_module_base: false
+      lifecycle: []
+      key_elements:
+          - element: Injectable
+            type: function
+            location: 'Decorators.ts:18'
+            description: '类装饰器，标记类为可注入'
+          - element: Inject
+            type: function
+            location: 'Decorators.ts:42'
+            description: '参数装饰器，标记构造函数参数需要注入的服务'
+      language: typescript
+      lines: 92
+      suggested_log_points: [] # 装饰器在元数据阶段执行，不适合加运行时日志
 
 # ────────────── 汇总统计 ──────────────
 summary_statistics:
-  total_files: 23
-  files_with_logger: 1  # 仅 SceneManager
-  files_without_logger: 22
-  module_base_subclasses: 12
-  core_classes: 11
-  abstract_base_classes: 4  # ModuleBase, FsmState, ProcedureBase, UIFormBase, EntityBase
-  estimated_log_points: 120
+    total_files: 23
+    files_with_logger: 1 # 仅 SceneManager
+    files_without_logger: 22
+    module_base_subclasses: 12
+    core_classes: 11
+    abstract_base_classes: 4 # ModuleBase, FsmState, ProcedureBase, UIFormBase, EntityBase
+    estimated_log_points: 120
 
 patterns_found:
-  - category: architecture
-    pattern: "所有模块错误消息已统一使用 [模块名] 前缀格式"
-    description: "throw new Error('[ModuleName] 描述') 模式已在所有模块中统一使用"
-    examples:
-      - file: ResourceManager.ts
-        location: "ResourceManager.ts:55"
-        snippet: "throw new Error('[ResourceManager] loader 不能为空')"
-      - file: NetworkManager.ts
-        location: "NetworkChannel.ts:157"
-        snippet: "throw new Error(`[NetworkChannel] 通道 '${this._name}' 未连接，无法发送消息`)"
-    prevalence: common
+    - category: architecture
+      pattern: '所有模块错误消息已统一使用 [模块名] 前缀格式'
+      description: "throw new Error('[ModuleName] 描述') 模式已在所有模块中统一使用"
+      examples:
+          - file: ResourceManager.ts
+            location: 'ResourceManager.ts:55'
+            snippet: "throw new Error('[ResourceManager] loader 不能为空')"
+          - file: NetworkManager.ts
+            location: 'NetworkChannel.ts:157'
+            snippet: "throw new Error(`[NetworkChannel] 通道 '${this._name}' 未连接，无法发送消息`)"
+      prevalence: common
 
-  - category: structure
-    pattern: "仅 SceneManager 已集成 Logger，其余 22 个文件均未导入"
-    description: "SceneManager 使用 Logger.warn 进行参数校验告警，是唯一已集成的模块"
-    examples:
-      - file: SceneManager.ts
-        location: "SceneManager.ts:2"
-        snippet: "import { Logger } from '../debug/Logger';"
-    prevalence: rare
+    - category: structure
+      pattern: '仅 SceneManager 已集成 Logger，其余 22 个文件均未导入'
+      description: 'SceneManager 使用 Logger.warn 进行参数校验告警，是唯一已集成的模块'
+      examples:
+          - file: SceneManager.ts
+            location: 'SceneManager.ts:2'
+            snippet: "import { Logger } from '../debug/Logger';"
+      prevalence: rare
 
-  - category: naming
-    pattern: "TAG 常量命名应与错误消息前缀一致"
-    description: "建议 private static readonly TAG = 'ClassName'，与已有的 throw Error('[ClassName] ...') 保持统一"
-    examples: []
-    prevalence: common
+    - category: naming
+      pattern: 'TAG 常量命名应与错误消息前缀一致'
+      description: "建议 private static readonly TAG = 'ClassName'，与已有的 throw Error('[ClassName] ...') 保持统一"
+      examples: []
+      prevalence: common
 
 open_questions: []
 

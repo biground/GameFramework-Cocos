@@ -5,6 +5,7 @@
  */
 
 import { BenchmarkRunner, consumeSink } from './BenchmarkRunner';
+import { Logger } from '../../assets/scripts/framework/debug/Logger';
 import { EventKey } from '../../assets/scripts/framework/event/EventDefs';
 import { EventManager } from '../../assets/scripts/framework/event/EventManager';
 import { IPoolable } from '../../assets/scripts/framework/objectpool/PoolDefs';
@@ -139,7 +140,9 @@ function main(): void {
 
     // ─── 运行并输出报告 ───
     console.log('开始运行基准测试...\n');
+    Logger.time('benchmark:runAll');
     runner.runAll();
+    Logger.timeEnd('benchmark:runAll');
     console.log(runner.reportMarkdown());
 
     // 清理
