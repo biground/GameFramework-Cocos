@@ -26,12 +26,15 @@ export class Fsm<T> implements IFsm<T> {
      */
     constructor(name: string, owner: T, states: IFsmState<T>[]) {
         if (!name) {
+            Logger.error(Fsm.TAG, '状态机名称不能为空');
             throw new Error('[FSM] 状态机名称不能为空');
         }
         if (owner == null) {
+            Logger.error(Fsm.TAG, '状态机持有者不能为空');
             throw new Error('[FSM] 状态机持有者不能为空');
         }
         if (!states || states.length === 0) {
+            Logger.error(Fsm.TAG, '状态列表不能为空');
             throw new Error('[FSM] 状态列表不能为空');
         }
 
@@ -42,6 +45,7 @@ export class Fsm<T> implements IFsm<T> {
         for (const state of states) {
             const ctor = state.constructor as Constructor<IFsmState<T>>;
             if (this._states.has(ctor)) {
+                Logger.error(Fsm.TAG, `状态机 "${name}" 存在重复状态类型: ${ctor.name}`);
                 throw new Error(`[FSM] 状态机 "${name}" 存在重复状态类型: ${ctor.name}`);
             }
             this._states.set(ctor, state);
@@ -79,13 +83,16 @@ export class Fsm<T> implements IFsm<T> {
      */
     start<TState extends IFsmState<T>>(stateType: Constructor<TState>): void {
         if (this._isDestroyed) {
+            Logger.error(Fsm.TAG, `状态机 "${this._name}" 已销毁，无法启动`);
             throw new Error(`[FSM] 状态机 "${this._name}" 已销毁，无法启动`);
         }
         if (this._currentState !== null) {
+            Logger.error(Fsm.TAG, `状态机 "${this._name}" 已启动，不可重复启动`);
             throw new Error(`[FSM] 状态机 "${this._name}" 已启动，不可重复启动`);
         }
         const state = this._states.get(stateType as unknown as Constructor<IFsmState<T>>);
         if (!state) {
+            Logger.error(Fsm.TAG, `状态机 "${this._name}" 不包含状态: ${stateType.name}`);
             throw new Error(`[FSM] 状态机 "${this._name}" 不包含状态: ${stateType.name}`);
         }
         this._currentState = state;
@@ -99,13 +106,16 @@ export class Fsm<T> implements IFsm<T> {
      */
     changeState<TState extends IFsmState<T>>(stateType: Constructor<TState>): void {
         if (this._currentState === null) {
+            Logger.error(Fsm.TAG, `状态机 "${this._name}" 尚未启动，无法切换状态`);
             throw new Error(`[FSM] 状态机 "${this._name}" 尚未启动，无法切换状态`);
         }
         if (this._isChangingState) {
+            Logger.error(Fsm.TAG, `状态机 "${this._name}" 正在切换状态中，禁止递归切换`);
             throw new Error(`[FSM] 状态机 "${this._name}" 正在切换状态中，禁止递归切换`);
         }
         const targetState = this._states.get(stateType as unknown as Constructor<IFsmState<T>>);
         if (!targetState) {
+            Logger.error(Fsm.TAG, `状态机 "${this._name}" 不包含状态: ${stateType.name}`);
             throw new Error(`[FSM] 状态机 "${this._name}" 不包含状态: ${stateType.name}`);
         }
 

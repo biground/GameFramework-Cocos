@@ -77,6 +77,7 @@ export class UIManager extends ModuleBase implements IUIManager {
      */
     public setUIFormFactory(factory: IUIFormFactory): void {
         if (!factory) {
+            Logger.error(UIManager.TAG, 'factory 不能为空');
             throw new Error('[UIManager] factory 不能为空');
         }
         this._factory = factory;
@@ -87,12 +88,15 @@ export class UIManager extends ModuleBase implements IUIManager {
      */
     public registerForm(formName: string, config: UIFormConfig): void {
         if (!formName) {
+            Logger.error(UIManager.TAG, '表单名称不能为空');
             throw new Error('[UIManager] 表单名称不能为空');
         }
         if (!config.path) {
+            Logger.error(UIManager.TAG, '表单资源路径不能为空');
             throw new Error('[UIManager] 表单资源路径不能为空');
         }
         if (this._formConfigs.has(formName)) {
+            Logger.error(UIManager.TAG, `表单 "${formName}" 已注册，不能重复注册`);
             throw new Error(`[UIManager] 表单 "${formName}" 已注册，不能重复注册`);
         }
         this._formConfigs.set(formName, config);
@@ -106,6 +110,7 @@ export class UIManager extends ModuleBase implements IUIManager {
         // 1. 检查是否已注册
         const config = this._formConfigs.get(formName);
         if (!config) {
+            Logger.error(UIManager.TAG, `表单 "${formName}" 未注册，请先调用 registerForm`);
             throw new Error(`[UIManager] 表单 "${formName}" 未注册，请先调用 registerForm`);
         }
 
@@ -117,6 +122,7 @@ export class UIManager extends ModuleBase implements IUIManager {
 
         // 3. 检查 factory
         if (!this._factory) {
+            Logger.error(UIManager.TAG, '未设置 UIFormFactory，请先调用 setUIFormFactory');
             throw new Error('[UIManager] 未设置 UIFormFactory，请先调用 setUIFormFactory');
         }
 

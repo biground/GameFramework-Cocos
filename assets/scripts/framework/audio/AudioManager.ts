@@ -101,6 +101,7 @@ export class AudioManager extends ModuleBase implements IAudioManager {
      */
     public setAudioPlayer(player: IAudioPlayer): void {
         if (!player) {
+            Logger.error(AudioManager.TAG, 'player 不能为空');
             throw new Error('[AudioManager] player 不能为空');
         }
         this._audioPlayer = player;
@@ -113,6 +114,7 @@ export class AudioManager extends ModuleBase implements IAudioManager {
      */
     public playMusic(musicId: string, config?: AudioPlayConfig): void {
         if (!this._audioPlayer) {
+            Logger.error(AudioManager.TAG, '未设置 audioPlayer');
             throw new Error('[AudioManager] 未设置 audioPlayer');
         }
         if (musicId === this._currentMusicId) {
@@ -168,6 +170,7 @@ export class AudioManager extends ModuleBase implements IAudioManager {
      */
     public playSound(soundId: string, config?: AudioPlayConfig): void {
         if (!this._audioPlayer) {
+            Logger.error(AudioManager.TAG, '未设置 audioPlayer');
             throw new Error('[AudioManager] 未设置 audioPlayer');
         }
         Logger.debug(AudioManager.TAG, `播放音效: ${soundId}`);

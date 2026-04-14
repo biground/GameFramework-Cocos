@@ -453,4 +453,60 @@ describe('Logger', () => {
             newLogger.onShutdown();
         });
     });
+
+    // ─── 性能计时 ──────────────────────────────────
+
+    describe('性能计时', () => {
+        test('time/timeEnd 输出耗时', () => {
+            Logger.time('TestTimer');
+            Logger.timeEnd('TestTimer');
+            // timeEnd 应该通过 Logger.info 输出
+            expect(spyInfo).toHaveBeenCalledTimes(1);
+        });
+
+        test('timeEnd 返回耗时毫秒数', () => {
+            Logger.time('ReturnTest');
+            const elapsed = Logger.timeEnd('ReturnTest');
+            expect(elapsed).toBeGreaterThanOrEqual(0);
+        });
+
+        test('timeEnd 不存在的 label 返回 -1 并警告', () => {
+            const result = Logger.timeEnd('NonExistent');
+            expect(result).toBe(-1);
+            // 应该有 warn 输出
+            expect(spyWarn).toHaveBeenCalledTimes(1);
+        });
+
+        test('time 重复启动覆盖旧值', () => {
+            Logger.time('Dup');
+            Logger.time('Dup'); // 覆盖
+            const elapsed = Logger.timeEnd('Dup');
+            expect(elapsed).toBeGreaterThanOrEqual(0);
+            // 只应输出一次（timeEnd）
+            expect(spyInfo).toHaveBeenCalledTimes(1);
+        });
+
+        test('onShutdown 清空计时器', () => {
+            Logger.time('WillClear');
+            logger.onShutdown();
+            logger.onInit();
+            const result = Logger.timeEnd('WillClear');
+            expect(result).toBe(-1);
+        });
+    });
+
+    // ─── 生产环境裁剪 ──────────────────────────────
+
+    describe('生产环境裁剪', () => {
+        test('GFC_DEBUG 在测试环境中为 true', () => {
+            expect(GFC_DEBUG).toBe(true);
+        });
+
+        test('GFC_DEBUG=true 时 debug/info 正常输出', () => {
+            Logger.debug('Test', '调试消息');
+            Logger.info('Test', '信息消息');
+            expect(spyDebug).toHaveBeenCalledTimes(1);
+            expect(spyInfo).toHaveBeenCalledTimes(1);
+        });
+    });
 });

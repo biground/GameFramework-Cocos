@@ -75,9 +75,11 @@ export class FsmManager extends ModuleBase implements IFsmManager {
      */
     public createFsm<T>(name: string, owner: T, ...states: IFsmState<T>[]): IFsm<T> {
         if (this._fsmMap.has(name)) {
+            Logger.error(FsmManager.TAG, `已存在同名状态机: "${name}"`);
             throw new Error(`[FsmManager] 已存在同名状态机: "${name}"`);
         }
         if (states.length === 0) {
+            Logger.error(FsmManager.TAG, `创建状态机 "${name}" 时状态列表不能为空`);
             throw new Error(`[FsmManager] 创建状态机 "${name}" 时状态列表不能为空`);
         }
         const fsm = new Fsm<T>(name, owner, states);

@@ -23,6 +23,7 @@ export class GameModule {
         const name = module.moduleName;
         if (this._modules.has(name)) {
             if (!allowReplace) {
+                Logger.error(GameModule.TAG, `模块 "${name}" 已经注册。`);
                 throw new Error(`模块 "${name}" 已经注册。`);
             }
             Logger.warn(GameModule.TAG, `模块替换: ${name}, 旧模块将被关闭`);
@@ -42,6 +43,7 @@ export class GameModule {
     public static getModule<T extends ModuleBase>(name: string): T {
         const module = this._modules.get(name);
         if (!module) {
+            Logger.error(GameModule.TAG, `模块 "${name}" 未找到。`);
             throw new Error(`模块 "${name}" 未找到。`);
         }
         return module as T;
