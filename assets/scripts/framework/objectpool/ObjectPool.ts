@@ -29,6 +29,8 @@ export class ObjectPool<T extends IPoolable> {
     private _ctor: Constructor<T>;
     /** 空闲对象栈 */
     private _freeList: T[] = [];
+    /** 空闲对象查重集合，O(1) 替代 includes 的 O(n) */
+    private _freeSet: Set<T> = new Set();
     /** 池子容量上限 */
     private _maxSize: number;
     /** 累计创建对象数 */
@@ -62,7 +64,9 @@ export class ObjectPool<T extends IPoolable> {
      */
     public acquire(): T {
         let obj = this._freeList.pop();
-        if (obj === undefined) {
+        if (obj !== undefined) {
+            this._freeSet.delete(obj);
+        } else {
             obj = new this._ctor();
             this._totalCreated++;
             Logger.debug(
@@ -83,7 +87,7 @@ export class ObjectPool<T extends IPoolable> {
      * @param obj 要回收的对象
      */
     public release(obj: T): void {
-        if (this._freeList.includes(obj)) {
+        if (this._freeSet.has(obj)) {
             Logger.warn(ObjectPool.TAG, `重复 release 被忽略: ${this._ctor.name}`);
             return;
         }
@@ -95,6 +99,7 @@ export class ObjectPool<T extends IPoolable> {
 
         if (this._freeList.length < this._maxSize) {
             this._freeList.push(obj);
+            this._freeSet.add(obj);
         } else {
             Logger.debug(ObjectPool.TAG, `池满丢弃: ${this._ctor.name}, maxSize=${this._maxSize}`);
         }
@@ -121,6 +126,7 @@ export class ObjectPool<T extends IPoolable> {
     public clear(): void {
         Logger.debug(ObjectPool.TAG, `清空池: ${this._ctor.name}, freed=${this._freeList.length}`);
         this._freeList.length = 0;
+        this._freeSet.clear();
     }
 
     /**
