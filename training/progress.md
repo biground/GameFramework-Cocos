@@ -27,7 +27,7 @@
 | TimerManager（定时器管理器）                | ⬜ 未开始 | -          | -           | Week 6                                                                                                         |
 | DataTable（数据表）                         | ⬜ 未开始 | -          | -           | Week 6                                                                                                         |
 | LocalizationManager（多语言管理器）         | ⬜ 未开始 | -          | -           | Week 6                                                                                                         |
-| Logger（日志管理器）                        | ✅ 已完成 | 2026-04-15 | 92          | Week 4 Day 4；静态 API + ModuleBase 混合方案，priority=0，19 个测试                                           |
+| Logger（日志管理器）                        | ✅ 已完成 | 2026-04-15 | 93          | Week 4 Day 4-5；基础 19 测 + 增强 48 测（ILogOutput/Tag 过滤/时间戳/堆栈/Ring Buffer/颜色/time-timeEnd/GFC_DEBUG 裁剪）；全框架 Logger 集成（~96 调试日志 + 46 错误日志） |
 | DebugPanel（调试面板）                      | ⬜ 未开始 | -          | -           | Week 5-6                                                                                                       |
 | CI/CD Pipeline（持续集成流水线）            | ⬜ 未开始 | -          | -           | Week 6                                                                                                         |
 | 综合 Demo 项目                              | ⬜ 未开始 | -          | -           | Week 7                                                                                                         |
@@ -77,6 +77,9 @@
 - [x] ✅ 场景管理模式：三层加载去重 + ISceneLoader 策略注入 + 异步回调 + 事件预留
 - [x] ✅ Phase 2 完成：Resource / UI / Entity / Network / Audio / Scene 六大业务模块全部完成
 - [x] ✅ Logger 静态 API + ModuleBase 混合方案：priority=0 保证最先初始化、rest params 性能优化、_levelLabels 静态常量避免热路径分配
+- [x] ✅ Logger 增强六件套：ILogOutput 策略模式、Tag 过滤、时间戳格式化、错误自动堆栈、Ring Buffer 历史、%c 颜色编码
+- [x] ✅ Logger 高级三件套：统一错误日志（46 处 throw 前置 log）、Logger.time/timeEnd 性能计时、GFC_DEBUG 编译期裁剪
+- [x] ✅ 全框架 Logger 集成：16 模块 ~96 处运行时调试日志 + 11 模块 46 处错误日志
 
 ## 面试题积累
 
@@ -84,8 +87,8 @@
 
 ## 上次会话断点
 
-- 最后操作：Week 4 Day 4 — Logger 模块实现完成，19 个测试全绿，Review 92 分，Phase 3 启动
-- 下次继续：Week 5 — Phase 3 性能优化 / CI/CD / 热更新 / DataTable / Timer / i18n / DebugPanel
+- 最后操作：Week 4 Day 5 — Logger 高级功能三件套（统一错误日志 + time/timeEnd + GFC_DEBUG 裁剪），48 测试全绿
+- 下次继续：Phase 3 继续 — 性能优化 / CI/CD / 热更新 / DataTable / Timer / i18n / DebugPanel
 - 未完成事项：无
-- 额外成就：Phase 3 首个模块 Logger 完成
+- 额外成就：Logger 从基础 19 测进化到 48 测；全框架 16 模块 Logger 集成完成
 - 更新日期：2026-04-15
