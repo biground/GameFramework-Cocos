@@ -1,4 +1,17 @@
 /**
+ * 框架调试标志
+ * - 开发环境: true（输出所有日志）
+ * - 生产环境: false（仅保留 warn/error，debug/info 被裁剪）
+ *
+ * Cocos Creator 构建时通过 Define 宏替换为 false
+ * Jest 测试时默认为 true
+ */
+declare global {
+    // eslint-disable-next-line no-var
+    var GFC_DEBUG: boolean;
+}
+
+/**
  * 日志级别枚举
  * 数值越大级别越高，用于过滤控制
  */

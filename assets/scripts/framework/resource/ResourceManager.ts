@@ -66,6 +66,7 @@ export class ResourceManager extends ModuleBase implements IResourceManager {
      */
     public setResourceLoader(loader: IResourceLoader): void {
         if (!loader) {
+            Logger.error(ResourceManager.TAG, 'loader 不能为空');
             throw new Error('[ResourceManager] loader 不能为空');
         }
         this._loader = loader;
@@ -81,12 +82,15 @@ export class ResourceManager extends ModuleBase implements IResourceManager {
      */
     public loadAsset(path: string, owner: string, callbacks?: LoadAssetCallbacks): void {
         if (!path) {
+            Logger.error(ResourceManager.TAG, '资源路径不能为空');
             throw new Error('[ResourceManager] 资源路径不能为空');
         }
         if (!owner) {
+            Logger.error(ResourceManager.TAG, 'owner 不能为空');
             throw new Error('[ResourceManager] owner 不能为空');
         }
         if (!this._loader) {
+            Logger.error(ResourceManager.TAG, '未设置 ResourceLoader，请先调用 setResourceLoader');
             throw new Error('[ResourceManager] 未设置 ResourceLoader，请先调用 setResourceLoader');
         }
 

@@ -164,6 +164,7 @@ export class NetworkChannel {
      */
     public send(packet: NetworkPacket): void {
         if (this._state !== NetworkState.Connected) {
+            Logger.error(NetworkChannel.TAG, `通道 '${this._name}' 未连接，无法发送消息`);
             throw new Error(`[NetworkChannel] 通道 '${this._name}' 未连接，无法发送消息`);
         }
 

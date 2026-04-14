@@ -71,6 +71,7 @@ export class EntityManager extends ModuleBase implements IEntityManager {
      */
     public setEntityFactory(factory: IEntityFactory): void {
         if (!factory) {
+            Logger.error(EntityManager.TAG, 'factory 不能为空');
             throw new Error('[EntityManager] factory 不能为空');
         }
         this._factory = factory;
@@ -81,12 +82,15 @@ export class EntityManager extends ModuleBase implements IEntityManager {
      */
     public registerGroup(groupName: string): void {
         if (!groupName) {
+            Logger.error(EntityManager.TAG, 'groupName 不能为空');
             throw new Error('[EntityManager] groupName 不能为空');
         }
         if (this._groups.has(groupName)) {
+            Logger.error(EntityManager.TAG, `分组 "${groupName}" 已注册`);
             throw new Error(`[EntityManager] 分组 "${groupName}" 已注册`);
         }
         if (!this._factory) {
+            Logger.error(EntityManager.TAG, '请先调用 setEntityFactory 设置工厂');
             throw new Error('[EntityManager] 请先调用 setEntityFactory 设置工厂');
         }
         this._groups.set(groupName, new EntityGroup(groupName, this._factory));
@@ -104,6 +108,7 @@ export class EntityManager extends ModuleBase implements IEntityManager {
         const group = this._groups.get(groupName);
         if (!group) {
             const error = `[EntityManager] 分组 "${groupName}" 不存在`;
+            Logger.error(EntityManager.TAG, `分组 "${groupName}" 不存在`);
             callbacks?.onFailure?.(-1, error);
             throw new Error(error);
         }

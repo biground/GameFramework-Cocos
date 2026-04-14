@@ -81,6 +81,7 @@ export class Container {
                 Logger.debug(Container.TAG, `委托父容器解析: ${key.description}`);
                 return this._parent.resolve(key);
             }
+            Logger.error(Container.TAG, `Service not bound: ${key.description}`);
             throw new Error(`Service not bound: ${key.description}`);
         }
 
@@ -92,6 +93,10 @@ export class Container {
         // 循环依赖检测
         if (this._resolutionStack.has(key)) {
             const chain = [...this._resolutionStack].map((k) => k.description).join(' → ');
+            Logger.error(
+                Container.TAG,
+                `Circular dependency detected: ${chain} → ${key.description}`,
+            );
             throw new Error(
                 `[Container] Circular dependency detected: ${chain} → ${key.description}`,
             );
@@ -106,6 +111,7 @@ export class Container {
                 const args = this._resolveConstructorArgs(binding.ctor);
                 instance = new (binding.ctor as new (...args: unknown[]) => T)(...args);
             } else {
+                Logger.error(Container.TAG, `Invalid binding for service: ${key.description}`);
                 throw new Error(`Invalid binding for service: ${key.description}`);
             }
 

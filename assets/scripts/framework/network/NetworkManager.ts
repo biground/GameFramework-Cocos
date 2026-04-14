@@ -78,6 +78,7 @@ export class NetworkManager extends ModuleBase implements INetworkManager, Netwo
      */
     public setEventManager(eventManager: IEventManager): void {
         if (!eventManager) {
+            Logger.error(NetworkManager.TAG, 'eventManager 不能为空');
             throw new Error('[NetworkManager] eventManager 不能为空');
         }
         this._eventManager = eventManager;
@@ -95,15 +96,19 @@ export class NetworkManager extends ModuleBase implements INetworkManager, Netwo
         config?: Partial<NetworkChannelConfig>,
     ): NetworkChannel {
         if (!name) {
+            Logger.error(NetworkManager.TAG, '通道名称不能为空');
             throw new Error('[NetworkManager] 通道名称不能为空');
         }
         if (this._channels.has(name)) {
+            Logger.error(NetworkManager.TAG, `通道 '${name}' 已存在，不能重复创建`);
             throw new Error(`[NetworkManager] 通道 '${name}' 已存在，不能重复创建`);
         }
         if (!socket) {
+            Logger.error(NetworkManager.TAG, 'socket 不能为空');
             throw new Error('[NetworkManager] socket 不能为空');
         }
         if (!packetHandler) {
+            Logger.error(NetworkManager.TAG, 'packetHandler 不能为空');
             throw new Error('[NetworkManager] packetHandler 不能为空');
         }
 
@@ -125,6 +130,7 @@ export class NetworkManager extends ModuleBase implements INetworkManager, Netwo
     public destroyChannel(name: string): void {
         const channel = this._channels.get(name);
         if (!channel) {
+            Logger.error(NetworkManager.TAG, `通道 '${name}' 不存在，无法销毁`);
             throw new Error(`[NetworkManager] 通道 '${name}' 不存在，无法销毁`);
         }
         channel.shutdown();
@@ -159,6 +165,7 @@ export class NetworkManager extends ModuleBase implements INetworkManager, Netwo
     public setHeartbeatHandler(channelName: string, handler: IHeartbeatHandler): void {
         const channel = this._channels.get(channelName);
         if (!channel) {
+            Logger.error(NetworkManager.TAG, `通道 '${channelName}' 不存在，无法设置心跳处理器`);
             throw new Error(`[NetworkManager] 通道 '${channelName}' 不存在，无法设置心跳处理器`);
         }
         channel.setHeartbeatHandler(handler);

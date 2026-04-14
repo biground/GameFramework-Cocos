@@ -1,6 +1,9 @@
 module.exports = {
     preset: 'ts-jest',
     testEnvironment: 'node',
+    globals: {
+        GFC_DEBUG: true,
+    },
     roots: ['<rootDir>/tests', '<rootDir>/packages'],
     testMatch: ['**/*.test.ts'],
     moduleNameMapper: {

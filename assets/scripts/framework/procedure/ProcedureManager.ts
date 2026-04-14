@@ -55,9 +55,11 @@ export class ProcedureManager extends ModuleBase implements IProcedureManager {
      */
     public initialize(...procedures: ProcedureBase[]): void {
         if (procedures.length === 0) {
+            Logger.error(ProcedureManager.TAG, '初始化失败：procedures 不能为空');
             throw new Error('[ProcedureManager] 初始化失败：procedures 不能为空');
         }
         if (this._procedureFsm) {
+            Logger.error(ProcedureManager.TAG, '初始化失败：不允许重复初始化');
             throw new Error('[ProcedureManager] 初始化失败：不允许重复初始化');
         }
 
@@ -76,6 +78,7 @@ export class ProcedureManager extends ModuleBase implements IProcedureManager {
      */
     public startProcedure<T extends ProcedureBase>(entryProcedure: Constructor<T>): void {
         if (!this._procedureFsm) {
+            Logger.error(ProcedureManager.TAG, '启动失败：请先调用 initialize 初始化流程');
             throw new Error('[ProcedureManager] 启动失败：请先调用 initialize 初始化流程');
         }
         Logger.info(ProcedureManager.TAG, `启动入口流程: ${entryProcedure.name}`);

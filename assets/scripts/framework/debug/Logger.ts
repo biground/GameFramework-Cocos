@@ -109,6 +109,9 @@ export class Logger extends ModuleBase {
     // ─── 静态默认级别（实例化前的降级配置） ────
     private static _defaultLevel: LogLevel = LogLevel.Debug;
 
+    // ─── 性能计时器 ────────────────────────────
+    private static _timers: Map<string, number> = new Map();
+
     // ─── 实例属性 ──────────────────────────────
     private _level: LogLevel = LogLevel.Debug;
 
@@ -145,6 +148,7 @@ export class Logger extends ModuleBase {
     public onShutdown(): void {
         Logger._instance = null;
         Logger._defaultLevel = LogLevel.Debug;
+        Logger._timers.clear();
         this._level = LogLevel.Debug;
         this._outputs = [];
         this._disabledTags.clear();
@@ -174,6 +178,13 @@ export class Logger extends ModuleBase {
      * @param args - 日志参数
      */
     private static _log(level: LogLevel, tag: string, ...args: unknown[]): void {
+        // 生产环境裁剪：debug/info 级别在 GFC_DEBUG=false 时直接跳过
+        if (typeof GFC_DEBUG !== 'undefined' && !GFC_DEBUG) {
+            if (level <= LogLevel.Info) {
+                return;
+            }
+        }
+
         const inst = Logger._instance;
         const currentLevel = inst ? inst._level : Logger._defaultLevel;
 
@@ -362,5 +373,34 @@ export class Logger extends ModuleBase {
     /** 获取当前历史条目数 */
     public static getHistoryCount(): number {
         return Logger._instance ? Logger._instance._historyCount : 0;
+    }
+
+    // ─── 性能计时 API ───────────────────────
+
+    /**
+     * 开始计时
+     * @param label 计时标签（唯一标识）
+     */
+    public static time(label: string): void {
+        if (typeof GFC_DEBUG !== 'undefined' && !GFC_DEBUG) return;
+        Logger._timers.set(label, Date.now());
+    }
+
+    /**
+     * 结束计时并输出耗时
+     * @param label 计时标签
+     * @returns 耗时（毫秒），不存在则返回 -1
+     */
+    public static timeEnd(label: string): number {
+        if (typeof GFC_DEBUG !== 'undefined' && !GFC_DEBUG) return 0;
+        const start = Logger._timers.get(label);
+        if (start === undefined) {
+            Logger.warn('Logger', `计时器 "${label}" 不存在`);
+            return -1;
+        }
+        const elapsed = Date.now() - start;
+        Logger._timers.delete(label);
+        Logger.info(label, `耗时: ${elapsed.toFixed(2)}ms`);
+        return elapsed;
     }
 }
