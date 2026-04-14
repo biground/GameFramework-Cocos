@@ -28,7 +28,7 @@ sceneMgr.setSceneLoader(new CocosSceneLoader());
 
 ```typescript
 sceneMgr.loadScene('BattleScene', {
-    onProgress: (progress) => console.log(`加载进度: ${progress * 100}%`),
+    onProgress: (progress) => Logger.debug('Scene', `加载进度: ${progress * 100}%`),
     userData: { levelId: 1 },
 });
 ```
@@ -55,14 +55,14 @@ interface ISceneManager {
 
 ## 设计决策
 
-| 决策                   | 选择                     | 原因                                                     |
-| ---------------------- | ------------------------ | -------------------------------------------------------- |
-| 三层加载去重           | 空名 + 当前场景 + 正在加载 | 防止重复加载导致状态混乱                                 |
-| ISceneLoader 策略注入  | 接口 + setter            | 与 IAudioPlayer / IResourceLoader 一致的 Framework→Runtime 解耦模式 |
-| priority = 220         | 业务框架范围 200-299     | 在 AudioManager(210) 之后，可按需调整                    |
-| 只管加载、不管卸载逻辑 | loadScene 内置状态切换   | 引擎通常在加载新场景时自动卸载旧场景                     |
-| 回调而非 Promise       | LoadSceneCallbacks       | 与框架其他模块一致的异步风格，支持 onProgress 渐进反馈   |
-| 事件定义预留           | SceneEvents + EventKey   | 提前定义类型安全事件，集成 EventManager 时零改动         |
+| 决策                   | 选择                       | 原因                                                                |
+| ---------------------- | -------------------------- | ------------------------------------------------------------------- |
+| 三层加载去重           | 空名 + 当前场景 + 正在加载 | 防止重复加载导致状态混乱                                            |
+| ISceneLoader 策略注入  | 接口 + setter              | 与 IAudioPlayer / IResourceLoader 一致的 Framework→Runtime 解耦模式 |
+| priority = 220         | 业务框架范围 200-299       | 在 AudioManager(210) 之后，可按需调整                               |
+| 只管加载、不管卸载逻辑 | loadScene 内置状态切换     | 引擎通常在加载新场景时自动卸载旧场景                                |
+| 回调而非 Promise       | LoadSceneCallbacks         | 与框架其他模块一致的异步风格，支持 onProgress 渐进反馈              |
+| 事件定义预留           | SceneEvents + EventKey     | 提前定义类型安全事件，集成 EventManager 时零改动                    |
 
 ## 依赖
 
