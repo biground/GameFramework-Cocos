@@ -24,6 +24,8 @@ export class EventManager extends ModuleBase {
     private static readonly TAG = 'EventManager';
     /** 事件监听器映射表：EventKey → EventBinding 数组 */
     private _eventMap: Map<EventKey<unknown>, EventBinding<unknown>[]> = new Map();
+    /** emit 嵌套深度计数器，> 0 时 off 只做标记不做 splice */
+    private _emitDepth: number = 0;
 
     /** 模块名称 */
     public get moduleName(): string {
@@ -121,9 +123,14 @@ export class EventManager extends ModuleBase {
         for (let i = 0; i < bindings.length; i++) {
             const binding = bindings[i];
             if (binding.callback === callback && binding.caller === caller) {
-                bindings.splice(i, 1);
-                if (bindings.length === 0) {
-                    this._eventMap.delete(key);
+                if (this._emitDepth > 0) {
+                    // emit 遍历中，仅标记延迟移除
+                    binding._removed = true;
+                } else {
+                    bindings.splice(i, 1);
+                    if (bindings.length === 0) {
+                        this._eventMap.delete(key);
+                    }
                 }
                 return;
             }
@@ -180,17 +187,35 @@ export class EventManager extends ModuleBase {
 
         Logger.debug(EventManager.TAG, `emit: ${key.description}, listeners=${bindings.length}`);
         const data = (args as unknown[])[0] as T;
-        const onceBindings: EventBinding<T>[] = [];
-        const snapshot = [...bindings];
-        for (const binding of snapshot) {
+
+        this._emitDepth++;
+        for (let i = 0; i < bindings.length; i++) {
+            const binding = bindings[i];
+            if (binding._removed) continue;
             binding.callback.call(binding.caller, data);
             if (binding.once) {
-                onceBindings.push(binding);
+                binding._removed = true;
             }
         }
+        this._emitDepth--;
 
-        for (const binding of onceBindings) {
-            this.off(key, binding.callback, binding.caller);
+        if (this._emitDepth === 0) {
+            this._cleanupRemoved(key, bindings);
+        }
+    }
+
+    /**
+     * 清理已标记 _removed 的绑定（延迟移除）
+     * 仅在 emitDepth === 0 时调用
+     */
+    private _cleanupRemoved<T>(key: EventKey<T>, bindings: EventBinding<T>[]): void {
+        for (let i = bindings.length - 1; i >= 0; i--) {
+            if (bindings[i]._removed) {
+                bindings.splice(i, 1);
+            }
+        }
+        if (bindings.length === 0) {
+            this._eventMap.delete(key);
         }
     }
 }

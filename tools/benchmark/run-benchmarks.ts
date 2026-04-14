@@ -97,14 +97,19 @@ function main(): void {
 
     // ─── Benchmark 2：ObjectPool acquire/release × 10000 ───
     {
-        const pool = new ObjectPool(BenchPoolable, 128);
+        const pool = new ObjectPool(BenchPoolable, 10240);
 
         runner.add('ObjectPool acquire/release × 10000', () => {
+            // 先批量 acquire 10000 个对象
+            const objs: BenchPoolable[] = [];
+            for (let i = 0; i < 10000; i++) {
+                objs.push(pool.acquire());
+            }
+            // 再批量 release（此时 freeList 逐步增长，release 的查重才有意义）
             let sink = 0;
             for (let i = 0; i < 10000; i++) {
-                const obj = pool.acquire();
-                sink += obj.value;
-                pool.release(obj);
+                sink += objs[i].value;
+                pool.release(objs[i]);
             }
             consumeSink(sink);
         });

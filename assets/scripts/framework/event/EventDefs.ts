@@ -41,4 +41,6 @@ export interface EventBinding<T> {
     caller: unknown;
     /** 是否为一次性监听，触发后自动移除 */
     once: boolean;
+    /** 延迟移除标记，emit 遍历中 off 时置 true */
+    _removed?: boolean;
 }
