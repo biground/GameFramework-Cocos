@@ -1,3 +1,4 @@
+import { Logger } from '../debug/Logger';
 import { EntityBase } from './EntityBase';
 import { EntityId, IEntityFactory } from './EntityDefs';
 
@@ -10,6 +11,8 @@ import { EntityId, IEntityFactory } from './EntityDefs';
  * - _waitingList：已 hide、等待复用的实体
  */
 export class EntityGroup {
+    private static readonly TAG = 'EntityGroup';
+
     /** 分组名称 */
     private readonly _groupName: string;
 
@@ -61,8 +64,10 @@ export class EntityGroup {
     public showEntity(entityId: EntityId, data?: unknown): EntityBase {
         const entity =
             this._waitingList.length > 0
-                ? this._waitingList.pop()!
-                : this._factory.createEntity(this._groupName);
+                ? (Logger.debug(EntityGroup.TAG, `[${this._groupName}] 复用实体`),
+                  this._waitingList.pop()!)
+                : (Logger.debug(EntityGroup.TAG, `[${this._groupName}] 新建实体`),
+                  this._factory.createEntity(this._groupName));
         entity._init(entityId, this._groupName);
         entity._setActive(true);
         this._activeList.push(entity);
@@ -79,6 +84,7 @@ export class EntityGroup {
         if (index !== -1) {
             this._activeList.splice(index, 1);
         }
+        Logger.debug(EntityGroup.TAG, `[${this._groupName}] 回收实体`);
         entity.onHide();
         entity._setActive(false);
         this._waitingList.push(entity);
@@ -99,6 +105,7 @@ export class EntityGroup {
      * 销毁分组：将所有实体（活跃 + 等待）通过 factory 销毁
      */
     public destroyAll(): void {
+        Logger.debug(EntityGroup.TAG, `[${this._groupName}] 销毁全部`);
         for (const entity of this._activeList) {
             entity.onHide();
             entity._setActive(false);

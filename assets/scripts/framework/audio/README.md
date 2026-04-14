@@ -74,16 +74,16 @@ interface IAudioManager {
 
 ## 设计决策
 
-| 决策 | 选择 | 原因 |
-|------|------|------|
-| music 同时只一首 | 切换时先 stop 旧曲 | 绝大多数游戏场景只需一首 BGM |
-| sound 按 ID 分组 | `Map<string, IAudioInstance[]>` | 支持同一音效叠加，且可按 ID 整组停止 |
-| 三级音量乘法 | `master × category` | 匹配主流游戏引擎的音量分层模型 |
-| 静音不改属性值 | flag 控制，取消恢复 | 用户调节的音量不会因静音而丢失 |
-| IAudioPlayer 策略注入 | 接口 + setter | 与 ResourceManager 一致的模式，Framework 不依赖 cc |
-| priority = 210 | 业务框架范围 200-299 | 依赖 ResourceManager(150)，在其之后初始化 |
-| onUpdate 清理已结束实例 | 每帧遍历 _sounds | 避免 Map 无限增长；零 GC（复用数组 index 遍历） |
-| AudioPlayConfig.loop 默认 false | 显式默认值 | 音效通常不循环；音乐循环由调用方按需传入 |
+| 决策                            | 选择                            | 原因                                               |
+| ------------------------------- | ------------------------------- | -------------------------------------------------- |
+| music 同时只一首                | 切换时先 stop 旧曲              | 绝大多数游戏场景只需一首 BGM                       |
+| sound 按 ID 分组                | `Map<string, IAudioInstance[]>` | 支持同一音效叠加，且可按 ID 整组停止               |
+| 三级音量乘法                    | `master × category`             | 匹配主流游戏引擎的音量分层模型                     |
+| 静音不改属性值                  | flag 控制，取消恢复             | 用户调节的音量不会因静音而丢失                     |
+| IAudioPlayer 策略注入           | 接口 + setter                   | 与 ResourceManager 一致的模式，Framework 不依赖 cc |
+| priority = 210                  | 业务框架范围 200-299            | 依赖 ResourceManager(150)，在其之后初始化          |
+| onUpdate 清理已结束实例         | 每帧遍历 \_sounds               | 避免 Map 无限增长；零 GC（复用数组 index 遍历）    |
+| AudioPlayConfig.loop 默认 false | 显式默认值                      | 音效通常不循环；音乐循环由调用方按需传入           |
 
 ## 依赖
 

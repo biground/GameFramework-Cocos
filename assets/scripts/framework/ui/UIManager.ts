@@ -1,4 +1,5 @@
 import { ModuleBase } from '../core/ModuleBase';
+import { Logger } from '../debug/Logger';
 import { IUIManager } from '../interfaces/IUIManager';
 import { UIFormBase } from './UIFormBase';
 import { IUIFormFactory, OpenFormCallbacks, UIFormConfig, UILayer } from './UIDefs';
@@ -14,6 +15,8 @@ import { IUIFormFactory, OpenFormCallbacks, UIFormConfig, UILayer } from './UIDe
  * - 资源加载委托给 ResourceManager
  */
 export class UIManager extends ModuleBase implements IUIManager {
+    private static readonly TAG = 'UIManager';
+
     public get moduleName(): string {
         return 'UIManager';
     }
@@ -41,6 +44,7 @@ export class UIManager extends ModuleBase implements IUIManager {
 
     public onInit(): void {
         this._initGroups();
+        Logger.info(UIManager.TAG, 'UI 管理器初始化');
     }
 
     public onUpdate(deltaTime: number): void {
@@ -55,6 +59,11 @@ export class UIManager extends ModuleBase implements IUIManager {
     }
 
     public onShutdown(): void {
+        const formCount = this._openForms.size;
+        Logger.info(
+            UIManager.TAG,
+            `UI 管理器关闭，清理 ${formCount} 个开启的表单，${this._formConfigs.size} 个注册配置`,
+        );
         this.closeAllForms();
         this._formConfigs.clear();
         this._groups.clear();
@@ -87,6 +96,7 @@ export class UIManager extends ModuleBase implements IUIManager {
             throw new Error(`[UIManager] 表单 "${formName}" 已注册，不能重复注册`);
         }
         this._formConfigs.set(formName, config);
+        Logger.debug(UIManager.TAG, `注册表单: ${formName}`);
     }
 
     /**
@@ -101,6 +111,7 @@ export class UIManager extends ModuleBase implements IUIManager {
 
         // 2. 非 allowMultiple 时，已打开则忽略
         if (!config.allowMultiple && (this._openForms.get(formName)?.length ?? 0) > 0) {
+            Logger.debug(UIManager.TAG, `表单已打开, 忽略: ${formName}`);
             return;
         }
 
@@ -130,6 +141,8 @@ export class UIManager extends ModuleBase implements IUIManager {
         // 7. 调用 onOpen
         form.onOpen(data);
 
+        Logger.debug(UIManager.TAG, `打开表单: ${formName}`);
+
         // 8. 成功回调
         callbacks?.onSuccess?.(formName, form);
     }
@@ -140,6 +153,8 @@ export class UIManager extends ModuleBase implements IUIManager {
     public closeForm(formName: string): void {
         const instances = this._openForms.get(formName);
         if (!instances || instances.length === 0) return; // 静默忽略
+
+        Logger.debug(UIManager.TAG, `关闭表单: ${formName}`);
 
         // allowMultiple 时关闭最后打开的实例（LIFO）
         const form = instances[instances.length - 1];
@@ -170,6 +185,7 @@ export class UIManager extends ModuleBase implements IUIManager {
         const pauseCovered = config.pauseCoveredForm !== false;
         if (wasTop && pauseCovered && group.length > 0) {
             const newTop = group[group.length - 1];
+            Logger.debug(UIManager.TAG, `栈顶恢复: ${newTop.formName}`);
             newTop.onReveal();
         }
 
@@ -181,6 +197,7 @@ export class UIManager extends ModuleBase implements IUIManager {
      * 关闭指定层级的所有表单
      */
     public closeAllForms(layer?: UILayer): void {
+        Logger.info(UIManager.TAG, `关闭所有表单`);
         if (layer !== undefined) {
             this._closeGroupForms(layer);
         } else {

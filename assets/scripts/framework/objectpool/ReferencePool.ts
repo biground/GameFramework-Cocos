@@ -1,6 +1,7 @@
 import { ModuleBase } from '../core/ModuleBase';
 import { IPoolable, Constructor, PoolStats } from './PoolDefs';
 import { ObjectPool } from './ObjectPool';
+import { Logger } from '../debug/Logger';
 
 /**
  * 引用池管理器（框架模块）
@@ -20,6 +21,7 @@ import { ObjectPool } from './ObjectPool';
  * ```
  */
 export class ReferencePool extends ModuleBase {
+    private static readonly TAG = 'ReferencePool';
     /** 多类型对象池映射表：Constructor → ObjectPool */
     private _poolMap: Map<Constructor<IPoolable>, ObjectPool<IPoolable>> = new Map();
 
@@ -34,10 +36,13 @@ export class ReferencePool extends ModuleBase {
     }
 
     /** 模块初始化 */
-    public onInit(): void {}
+    public onInit(): void {
+        Logger.info(ReferencePool.TAG, '引用池管理器初始化');
+    }
 
     /** 模块销毁，清空所有对象池并释放映射表 */
     public onShutdown(): void {
+        Logger.info(ReferencePool.TAG, `引用池管理器关闭, 清理 ${this._poolMap.size} 个池`);
         this.clearAll();
         this._poolMap.clear();
     }
@@ -126,6 +131,7 @@ export class ReferencePool extends ModuleBase {
         if (!pool) {
             pool = new ObjectPool(ctor) as ObjectPool<IPoolable>;
             this._poolMap.set(key, pool);
+            Logger.debug(ReferencePool.TAG, `自动创建对象池: ${ctor.name}`);
         }
         return pool as ObjectPool<T>;
     }

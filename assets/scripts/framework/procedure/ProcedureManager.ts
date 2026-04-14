@@ -3,6 +3,7 @@ import { Constructor, IFsmState } from '../fsm/FsmDefs';
 import { Fsm } from '../fsm/Fsm';
 import { ProcedureBase } from './ProcedureBase';
 import { IProcedureManager } from '../interfaces/IProcedureManager';
+import { Logger } from '../debug/Logger';
 
 /**
  * 流程管理器
@@ -25,6 +26,8 @@ import { IProcedureManager } from '../interfaces/IProcedureManager';
  * ```
  */
 export class ProcedureManager extends ModuleBase implements IProcedureManager {
+    private static readonly TAG = 'ProcedureManager';
+
     /** 内部状态机实例 */
     private _procedureFsm: Fsm<ProcedureManager> | null = null;
 
@@ -63,6 +66,7 @@ export class ProcedureManager extends ModuleBase implements IProcedureManager {
             this,
             procedures as unknown as IFsmState<ProcedureManager>[],
         );
+        Logger.info(ProcedureManager.TAG, `注册 ${procedures.length} 个流程`);
     }
 
     /**
@@ -74,6 +78,7 @@ export class ProcedureManager extends ModuleBase implements IProcedureManager {
         if (!this._procedureFsm) {
             throw new Error('[ProcedureManager] 启动失败：请先调用 initialize 初始化流程');
         }
+        Logger.info(ProcedureManager.TAG, `启动入口流程: ${entryProcedure.name}`);
         this._procedureFsm.start(
             entryProcedure as unknown as Constructor<IFsmState<ProcedureManager>>,
         );
@@ -95,7 +100,9 @@ export class ProcedureManager extends ModuleBase implements IProcedureManager {
     }
 
     /** 模块初始化 */
-    public onInit(): void {}
+    public onInit(): void {
+        Logger.info(ProcedureManager.TAG, '流程管理器初始化');
+    }
 
     /**
      * 每帧驱动内部 FSM 更新
@@ -109,6 +116,7 @@ export class ProcedureManager extends ModuleBase implements IProcedureManager {
 
     /** 模块销毁，关闭内部 FSM */
     public onShutdown(): void {
+        Logger.info(ProcedureManager.TAG, '流程管理器关闭');
         if (this._procedureFsm) {
             this._procedureFsm.shutdown();
             this._procedureFsm = null;

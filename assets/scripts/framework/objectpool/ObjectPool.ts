@@ -1,4 +1,5 @@
 import { IPoolable, Constructor, PoolStats } from './PoolDefs';
+import { Logger } from '../debug/Logger';
 
 /**
  * 泛型单类型对象池
@@ -23,6 +24,7 @@ import { IPoolable, Constructor, PoolStats } from './PoolDefs';
  * ```
  */
 export class ObjectPool<T extends IPoolable> {
+    private static readonly TAG = 'ObjectPool';
     /** 对象构造函数 */
     private _ctor: Constructor<T>;
     /** 空闲对象栈 */
@@ -63,6 +65,10 @@ export class ObjectPool<T extends IPoolable> {
         if (obj === undefined) {
             obj = new this._ctor();
             this._totalCreated++;
+            Logger.debug(
+                ObjectPool.TAG,
+                `新建对象: ${this._ctor.name}, totalCreated=${this._totalCreated}`,
+            );
         }
         this._usedCount++;
         obj.onSpawn();
@@ -78,6 +84,7 @@ export class ObjectPool<T extends IPoolable> {
      */
     public release(obj: T): void {
         if (this._freeList.includes(obj)) {
+            Logger.warn(ObjectPool.TAG, `重复 release 被忽略: ${this._ctor.name}`);
             return;
         }
 
@@ -88,6 +95,8 @@ export class ObjectPool<T extends IPoolable> {
 
         if (this._freeList.length < this._maxSize) {
             this._freeList.push(obj);
+        } else {
+            Logger.debug(ObjectPool.TAG, `池满丢弃: ${this._ctor.name}, maxSize=${this._maxSize}`);
         }
     }
 
@@ -99,6 +108,7 @@ export class ObjectPool<T extends IPoolable> {
     public preload(count: number): void {
         const canCreate = this._maxSize - this._freeList.length;
         const createCount = count < canCreate ? count : canCreate;
+        Logger.debug(ObjectPool.TAG, `预热: ${this._ctor.name}, count=${createCount}`);
         for (let i = 0; i < createCount; i++) {
             this._freeList.push(new this._ctor());
             this._totalCreated++;
@@ -109,6 +119,7 @@ export class ObjectPool<T extends IPoolable> {
      * 清空池中所有空闲对象
      */
     public clear(): void {
+        Logger.debug(ObjectPool.TAG, `清空池: ${this._ctor.name}, freed=${this._freeList.length}`);
         this._freeList.length = 0;
     }
 

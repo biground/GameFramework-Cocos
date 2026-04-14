@@ -1,4 +1,5 @@
 import { ModuleBase } from '../core/ModuleBase';
+import { Logger } from '../debug/Logger';
 import { IEventManager } from '../interfaces/IEventManager';
 import { INetworkManager } from '../interfaces/INetworkManager';
 import { NetworkChannel, NetworkChannelCallbacks } from './NetworkChannel';
@@ -27,6 +28,8 @@ import {
  * - Priority = 110（核心服务层，在 EventManager 之后）
  */
 export class NetworkManager extends ModuleBase implements INetworkManager, NetworkChannelCallbacks {
+    private static readonly TAG = 'NetworkManager';
+
     public get moduleName(): string {
         return 'NetworkManager';
     }
@@ -44,6 +47,7 @@ export class NetworkManager extends ModuleBase implements INetworkManager, Netwo
     // ─── 生命周期 ──────────────────────────────────────
 
     public onInit(): void {
+        Logger.info(NetworkManager.TAG, '网络管理器初始化');
         // 如果二次 init（模块重启），先关闭已有通道防止 Socket 泄漏
         for (const channel of this._channels.values()) {
             channel.shutdown();
@@ -58,6 +62,7 @@ export class NetworkManager extends ModuleBase implements INetworkManager, Netwo
     }
 
     public onShutdown(): void {
+        Logger.info(NetworkManager.TAG, `网络管理器关闭, 关闭 ${this._channels.size} 个通道`);
         for (const channel of this._channels.values()) {
             channel.shutdown();
         }
@@ -110,6 +115,7 @@ export class NetworkManager extends ModuleBase implements INetworkManager, Netwo
             config,
         );
         this._channels.set(name, channel);
+        Logger.info(NetworkManager.TAG, `创建通道: ${name}`);
         return channel;
     }
 
@@ -123,6 +129,7 @@ export class NetworkManager extends ModuleBase implements INetworkManager, Netwo
         }
         channel.shutdown();
         this._channels.delete(name);
+        Logger.info(NetworkManager.TAG, `销毁通道: ${name}`);
     }
 
     /**
@@ -163,6 +170,7 @@ export class NetworkManager extends ModuleBase implements INetworkManager, Netwo
      * 通道连接成功回调
      */
     public onConnected(channelName: string): void {
+        Logger.info(NetworkManager.TAG, `通道已连接: ${channelName}`);
         this._eventManager?.emit(NETWORK_CONNECTED, { channelName });
     }
 
@@ -170,6 +178,7 @@ export class NetworkManager extends ModuleBase implements INetworkManager, Netwo
      * 通道连接关闭回调
      */
     public onClosed(channelName: string, code: number, reason: string): void {
+        Logger.warn(NetworkManager.TAG, `通道已关闭: ${channelName}`);
         this._eventManager?.emit(NETWORK_CLOSED, {
             channelName,
             code,
@@ -181,6 +190,7 @@ export class NetworkManager extends ModuleBase implements INetworkManager, Netwo
      * 通道连接错误回调
      */
     public onError(channelName: string, error: Error): void {
+        Logger.error(NetworkManager.TAG, `通道错误: ${channelName}`, error);
         this._eventManager?.emit(NETWORK_ERROR, { channelName, error });
     }
 
@@ -195,6 +205,7 @@ export class NetworkManager extends ModuleBase implements INetworkManager, Netwo
      * 通道重连中回调
      */
     public onReconnecting(channelName: string, attempt: number, maxAttempts: number): void {
+        Logger.warn(NetworkManager.TAG, `通道重连中: ${channelName}`);
         this._eventManager?.emit(NETWORK_RECONNECTING, {
             channelName,
             attempt,

@@ -1,4 +1,5 @@
 import { ModuleBase } from '../core/ModuleBase';
+import { Logger } from '../debug/Logger';
 import { EntityBase } from './EntityBase';
 import { EntityGroup } from './EntityGroup';
 import { EntityId, IEntityFactory, ShowEntityCallbacks } from './EntityDefs';
@@ -15,6 +16,8 @@ import { IEntityManager } from '@framework/interfaces/IEntityManager';
  * - Priority = 180，在 UIManager（200）之前 update，确保 UI 读到当帧最新实体状态
  */
 export class EntityManager extends ModuleBase implements IEntityManager {
+    private static readonly TAG = 'EntityManager';
+
     public get moduleName(): string {
         return 'EntityManager';
     }
@@ -43,6 +46,7 @@ export class EntityManager extends ModuleBase implements IEntityManager {
         this._groups.clear();
         this._entityGroupMap.clear();
         this._factory = null;
+        Logger.info(EntityManager.TAG, '实体管理器初始化');
     }
 
     public onUpdate(deltaTime: number): void {
@@ -52,6 +56,7 @@ export class EntityManager extends ModuleBase implements IEntityManager {
     }
 
     public onShutdown(): void {
+        Logger.info(EntityManager.TAG, `实体管理器关闭，销毁 ${this._groups.size} 个分组`);
         for (const group of this._groups.values()) {
             group.destroyAll();
         }
@@ -85,6 +90,7 @@ export class EntityManager extends ModuleBase implements IEntityManager {
             throw new Error('[EntityManager] 请先调用 setEntityFactory 设置工厂');
         }
         this._groups.set(groupName, new EntityGroup(groupName, this._factory));
+        Logger.debug(EntityManager.TAG, `注册分组: ${groupName}`);
     }
 
     /**
@@ -104,6 +110,7 @@ export class EntityManager extends ModuleBase implements IEntityManager {
         const entityId = this._nextEntityId++;
         const entity = group.showEntity(entityId, data);
         this._entityGroupMap.set(entityId, group);
+        Logger.debug(EntityManager.TAG, `显示实体: group=${groupName}, id=${entityId}`);
         callbacks?.onSuccess?.(entityId, entity);
         return entity;
     }
@@ -116,6 +123,7 @@ export class EntityManager extends ModuleBase implements IEntityManager {
         if (!group) {
             return;
         }
+        Logger.debug(EntityManager.TAG, `隐藏实体: id=${entity.entityId}`);
         group.hideEntity(entity);
         this._entityGroupMap.delete(entity.entityId);
     }
@@ -124,6 +132,7 @@ export class EntityManager extends ModuleBase implements IEntityManager {
      * 隐藏指定分组的所有实体
      */
     public hideAllEntities(groupName?: string): void {
+        Logger.debug(EntityManager.TAG, `隐藏所有实体${groupName ? `: group=${groupName}` : ''}`);
         if (groupName !== undefined) {
             const group = this._groups.get(groupName);
             if (!group) return;

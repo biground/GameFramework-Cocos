@@ -2,6 +2,7 @@ import { ModuleBase } from '../core/ModuleBase';
 import { IFsm, IFsmState } from './FsmDefs';
 import { Fsm } from './Fsm';
 import { IFsmManager } from '../interfaces/IFsmManager';
+import { Logger } from '../debug/Logger';
 
 /**
  * 有限状态机管理器
@@ -20,6 +21,8 @@ import { IFsmManager } from '../interfaces/IFsmManager';
  * ```
  */
 export class FsmManager extends ModuleBase implements IFsmManager {
+    private static readonly TAG = 'FsmManager';
+
     /** 状态机映射表：name → Fsm 实例 */
     private _fsmMap: Map<string, Fsm<unknown>> = new Map();
 
@@ -39,7 +42,9 @@ export class FsmManager extends ModuleBase implements IFsmManager {
     }
 
     /** 模块初始化 */
-    public onInit(): void {}
+    public onInit(): void {
+        Logger.info(FsmManager.TAG, '状态机管理器初始化');
+    }
 
     /**
      * 每帧驱动所有状态机更新
@@ -53,6 +58,7 @@ export class FsmManager extends ModuleBase implements IFsmManager {
 
     /** 模块销毁，关闭并清理所有状态机 */
     public onShutdown(): void {
+        Logger.info(FsmManager.TAG, `状态机管理器关闭, 销毁 ${this._fsmMap.size} 个状态机`);
         for (const fsm of this._fsmMap.values()) {
             fsm.shutdown();
         }
@@ -76,6 +82,7 @@ export class FsmManager extends ModuleBase implements IFsmManager {
         }
         const fsm = new Fsm<T>(name, owner, states);
         this._fsmMap.set(name, fsm as unknown as Fsm<unknown>);
+        Logger.debug(FsmManager.TAG, `创建状态机: ${name}, states=${states.length}`);
         return fsm;
     }
 
@@ -87,10 +94,12 @@ export class FsmManager extends ModuleBase implements IFsmManager {
     public destroyFsm(name: string): boolean {
         const fsm = this._fsmMap.get(name);
         if (!fsm) {
+            Logger.debug(FsmManager.TAG, `状态机不存在，忽略销毁: ${name}`);
             return false;
         }
         fsm.shutdown();
         this._fsmMap.delete(name);
+        Logger.debug(FsmManager.TAG, `销毁状态机: ${name}`);
         return true;
     }
 

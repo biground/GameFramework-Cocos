@@ -13,6 +13,8 @@ import { ISceneLoader, LoadSceneOptions } from './SceneDefs';
  * - 场景事件广播（待集成 EventManager）
  */
 export class SceneManager extends ModuleBase implements ISceneManager {
+    private static readonly TAG = 'SceneManager';
+
     public get moduleName(): string {
         return 'SceneManager';
     }
@@ -54,12 +56,14 @@ export class SceneManager extends ModuleBase implements ISceneManager {
     // ─── 生命周期 ──────────────────────────────────────
 
     public onInit(): void {
+        Logger.info(SceneManager.TAG, '场景管理器初始化');
         this._currentScene = null;
         this._loadingScene = null;
         this._isLoading = false;
     }
 
     public onShutdown(): void {
+        Logger.info(SceneManager.TAG, '场景管理器关闭');
         this._currentScene = null;
         this._loadingScene = null;
         this._isLoading = false;
@@ -84,31 +88,32 @@ export class SceneManager extends ModuleBase implements ISceneManager {
     public loadScene(sceneName: string, options?: LoadSceneOptions): void {
         // 异常：空场景名
         if (!sceneName) {
-            Logger.warn('SceneManager', '场景名称不能为空');
+            Logger.warn(SceneManager.TAG, '场景名称不能为空');
             return;
         }
 
         // 异常：未设置加载器
         if (!this._sceneLoader) {
-            Logger.warn('SceneManager', '未设置场景加载器，请先调用 setSceneLoader');
+            Logger.warn(SceneManager.TAG, '未设置场景加载器，请先调用 setSceneLoader');
             return;
         }
 
         // 去重：已是当前场景
         if (this._currentScene === sceneName) {
-            Logger.warn('SceneManager', `已在场景 ${sceneName} 中，忽略重复加载`);
+            Logger.warn(SceneManager.TAG, `已在场景 ${sceneName} 中，忽略重复加载`);
             return;
         }
 
         // 去重：正在加载中
         if (this._isLoading) {
             Logger.warn(
-                'SceneManager',
+                SceneManager.TAG,
                 `正在加载场景 ${this._loadingScene}，忽略新请求 ${sceneName}`,
             );
             return;
         }
 
+        Logger.info(SceneManager.TAG, `开始加载场景: ${sceneName}`);
         this._isLoading = true;
         this._loadingScene = sceneName;
 
@@ -117,11 +122,13 @@ export class SceneManager extends ModuleBase implements ISceneManager {
                 options?.onProgress?.(progress);
             },
             onSuccess: () => {
+                Logger.info(SceneManager.TAG, `场景加载完成: ${sceneName}`);
                 this._currentScene = sceneName;
                 this._loadingScene = null;
                 this._isLoading = false;
             },
             onFailure: () => {
+                Logger.error(SceneManager.TAG, `场景加载失败: ${sceneName}`);
                 this._loadingScene = null;
                 this._isLoading = false;
             },

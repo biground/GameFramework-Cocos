@@ -1,4 +1,5 @@
 import { IFsm, IFsmState, Constructor } from './FsmDefs';
+import { Logger } from '../debug/Logger';
 
 /**
  * 有限状态机
@@ -7,6 +8,8 @@ import { IFsm, IFsmState, Constructor } from './FsmDefs';
  * @template T 状态机持有者类型
  */
 export class Fsm<T> implements IFsm<T> {
+    private static readonly TAG = 'Fsm';
+
     private _name: string;
     private _owner: T;
     private _states: Map<Constructor<IFsmState<T>>, IFsmState<T>>;
@@ -86,6 +89,7 @@ export class Fsm<T> implements IFsm<T> {
             throw new Error(`[FSM] 状态机 "${this._name}" 不包含状态: ${stateType.name}`);
         }
         this._currentState = state;
+        Logger.debug(Fsm.TAG, `[${this._name}] 启动, 初始状态=${stateType.name}`);
         this._currentState.onEnter(this);
     }
 
@@ -107,6 +111,10 @@ export class Fsm<T> implements IFsm<T> {
 
         this._isChangingState = true;
         try {
+            Logger.debug(
+                Fsm.TAG,
+                `[${this._name}] 状态切换: ${this._currentState?.constructor.name} → ${stateType.name}`,
+            );
             this._currentState.onLeave(this);
             this._currentState = targetState;
             this._currentState.onEnter(this);
@@ -133,6 +141,7 @@ export class Fsm<T> implements IFsm<T> {
         if (this._isDestroyed) {
             return;
         }
+        Logger.debug(Fsm.TAG, `[${this._name}] 关闭, 清理 ${this._states.size} 个状态`);
         if (this._currentState !== null) {
             this._currentState.onLeave(this);
         }
