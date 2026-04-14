@@ -64,17 +64,18 @@ GameEntry（框架入口）
 
 ## 变更日志
 
-| 日期       | 变更内容                                                                                                                        | 操作人 |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| 2026-03-23 | 初始化模块注册表                                                                                                                | 系统   |
-| 2026-03-30 | Event 模块完成，含 EventKey<T> 类型安全事件系统                                                                                 | 大圆   |
-| 2026-04-10 | Network 模块完成（NetworkDefs + NetworkChannel + NetworkManager），41 个测试全绿                                                | 大圆   |
-| 2026-03-31 | ObjectPool + ReferencePool 完成（91/100），插件化架构方案确定                                                                   | 大圆   |
-| 2026-04-03 | DI Container 核心实现完成（10 个测试通过），装饰器待实现；更新模块状态                                                          | 大圆   |
-| 2026-04-03 | DI 装饰器实现 + Container 自动注入集成（95/100），30 个测试全绿                                                                 | 大圆   |
-| 2026-04-04 | FSM 模块完成（FsmDefs + FsmState + Fsm + FsmManager），52 个测试全绿                                                            | 大圆   |
-| 2026-04-07 | Procedure 模块完成（ProcedureBase + ProcedureManager），13 个测试全绿，94/100                                                   | 大圆   |
-| 2026-04-07 | Resource 模块完成（ResourceDefs + IResourceManager + ResourceManager），26 个测试全绿                                           | 大圆   |
-| 2026-04-08 | UI 模块完成（UIDefs + UIFormBase + IUIManager + UIManager），31 个测试全绿                                                      | 大圆   |
-| 2026-04-13 | Audio 模块完成（AudioDefs + IAudioManager + AudioManager），三级音量乘法链 + IAudioPlayer 策略注入，27 个测试全绿，Review 88 分 | 大圆   |
+| 日期       | 变更内容                                                                                                                                    | 操作人 |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 2026-03-23 | 初始化模块注册表                                                                                                                            | 系统   |
+| 2026-03-30 | Event 模块完成，含 EventKey<T> 类型安全事件系统                                                                                             | 大圆   |
+| 2026-04-10 | Network 模块完成（NetworkDefs + NetworkChannel + NetworkManager），41 个测试全绿                                                            | 大圆   |
+| 2026-03-31 | ObjectPool + ReferencePool 完成（91/100），插件化架构方案确定                                                                               | 大圆   |
+| 2026-04-03 | DI Container 核心实现完成（10 个测试通过），装饰器待实现；更新模块状态                                                                      | 大圆   |
+| 2026-04-03 | DI 装饰器实现 + Container 自动注入集成（95/100），30 个测试全绿                                                                             | 大圆   |
+| 2026-04-04 | FSM 模块完成（FsmDefs + FsmState + Fsm + FsmManager），52 个测试全绿                                                                        | 大圆   |
+| 2026-04-07 | Procedure 模块完成（ProcedureBase + ProcedureManager），13 个测试全绿，94/100                                                               | 大圆   |
+| 2026-04-07 | Resource 模块完成（ResourceDefs + IResourceManager + ResourceManager），26 个测试全绿                                                       | 大圆   |
+| 2026-04-08 | UI 模块完成（UIDefs + UIFormBase + IUIManager + UIManager），31 个测试全绿                                                                  | 大圆   |
+| 2026-04-13 | Audio 模块完成（AudioDefs + IAudioManager + AudioManager），三级音量乘法链 + IAudioPlayer 策略注入，27 个测试全绿，Review 88 分             | 大圆   |
 | 2026-04-14 | Scene 模块完成（SceneDefs + ISceneManager + SceneManager），三层加载去重 + ISceneLoader 策略注入，15 个测试全绿，Review 90 分，Phase 2 完成 | 大圆   |
+| 2026-04-15 | Logger 模块完成（LoggerDefs + Logger），静态 API + ModuleBase 混合方案，priority=0，19 个测试全绿，Review 92 分                                              | 大圆   |
