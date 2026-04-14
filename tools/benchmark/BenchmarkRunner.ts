@@ -31,8 +31,12 @@ export interface BenchmarkResult {
     p99: number;
     /** 总耗时（ms） */
     total: number;
+    /** 标准差（ms） */
+    stddev: number;
+    /** 每秒操作数 */
+    opsPerSec: number;
     /** 每轮原始采样数据（ms） */
-    samples: number[];
+    samples: readonly number[];
 }
 
 /** BenchmarkRunner 配置 */
@@ -93,19 +97,8 @@ export class BenchmarkRunner {
     /**
      * 运行单个基准测试
      *
-     * TODO 1：实现核心测试流程
-     * 1. 先跑 _warmupRounds 轮预热（调用 fn，不记录时间）
-     *    - 如果有 setup/teardown，预热时也要调用
-     * 2. 正式跑 _iterations 轮，每轮：
-     *    - 调用 setup（如果有）
-     *    - 用 performance.now() 记录开始时间
-     *    - 调用 fn
-     *    - 用 performance.now() 记录结束时间
-     *    - 调用 teardown（如果有）
-     *    - 把耗时（结束-开始）存入 samples 数组
-     * 3. 返回 BenchmarkResult
-     *
-     * 注意：setup/teardown 的耗时不要计入 samples！
+     * 先跑预热轮（不计入统计），再跑正式轮收集 samples。
+     * setup/teardown 的耗时不计入 samples。
      */
     run(benchCase: BenchmarkCase): BenchmarkResult {
         const { name, fn, setup, teardown } = benchCase;
@@ -144,37 +137,49 @@ export class BenchmarkRunner {
     }
 
     /**
-     * 计算统计数据
-     *
-     * TODO 2：实现统计计算
-     * 1. 对 samples 排序（升序）
-     * 2. 计算 avg = 总和 / 数量
-     * 3. min = 排序后第一个，max = 最后一个
-     * 4. p95 = 排序后第 Math.ceil(0.95 * n) - 1 位
-     * 5. p99 = 排序后第 Math.ceil(0.99 * n) - 1 位
-     * 6. total = 所有 sample 的总和
+     * 计算统计数据（avg/min/max/p95/p99/total）
+     * 对 samples 排序后提取各指标
      */
     private _computeStats(name: string, samples: number[]): BenchmarkResult {
+        if (samples.length === 0) {
+            return {
+                name,
+                iterations: 0,
+                avg: 0,
+                min: 0,
+                max: 0,
+                p95: 0,
+                p99: 0,
+                total: 0,
+                stddev: 0,
+                opsPerSec: 0,
+                samples,
+            };
+        }
+
         const sorted = samples.slice().sort((a, b) => a - b);
         const total = sorted.reduce((sum, v) => sum + v, 0);
+        const avg = total / samples.length;
+        const variance = sorted.reduce((sum, v) => sum + (v - avg) ** 2, 0) / samples.length;
+        const stddev = Math.sqrt(variance);
 
         return {
             name,
             iterations: samples.length,
-            avg: total / samples.length,
+            avg,
             min: sorted[0],
             max: sorted[sorted.length - 1],
             p95: this._percentile(sorted, 0.95),
             p99: this._percentile(sorted, 0.99),
             total,
+            stddev,
+            opsPerSec: avg > 0 ? 1000 / avg : 0,
             samples,
         };
     }
 
     /**
      * 计算百分位值
-     *
-     * TODO 3：实现百分位计算
      * @param sorted 已排序的数组
      * @param percentile 百分位（0-1），如 0.95 表示 p95
      */
@@ -185,20 +190,7 @@ export class BenchmarkRunner {
 
     /**
      * 生成 Markdown 格式的性能报告
-     *
-     * TODO 4：实现 Markdown 报告生成
-     * 输出格式示例：
-     *
-     * # 性能基准报告
-     *
-     * | 测试名称 | 迭代次数 | Avg (ms) | Min (ms) | Max (ms) | P95 (ms) | P99 (ms) | Total (ms) |
-     * |---------|---------|---------|---------|---------|---------|---------|-----------|
-     * | EventManager emit x10000 | 1000 | 1.23 | 0.98 | 5.67 | 2.34 | 4.56 | 1230.00 |
-     *
-     * 要求：
-     * - 数字保留 2 位小数
-     * - 包含运行配置信息（warmup 轮数、迭代次数）
-     * - 包含运行时间戳
+     * 包含运行配置、时间戳和各测试统计表格
      */
     reportMarkdown(): string {
         const lines: string[] = [];
@@ -209,14 +201,14 @@ export class BenchmarkRunner {
         lines.push(`- **迭代次数**: ${this._iterations}`);
         lines.push('');
         lines.push(
-            '| 测试名称 | 迭代次数 | Avg (ms) | Min (ms) | Max (ms) | P95 (ms) | P99 (ms) | Total (ms) |',
+            '| 测试名称 | 迭代次数 | Avg (ms) | Stddev (ms) | Min (ms) | Max (ms) | P95 (ms) | P99 (ms) | ops/sec | Total (ms) |',
         );
         lines.push(
-            '|---------|---------|---------|---------|---------|---------|---------|-----------|',
+            '|---------|---------|---------|-----------|---------|---------|---------|---------|---------|-----------|',
         );
         for (const r of this._results) {
             lines.push(
-                `| ${r.name} | ${r.iterations} | ${r.avg.toFixed(2)} | ${r.min.toFixed(2)} | ${r.max.toFixed(2)} | ${r.p95.toFixed(2)} | ${r.p99.toFixed(2)} | ${r.total.toFixed(2)} |`,
+                `| ${r.name} | ${r.iterations} | ${r.avg.toFixed(2)} | ${r.stddev.toFixed(2)} | ${r.min.toFixed(2)} | ${r.max.toFixed(2)} | ${r.p95.toFixed(2)} | ${r.p99.toFixed(2)} | ${r.opsPerSec.toFixed(0)} | ${r.total.toFixed(2)} |`,
             );
         }
         lines.push('');
