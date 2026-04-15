@@ -3,6 +3,7 @@
 基于 Unity [GameFramework](https://github.com/EllanJiang/GameFramework) 设计思想的 CocosCreator 3.x 游戏框架
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/biground/GameFramework-Cocos/actions/workflows/ci.yml/badge.svg)](https://github.com/biground/GameFramework-Cocos/actions/workflows/ci.yml)
 
 ## 📖 简介
 
