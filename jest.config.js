@@ -16,4 +16,8 @@ module.exports = {
         'assets/scripts/framework/**/*.ts',
         '!assets/scripts/framework/**/*.d.ts',
     ],
+    // CI 环境输出 JUnit XML，本地调试时仅用默认 reporter
+    reporters: process.env.CI
+        ? ['default', ['jest-junit', { outputDirectory: '.', outputName: 'junit.xml' }]]
+        : ['default'],
 };
