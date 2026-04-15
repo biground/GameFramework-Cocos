@@ -5,7 +5,7 @@
 - 开始日期：2026-03-23
 - 当前日期：2026-04-14
 - 当前周次：Week 4 / 8
-- 总完成度：60%
+- 总完成度：65%
 
 ## 模块开发进度
 
@@ -28,6 +28,8 @@
 | DataTable（数据表）                         | ⬜ 未开始 | -          | -           | Week 6                                                                                                                                                                    |
 | LocalizationManager（多语言管理器）         | ⬜ 未开始 | -          | -           | Week 6                                                                                                                                                                    |
 | Logger（日志管理器）                        | ✅ 已完成 | 2026-04-15 | 93          | Week 4 Day 4-5；基础 19 测 + 增强 48 测（ILogOutput/Tag 过滤/时间戳/堆栈/Ring Buffer/颜色/time-timeEnd/GFC_DEBUG 裁剪）；全框架 Logger 集成（~96 调试日志 + 46 错误日志） |
+| BenchmarkRunner（性能基准测试）            | ✅ 已完成 | 2026-04-14 | 82          | Week 4 Day 6；预热+计时+统计（avg/min/max/p95/p99/stddev/opsPerSec）+Markdown报告；3个基准测试 |
+| 性能优化（EventManager + ObjectPool）    | ✅ 已完成 | 2026-04-14 | -           | Week 4 Day 6；emit 消除快照拷贝（emitDepth+_removed）；release Set查重 O(1)                                                                     |
 | DebugPanel（调试面板）                      | ⬜ 未开始 | -          | -           | Week 5-6                                                                                                                                                                  |
 | CI/CD Pipeline（持续集成流水线）            | ⬜ 未开始 | -          | -           | Week 6                                                                                                                                                                    |
 | 综合 Demo 项目                              | ⬜ 未开始 | -          | -           | Week 7                                                                                                                                                                    |
@@ -80,10 +82,8 @@
 - [x] ✅ Logger 增强六件套：ILogOutput 策略模式、Tag 过滤、时间戳格式化、错误自动堆栈、Ring Buffer 历史、%c 颜色编码
 - [x] ✅ Logger 高级三件套：统一错误日志（46 处 throw 前置 log）、Logger.time/timeEnd 性能计时、GFC_DEBUG 编译期裁剪
 - [x] ✅ 全框架 Logger 集成：16 模块 ~96 处运行时调试日志 + 11 模块 46 处错误日志
-- [x] ✅ 微基准测试方法论：JIT 预热、死码消除（consumeSink）、performance.now() 精度、p95/p99 尾延迟统计
-- [x] ✅ emit 延迟删除模式：_emitDepth 计数器 + _removed 标记替代快照拷贝，消除 O(n) 数组分配
-- [x] ✅ Set 查重优化：ObjectPool release 从 includes() O(n) → Set.has() O(1)，_freeList + _freeSet 双结构同步
-- [x] ✅ 性能基准框架：BenchmarkRunner（warmup + 统计 + Markdown 报告） + Logger.time/timeEnd 集成
+- [x] ✅ 性能基准测试：BenchmarkRunner（预热+计时+统计+Markdown报告），3 个基准测试
+- [x] ✅ 性能优化实战：EventManager.emit 消除 slice 快照（emitDepth+_removed 延迟清理）；ObjectPool.release Set O(1) 查重
 
 ## 面试题积累
 
@@ -91,8 +91,8 @@
 
 ## 上次会话断点
 
-- 最后操作：Week 4 Day 6 — Phase 3 性能优化专项：BenchmarkRunner 框架 + 3 个基准测试 + EventManager/ObjectPool 热路径优化，496 测试全绿
-- 下次继续：Day 6 进阶任务（内存分析）or Phase 3 下一课题——CI/CD / 热更新 / DataTable / Timer / i18n / DebugPanel
-- 未完成事项：Task 3 进阶（内存分析）尚未开始
-- 额外成就：emit 延迟删除 + Set 查重优化两项热路径落地，BenchmarkRunner 可复用于后续所有模块的性能回归
+- 最后操作：Week 4 Day 6 — BenchmarkRunner 实现 + EventManager/ObjectPool 性能优化，23 套测试全绿
+- 下次继续：Phase 3 继续 — CI/CD / 热更新 / DataTable / Timer / i18n / DebugPanel
+- 未完成事项：无
+- 额外成就：BenchmarkRunner（含 stddev/opsPerSec）；emit 消除 slice 快照；ObjectPool Set 查重
 - 更新日期：2026-04-14
