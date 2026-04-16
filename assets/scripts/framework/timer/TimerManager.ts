@@ -36,8 +36,14 @@ export class TimerManager extends ModuleBase implements ITimerManager {
 
     // ─── 内部状态 ──────────────────────────────────────
 
-    /** 定时器列表 */
+    /** 定时器列表（顺序遍历用） */
     private _timers: ITimerEntry[] = [];
+
+    /** id → entry 的哈希索引，O(1) 查找 */
+    private _timerMap: Map<number, ITimerEntry> = new Map();
+
+    /** 活跃定时器计数缓存 */
+    private _activeCount = 0;
 
     /** 下一个可用 ID */
     private _nextId = 1;
@@ -66,15 +72,9 @@ export class TimerManager extends ModuleBase implements ITimerManager {
         this._timeScale = value;
     }
 
-    /** 当前活跃定时器数量（不含已标记删除的） */
+    /** 当前活跃定时器数量（O(1) 缓存） */
     public get activeCount(): number {
-        let count = 0;
-        for (let i = 0; i < this._timers.length; i++) {
-            if (!this._timers[i].removed) {
-                count++;
-            }
-        }
-        return count;
+        return this._activeCount;
     }
 
     // ─── 生命周期 ──────────────────────────────────────
@@ -119,6 +119,7 @@ export class TimerManager extends ModuleBase implements ITimerManager {
                     // 一次性定时器，标记删除
                     timer.removed = true;
                     this._hasRemoved = true;
+                    this._activeCount--;
                 } else {
                     // 重复定时器
                     if (timer.repeat > 0) {
@@ -142,6 +143,8 @@ export class TimerManager extends ModuleBase implements ITimerManager {
 
     public onShutdown(): void {
         this._timers.length = 0;
+        this._timerMap.clear();
+        this._activeCount = 0;
         this._nextId = 1;
         this._updating = false;
         this._hasRemoved = false;
@@ -186,6 +189,8 @@ export class TimerManager extends ModuleBase implements ITimerManager {
         };
 
         this._timers.push(entry);
+        this._timerMap.set(id, entry);
+        this._activeCount++;
         Logger.debug(`[TimerManager] 添加定时器 #${id}, delay=${delay}, repeat=${repeat}`);
         return id;
     }
@@ -197,6 +202,7 @@ export class TimerManager extends ModuleBase implements ITimerManager {
         }
 
         timer.removed = true;
+        this._activeCount--;
 
         if (this._updating) {
             this._hasRemoved = true;
@@ -216,7 +222,9 @@ export class TimerManager extends ModuleBase implements ITimerManager {
             this._hasRemoved = true;
         } else {
             this._timers.length = 0;
+            this._timerMap.clear();
         }
+        this._activeCount = 0;
     }
 
     public removeTimersByTag(tag: string): number {
@@ -230,6 +238,7 @@ export class TimerManager extends ModuleBase implements ITimerManager {
         }
 
         if (count > 0) {
+            this._activeCount -= count;
             if (this._updating) {
                 this._hasRemoved = true;
             } else {
@@ -324,28 +333,36 @@ export class TimerManager extends ModuleBase implements ITimerManager {
     // ─── 内部方法 ──────────────────────────────────────
 
     /**
-     * 查找指定 ID 的活跃定时器
+     * 查找指定 ID 的活跃定时器（O(1) Map 查找）
      */
     private _findTimer(id: number): ITimerEntry | null {
-        for (let i = 0; i < this._timers.length; i++) {
-            const timer = this._timers[i];
-            if (timer.id === id && !timer.removed) {
-                return timer;
-            }
+        const timer = this._timerMap.get(id);
+        if (timer && !timer.removed) {
+            return timer;
         }
         return null;
     }
 
     /**
-     * 清理所有标记删除的定时器
+     * 清理所有标记删除的定时器（swap-and-pop，O(n) 单遍扫描）
      */
     private _cleanupRemoved(): void {
-        // 倒序遍历以安全删除
-        for (let i = this._timers.length - 1; i >= 0; i--) {
-            if (this._timers[i].removed) {
-                this._timers.splice(i, 1);
+        const timers = this._timers;
+        let writeIdx = 0;
+
+        for (let readIdx = 0; readIdx < timers.length; readIdx++) {
+            if (timers[readIdx].removed) {
+                // 从 Map 中移除
+                this._timerMap.delete(timers[readIdx].id);
+            } else {
+                if (readIdx !== writeIdx) {
+                    timers[writeIdx] = timers[readIdx];
+                }
+                writeIdx++;
             }
         }
+
+        timers.length = writeIdx;
         this._hasRemoved = false;
     }
 }
