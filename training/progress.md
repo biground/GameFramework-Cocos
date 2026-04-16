@@ -90,6 +90,7 @@
 - [x] ✅ Timer 定时器模式：mark-delete + _updating 标记安全遍历、count 快照防新增 Timer 当帧遍历、溢出精度保留（elapsed -= delay）、timeScale 时间缩放、tag 分组批量操作
 - [x] ✅ 最小堆定时器：数组二叉堆、siftUp/siftDown、heapIndex O(1) 定位、绝对到期时间 expireTime、pause 分离列表重算 expireTime
 - [x] ✅ 时间轮定时器：slot 数组 + tick 前进 + 整数 tick 计数避免浮点漂移 + 多圈 remainingRounds + epsilon 修正 ceil 精度 + advance-first-then-process
+- [x] ✅ DataTable 数据表模式：泛型容器 DataTable\<T extends IDataRow\>、双存储模式（Map 随机查询 / Array 顺序遍历）、indexMap 空间换时间 O(1)、IDataTableParser 策略注入
 
 ## 面试题积累
 
@@ -97,8 +98,8 @@
 
 ## 上次会话断点
 
-- 最后操作：Week 4 Day 8 — Timer 模块 + gfc-timer-heap 插件 + gfc-timer-wheel 插件全部完成
-- 下次继续：Phase 3 继续 — DataTable / i18n / DebugPanel / 热更新
-- 未完成事项：Timer 模块 Obsidian 笔记待写
-- 额外成就：实现三种定时器方案（数组/最小堆/时间轮），总计 121 个测试全绿
+- 最后操作：Week 4 Day 9 — DataTable 模块完成（双存储模式 + 策略注入 + 41 测试全绿）
+- 下次继续：Phase 3 继续 — i18n / DebugPanel / 热更新
+- 未完成事项：无
+- 额外成就：学员主动提出双存储模式设计，已纳入实现
 - 更新日期：2026-04-16

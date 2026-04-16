@@ -15,7 +15,7 @@ GameEntry（框架入口）
   ├── ProcedureManager（依赖 → FSM）
   ├── ResourceManager（依赖 → EventManager, ObjectPool）
   ├── AudioManager（依赖 → ResourceManager）
-  ├── DataManager（依赖 → ResourceManager）
+  ├── DataTableManager（依赖 → ResourceManager）
   ├── SceneManager（依赖 → ResourceManager, EventManager）
   ├── UIManager（依赖 → ResourceManager, EventManager, ObjectPool）
   ├── EntityManager（依赖 → ResourceManager, EventManager, ObjectPool）
@@ -61,7 +61,7 @@ GameEntry（框架入口）
 | 0 - 99     | 基础设施 | Logger, EventManager, TimerManager, ObjectPool       |
 | 100 - 199  | 核心服务 | ResourceManager, NetworkManager, FSM                 |
 | 200 - 299  | 业务框架 | UIManager, EntityManager, AudioManager, SceneManager |
-| 300 - 399  | 上层逻辑 | ProcedureManager, DataManager, LocalizationManager   |
+| 300 - 399  | 上层逻辑 | ProcedureManager, DataTableManager, LocalizationManager   |
 | 400+       | 调试工具 | DebugPanel                                           |
 
 ## 变更日志
@@ -84,3 +84,4 @@ GameEntry（框架入口）
 | 2026-04-16 | Timer 模块完成（TimerDefs + ITimerManager + TimerManager），mark-delete 遍历安全 + 溢出精度保留 + timeScale + tag 批量操作，35 个测试全绿，Review 88 分 | 大圆   |
 | 2026-04-16 | gfc-timer-heap 插件完成（MinHeap + HeapTimerManager），绝对到期时间 + 堆索引 O(1) 定位 + pause 分离列表，47 个测试全绿 | 大圆   |
 | 2026-04-16 | gfc-timer-wheel 插件完成（WheelTimerManager），slot 数组 + advance-first tick + 整数 tick 计数 + 多圈 remainingRounds + epsilon 浮点修正，39 个测试全绿 | 大圆   |
+| 2026-04-16 | DataTable 模块完成（DataTableDefs + DataTable\<T\> + DataTableManager），双存储模式（Map/Array）+ IDataTableParser 策略注入 + indexMap O(1) 查询，41 个测试全绿 | 大圆   |
