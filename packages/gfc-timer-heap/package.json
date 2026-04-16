@@ -1,0 +1,15 @@
+{
+    "name": "@gfc/timer-heap",
+    "version": "0.1.0",
+    "description": "GameFramework-Cocos 最小堆定时器插件：O(1) 无触发帧 + O(log n) 触发/添加",
+    "main": "src/index.ts",
+    "peerDependencies": {
+        "@gfc/core": ">=0.1.0"
+    },
+    "keywords": [
+        "timer",
+        "min-heap",
+        "priority-queue",
+        "game-framework"
+    ]
+}
