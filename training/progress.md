@@ -24,7 +24,7 @@
 | NetworkManager（网络管理器）                | ✅ 已完成 | 2026-04-10 | -           | Week 4 Day 1；NetworkDefs + NetworkChannel + NetworkManager，41 个测试；双策略注入 + 指数退避重连                                                                         |
 | AudioManager（音频管理器）                  | ✅ 已完成 | 2026-04-13 | 88          | Week 4 Day 2；音量乘法链 + IAudioPlayer 策略注入，27 个测试                                                                                                               |
 | SceneManager（场景管理器）                  | ✅ 已完成 | 2026-04-14 | 90          | Week 4 Day 3；三层加载去重 + ISceneLoader 策略注入，15 个测试，Phase 2 最后模块                                                                                           |
-| TimerManager（定时器管理器）                | ⬜ 未开始 | -          | -           | Week 6                                                                                                                                                                    |
+| TimerManager（定时器管理器）                | ✅ 已完成 | 2026-04-16 | 88          | Week 4 Day 8；mark-delete 遍历安全 + 溢出精度保留 + timeScale + tag 批量操作 + initialDelay，35 个测试                                                                    |
 | DataTable（数据表）                         | ⬜ 未开始 | -          | -           | Week 6                                                                                                                                                                    |
 | LocalizationManager（多语言管理器）         | ⬜ 未开始 | -          | -           | Week 6                                                                                                                                                                    |
 | Logger（日志管理器）                        | ✅ 已完成 | 2026-04-15 | 93          | Week 4 Day 4-5；基础 19 测 + 增强 48 测（ILogOutput/Tag 过滤/时间戳/堆栈/Ring Buffer/颜色/time-timeEnd/GFC_DEBUG 裁剪）；全框架 Logger 集成（~96 调试日志 + 46 错误日志） |
@@ -85,6 +85,7 @@
 - [x] ✅ 性能基准测试：BenchmarkRunner（预热+计时+统计+Markdown报告），3 个基准测试
 - [x] ✅ 性能优化实战：EventManager.emit 消除 slice 快照（emitDepth+_removed 延迟清理）；ObjectPool.release Set O(1) 查重
 - [x] ✅ CI/CD 流水线：Jenkins vs GitLab CI 原理对比、Pipeline 四层模型（Stage 串行/Job 并行）、DAG needs 依赖、.gitlab-ci.yml 实战配置
+- [x] ✅ Timer 定时器模式：mark-delete + _updating 标记安全遍历、count 快照防新增 Timer 当帧遍历、溢出精度保留（elapsed -= delay）、timeScale 时间缩放、tag 分组批量操作
 
 ## 面试题积累
 
@@ -92,8 +93,8 @@
 
 ## 上次会话断点
 
-- 最后操作：Week 4 Day 8 — CI/CD 教学（Jenkins vs GitLab CI）+ .gitlab-ci.yml 配置 + Obsidian 笔记
-- 下次继续：Phase 3 继续 — DataTable / Timer / i18n / DebugPanel / 热更新
-- 未完成事项：无
-- 额外成就：公司 Jenkinsfile 拆解分析；GitLab CI DAG 并行流水线
+- 最后操作：Week 4 Day 8 — Timer 模块实现 + 35 测试 + Review 88 分
+- 下次继续：Phase 3 继续 — DataTable / i18n / DebugPanel / 热更新
+- 未完成事项：Timer 模块 Obsidian 笔记待写
+- 额外成就：测试逼出 count 快照 bug 并修复
 - 更新日期：2026-04-16
