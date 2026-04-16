@@ -31,7 +31,7 @@
 | BenchmarkRunner（性能基准测试）            | ✅ 已完成 | 2026-04-14 | 82          | Week 4 Day 6；预热+计时+统计（avg/min/max/p95/p99/stddev/opsPerSec）+Markdown报告；3个基准测试 |
 | 性能优化（EventManager + ObjectPool）    | ✅ 已完成 | 2026-04-14 | -           | Week 4 Day 6；emit 消除快照拷贝（emitDepth+_removed）；release Set查重 O(1)                                                                     |
 | DebugPanel（调试面板）                      | ⬜ 未开始 | -          | -           | Week 5-6                                                                                                                                                                  |
-| CI/CD Pipeline（持续集成流水线）            | ⬜ 未开始 | -          | -           | Week 6                                                                                                                                                                    |
+| CI/CD Pipeline（持续集成流水线）            | ✅ 已完成 | 2026-04-16 | -           | Week 4 Day 8；Jenkins vs GitLab CI 原理教学 + .gitlab-ci.yml 配置（install→lint+test并行→quality_gate门禁）                                                               |
 | 综合 Demo 项目                              | ⬜ 未开始 | -          | -           | Week 7                                                                                                                                                                    |
 | 面试冲刺                                    | ⬜ 未开始 | -          | -           | Week 8                                                                                                                                                                    |
 
@@ -42,7 +42,7 @@
 | 框架设计    | C+          | B    | B+   |
 | 引擎底层    | B           | B    | A-   |
 | 架构知识面  | C+          | B+   | B+   |
-| CI/CD       | C+          | C+   | B    |
+| CI/CD       | C+          | B-   | B    |
 | Code Review | D           | C-   | B    |
 | 面试表现    | C           | C+   | A-   |
 
@@ -84,6 +84,7 @@
 - [x] ✅ 全框架 Logger 集成：16 模块 ~96 处运行时调试日志 + 11 模块 46 处错误日志
 - [x] ✅ 性能基准测试：BenchmarkRunner（预热+计时+统计+Markdown报告），3 个基准测试
 - [x] ✅ 性能优化实战：EventManager.emit 消除 slice 快照（emitDepth+_removed 延迟清理）；ObjectPool.release Set O(1) 查重
+- [x] ✅ CI/CD 流水线：Jenkins vs GitLab CI 原理对比、Pipeline 四层模型（Stage 串行/Job 并行）、DAG needs 依赖、.gitlab-ci.yml 实战配置
 
 ## 面试题积累
 
@@ -91,8 +92,8 @@
 
 ## 上次会话断点
 
-- 最后操作：Week 4 Day 6 — BenchmarkRunner 实现 + EventManager/ObjectPool 性能优化，23 套测试全绿
-- 下次继续：Phase 3 继续 — CI/CD / 热更新 / DataTable / Timer / i18n / DebugPanel
+- 最后操作：Week 4 Day 8 — CI/CD 教学（Jenkins vs GitLab CI）+ .gitlab-ci.yml 配置 + Obsidian 笔记
+- 下次继续：Phase 3 继续 — DataTable / Timer / i18n / DebugPanel / 热更新
 - 未完成事项：无
-- 额外成就：BenchmarkRunner（含 stddev/opsPerSec）；emit 消除 slice 快照；ObjectPool Set 查重
-- 更新日期：2026-04-14
+- 额外成就：公司 Jenkinsfile 拆解分析；GitLab CI DAG 并行流水线
+- 更新日期：2026-04-16
