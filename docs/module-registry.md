@@ -40,6 +40,8 @@ GameEntry（框架入口）
 | Audio      | framework/audio/      | setAudioPlayer() / playMusic() / stopMusic() / pauseMusic() / resumeMusic() / playSound() / stopSound() / stopAllSounds() / set/getMasterVolume() / set/getMusicVolume() / set/getSoundVolume() / setMuted() / isMuted() | Resource                    | ✅ 已完成 |
 | Scene      | framework/scene/      | setSceneLoader() / loadScene() / currentScene / isLoading                                                                                                                                                                | Event（@todo 事件广播）     | ✅ 已完成 |
 | Timer      | framework/timer/      | addTimer() / removeTimer() / removeAllTimers() / removeTimersByTag() / pauseTimer() / resumeTimer() / pauseAllTimers() / resumeAllTimers() / pauseTimersByTag() / resumeTimersByTag() / getTimerInfo() / hasTimer() / timeScale / activeCount | 无                          | ✅ 已完成 |
+| gfc-timer-heap | packages/gfc-timer-heap/ | HeapTimerManager（ITimerManager 实现），MinHeap 数据结构；绝对到期时间 expireTime，无触发帧 O(1)，触发 O(k log n） | @gfc/core（peerDep）       | ✅ 已完成 |
+| gfc-timer-wheel | packages/gfc-timer-wheel/ | WheelTimerManager（ITimerManager 实现）；slot 数组 + tick 前进 + 多圈 remainingRounds，添加/触发 O(1) | @gfc/core（peerDep）       | ✅ 已完成 |
 | Data       | framework/data/       | loadTable\<T\>() / getRow() / getAllRows()                                                                                                                                                                               | Resource                    | ⬜ 待开发 |
 | i18n       | framework/i18n/       | t() / setLanguage() / getLanguage()                                                                                                                                                                                      | Resource, Event             | ⬜ 待开发 |
 | Debug      | framework/debug/      | Logger.info() / warn() / error() / DebugPanel                                                                                                                                                                            | 无                          | ⬜ 待开发 |
@@ -80,3 +82,5 @@ GameEntry（框架入口）
 | 2026-04-14 | Scene 模块完成（SceneDefs + ISceneManager + SceneManager），三层加载去重 + ISceneLoader 策略注入，15 个测试全绿，Review 90 分，Phase 2 完成 | 大圆   |
 | 2026-04-15 | Logger 模块完成（LoggerDefs + Logger），静态 API + ModuleBase 混合方案，priority=0，19 个测试全绿，Review 92 分                             | 大圆   |
 | 2026-04-16 | Timer 模块完成（TimerDefs + ITimerManager + TimerManager），mark-delete 遍历安全 + 溢出精度保留 + timeScale + tag 批量操作，35 个测试全绿，Review 88 分 | 大圆   |
+| 2026-04-16 | gfc-timer-heap 插件完成（MinHeap + HeapTimerManager），绝对到期时间 + 堆索引 O(1) 定位 + pause 分离列表，47 个测试全绿 | 大圆   |
+| 2026-04-16 | gfc-timer-wheel 插件完成（WheelTimerManager），slot 数组 + advance-first tick + 整数 tick 计数 + 多圈 remainingRounds + epsilon 浮点修正，39 个测试全绿 | 大圆   |

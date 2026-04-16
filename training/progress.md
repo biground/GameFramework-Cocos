@@ -25,6 +25,8 @@
 | AudioManager（音频管理器）                  | ✅ 已完成 | 2026-04-13 | 88          | Week 4 Day 2；音量乘法链 + IAudioPlayer 策略注入，27 个测试                                                                                                               |
 | SceneManager（场景管理器）                  | ✅ 已完成 | 2026-04-14 | 90          | Week 4 Day 3；三层加载去重 + ISceneLoader 策略注入，15 个测试，Phase 2 最后模块                                                                                           |
 | TimerManager（定时器管理器）                | ✅ 已完成 | 2026-04-16 | 88          | Week 4 Day 8；mark-delete 遍历安全 + 溢出精度保留 + timeScale + tag 批量操作 + initialDelay，35 个测试                                                                    |
+| gfc-timer-heap（最小堆定时器插件）      | ✅ 已完成 | 2026-04-16 | -           | MinHeap + HeapTimerManager，绝对到期时间 expireTime，无触发帧 O(1)，47 个测试                                                                                                           |
+| gfc-timer-wheel（时间轮定时器插件）    | ✅ 已完成 | 2026-04-16 | -           | WheelTimerManager，slot 数组 + tick 前进 + 整数 tick 计数 + epsilon 浮点修正 + 多圈 remainingRounds，39 个测试                                                                           |
 | DataTable（数据表）                         | ⬜ 未开始 | -          | -           | Week 6                                                                                                                                                                    |
 | LocalizationManager（多语言管理器）         | ⬜ 未开始 | -          | -           | Week 6                                                                                                                                                                    |
 | Logger（日志管理器）                        | ✅ 已完成 | 2026-04-15 | 93          | Week 4 Day 4-5；基础 19 测 + 增强 48 测（ILogOutput/Tag 过滤/时间戳/堆栈/Ring Buffer/颜色/time-timeEnd/GFC_DEBUG 裁剪）；全框架 Logger 集成（~96 调试日志 + 46 错误日志） |
@@ -86,6 +88,8 @@
 - [x] ✅ 性能优化实战：EventManager.emit 消除 slice 快照（emitDepth+_removed 延迟清理）；ObjectPool.release Set O(1) 查重
 - [x] ✅ CI/CD 流水线：Jenkins vs GitLab CI 原理对比、Pipeline 四层模型（Stage 串行/Job 并行）、DAG needs 依赖、.gitlab-ci.yml 实战配置
 - [x] ✅ Timer 定时器模式：mark-delete + _updating 标记安全遍历、count 快照防新增 Timer 当帧遍历、溢出精度保留（elapsed -= delay）、timeScale 时间缩放、tag 分组批量操作
+- [x] ✅ 最小堆定时器：数组二叉堆、siftUp/siftDown、heapIndex O(1) 定位、绝对到期时间 expireTime、pause 分离列表重算 expireTime
+- [x] ✅ 时间轮定时器：slot 数组 + tick 前进 + 整数 tick 计数避免浮点漂移 + 多圈 remainingRounds + epsilon 修正 ceil 精度 + advance-first-then-process
 
 ## 面试题积累
 
@@ -93,8 +97,8 @@
 
 ## 上次会话断点
 
-- 最后操作：Week 4 Day 8 — Timer 模块实现 + 35 测试 + Review 88 分
+- 最后操作：Week 4 Day 8 — Timer 模块 + gfc-timer-heap 插件 + gfc-timer-wheel 插件全部完成
 - 下次继续：Phase 3 继续 — DataTable / i18n / DebugPanel / 热更新
 - 未完成事项：Timer 模块 Obsidian 笔记待写
-- 额外成就：测试逼出 count 快照 bug 并修复
+- 额外成就：实现三种定时器方案（数组/最小堆/时间轮），总计 121 个测试全绿
 - 更新日期：2026-04-16
