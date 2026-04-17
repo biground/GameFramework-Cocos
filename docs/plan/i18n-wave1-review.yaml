@@ -1,0 +1,55 @@
+# i18n Wave 1 集成检查报告
+review_date: 2026-04-17
+review_scope: wave
+wave: 1
+tasks_reviewed:
+    - task_001: LocalizationDefs.ts
+    - task_002: ILocalizationManager.ts
+
+status: needs_revision
+
+checks:
+    typescript_compilation:
+        status: warning
+        note: 项目级 tsconfig.json 配置问题，非 i18n 模块问题
+        errors:
+            - "Cannot find type definition file for 'reflect-metadata'"
+            - "Invalid value for '--ignoreDeprecations'"
+
+    type_references:
+        status: warning
+        details:
+            - file: LocalizationDefs.ts
+              import: EventKey from '../event/EventDefs'
+              valid: true
+            - file: ILocalizationManager.ts
+              import: none
+              valid: false
+              issue: 'Should import Language enum from LocalizationDefs.ts'
+
+    architecture_consistency:
+        status: fail
+        details:
+            - 'IResourceManager.ts imports ResourceDefs.ts'
+            - 'IUIManager.ts imports UIDefs.ts'
+            - 'ILocalizationManager.ts does NOT import LocalizationDefs.ts'
+            - 'Pattern violation: interfaces should import their Defs'
+
+    integration_issues:
+        - severity: medium
+          type: type_safety
+          file: ILocalizationManager.ts:21
+          description: 'setLanguage(lang: string) should use Language enum'
+        - severity: medium
+          type: type_safety
+          file: ILocalizationManager.ts:27
+          description: 'getAllLanguages(): string[] should return Language[]'
+        - severity: low
+          type: code_reuse
+          file: LocalizationDefs.ts:25-32
+          description: 'ILocalizationRow similar to IDataRow but not extending'
+
+recommendation: |
+    修改 ILocalizationManager.ts 导入 Language 枚举，
+    将 setLanguage/getCurrentLanguage/getAllLanguages 方法的参数/返回值类型
+    从 string 改为 Language，以提升类型安全性和架构一致性。

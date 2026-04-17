@@ -1,0 +1,18 @@
+{
+    "status": "completed",
+    "task_id": "task_004",
+    "plan_id": "i18n-module",
+    "summary": "已创建 i18n 配置表格式与加载策略指南文档，包含 languages.csv 和 i18n_{lang}.csv 格式定义、Excel 编辑流程、批量加载策略、UTF-8 BOM 处理、参数插值说明和大文件优化策略。",
+    "extra": {
+        "docs_created": [
+            {
+                "path": "docs/i18n-config-guide.md",
+                "title": "i18n 配置表格式与加载策略指南",
+                "type": "technical-documentation"
+            }
+        ],
+        "docs_updated": [],
+        "parity_verified": true,
+        "coverage_percentage": 100
+    }
+}

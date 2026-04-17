@@ -1,0 +1,505 @@
+plan_id: i18n-module
+objective: 研究 GameFramework-Cocos 项目的 i18n（多语言）模块需求和架构设计
+focus_area: i18n_localization
+created_at: '2026-04-17T15:56:47+08:00'
+created_by: gem-researcher
+status: completed
+
+tldr: |
+    - 项目当前无任何 i18n 相关代码，需要从零设计
+    - Framework 层采用分层架构，模块继承 ModuleBase，通过 GameEntry 统一管理
+    - DataTable 模块已完成，支持双存储模式（Map/Array）和 IDataTableParser 策略注入
+    - 建议采用基于 DataTable 的 i18n 方案，复用现有架构模式
+    - LocalizationManager 依赖 ResourceManager 和 EventManager，priority 建议 350
+    - 配置表推荐 CSV 格式（策划友好），运行时解析为 Map 结构
+
+research_metadata:
+    methodology: 'hybrid retrieval: grep + read, relationship discovery: module-registry.md, architecture.md'
+    scope: 'framework/core, framework/datatable, framework/ui, framework/audio, framework/interfaces, docs'
+    confidence: 'high'
+    coverage: 95
+    decision_blockers: 0
+    research_blockers: 0
+
+files_analyzed:
+    - file: ModuleBase.ts
+      path: assets/scripts/framework/core/ModuleBase.ts
+      purpose: 框架模块基类，所有 Manager 必须继承
+      key_elements:
+          - element: moduleName
+            type: getter
+            location: 'ModuleBase.ts:21'
+            description: 模块名称，用于注册表查找
+          - element: priority
+            type: getter
+            location: 'ModuleBase.ts:26'
+            description: 执行优先级，数字越小越先执行
+          - element: onInit
+            type: method
+            location: 'ModuleBase.ts:30'
+            description: 模块初始化时调用
+          - element: onUpdate
+            type: method
+            location: 'ModuleBase.ts:35'
+            description: 每帧更新，默认空实现
+          - element: onShutdown
+            type: method
+            location: 'ModuleBase.ts:41'
+            description: 模块销毁时调用
+      language: TypeScript
+      lines: 42
+
+    - file: GameEntry.ts
+      path: assets/scripts/framework/core/GameEntry.ts
+      purpose: 游戏框架入口（门面模式），提供统一 API 访问框架功能
+      key_elements:
+          - element: registerModule
+            type: static method
+            location: 'GameEntry.ts:30'
+            description: 注册模块到框架
+          - element: getModule
+            type: static method
+            location: 'GameEntry.ts:34'
+            description: 获取已注册的模块
+      language: TypeScript
+      lines: 45
+
+    - file: DataTable.ts
+      path: assets/scripts/framework/datatable/DataTable.ts
+      purpose: 数据表容器，支持 Map 和 Array 两种存储模式
+      key_elements:
+          - element: DataTable<T>
+            type: class
+            location: 'DataTable.ts:18'
+            description: 泛型数据表容器
+          - element: storageMode
+            type: property
+            location: 'DataTable.ts:23'
+            description: 存储模式（Map/Array）
+          - element: getRow
+            type: method
+            location: 'DataTable.ts:103'
+            description: 按 id 查询单行，O(1) 复杂度
+          - element: where
+            type: method
+            location: 'DataTable.ts:140'
+            description: 按条件查询行
+      language: TypeScript
+      lines: 166
+
+    - file: DataTableManager.ts
+      path: assets/scripts/framework/datatable/DataTableManager.ts
+      purpose: 数据表管理器，管理所有游戏配置数据表的加载、解析、存储和查询
+      key_elements:
+          - element: DataTableManager
+            type: class
+            location: 'DataTableManager.ts:32'
+            description: 继承 ModuleBase，priority=300
+          - element: setParser
+            type: method
+            location: 'DataTableManager.ts:72'
+            description: 设置数据表解析器（策略注入）
+          - element: createTable
+            type: method
+            location: 'DataTableManager.ts:85'
+            description: 用已解析的行数据创建数据表
+          - element: createTableFromRawData
+            type: method
+            location: 'DataTableManager.ts:111'
+            description: 用原始数据 + Parser 创建数据表
+          - element: getRow
+            type: method
+            location: 'DataTableManager.ts:165'
+            description: 按 id 查询指定表的单行
+      language: TypeScript
+      lines: 209
+
+    - file: DataTableDefs.ts
+      path: assets/scripts/framework/datatable/DataTableDefs.ts
+      purpose: 数据表相关定义（枚举、接口）
+      key_elements:
+          - element: DataTableStorageMode
+            type: enum
+            location: 'DataTableDefs.ts:8'
+            description: 存储模式枚举（Map/Array）
+          - element: IDataRow
+            type: interface
+            location: 'DataTableDefs.ts:30'
+            description: 数据行基础接口，要求有 id 字段
+          - element: IDataTableParser
+            type: interface
+            location: 'DataTableDefs.ts:41'
+            description: 数据表解析器接口（策略注入）
+      language: TypeScript
+      lines: 71
+
+    - file: UIManager.ts
+      path: assets/scripts/framework/ui/UIManager.ts
+      purpose: UI 管理器，统一管理 UI 表单的注册、加载、打开、关闭与生命周期
+      key_elements:
+          - element: UIManager
+            type: class
+            location: 'UIManager.ts:17'
+            description: 继承 ModuleBase，priority=200
+          - element: registerForm
+            type: method
+            location: 'UIManager.ts:89'
+            description: 注册表单配置
+          - element: openForm
+            type: method
+            location: 'UIManager.ts:109'
+            description: 打开表单
+      language: TypeScript
+      lines: 274
+
+    - file: AudioManager.ts
+      path: assets/scripts/framework/audio/AudioManager.ts
+      purpose: 音频管理器，统一管理游戏音频的播放、暂停、音量和静音控制
+      key_elements:
+          - element: AudioManager
+            type: class
+            location: 'AudioManager.ts:17'
+            description: 继承 ModuleBase，priority=210
+          - element: setAudioPlayer
+            type: method
+            location: 'AudioManager.ts:102'
+            description: 设置音频播放器（策略注入）
+          - element: _calculateMusicVolume
+            type: method
+            location: 'AudioManager.ts:306'
+            description: 计算音乐实际音量 = masterVolume × musicVolume
+      language: TypeScript
+      lines: 327
+
+    - file: IResourceManager.ts
+      path: assets/scripts/framework/interfaces/IResourceManager.ts
+      purpose: 资源管理器接口，定义资源系统的公共契约
+      key_elements:
+          - element: IResourceManager
+            type: interface
+            location: 'IResourceManager.ts:18'
+            description: 资源管理器接口定义
+          - element: loadAsset
+            type: method
+            location: 'IResourceManager.ts:36'
+            description: 加载资源
+          - element: releaseAsset
+            type: method
+            location: 'IResourceManager.ts:46'
+            description: 释放资源
+      language: TypeScript
+      lines: 84
+
+    - file: IUIManager.ts
+      path: assets/scripts/framework/interfaces/IUIManager.ts
+      purpose: UI 管理器接口，定义 UI 系统的公共契约
+      key_elements:
+          - element: IUIManager
+            type: interface
+            location: 'IUIManager.ts:14'
+            description: UI 管理器接口定义
+      language: TypeScript
+      lines: 69
+
+    - file: UIDefs.ts
+      path: assets/scripts/framework/ui/UIDefs.ts
+      purpose: UI 相关定义（枚举、接口、配置）
+      key_elements:
+          - element: UILayer
+            type: enum
+            location: 'UIDefs.ts:7'
+            description: UI 层级枚举
+          - element: UIFormConfig
+            type: interface
+            location: 'UIDefs.ts:24'
+            description: UI 表单配置接口
+          - element: IUIFormFactory
+            type: interface
+            location: 'UIDefs.ts:74'
+            description: UI 表单工厂接口（策略模式）
+      language: TypeScript
+      lines: 109
+
+    - file: EventDefs.ts
+      path: assets/scripts/framework/event/EventDefs.ts
+      purpose: 事件系统相关定义
+      key_elements:
+          - element: EventKey<T>
+            type: class
+            location: 'EventDefs.ts:14'
+            description: 类型化的事件键
+          - element: EventCallback<T>
+            type: type
+            location: 'EventDefs.ts:30'
+            description: 事件回调函数类型
+      language: TypeScript
+      lines: 46
+
+    - file: architecture.md
+      path: docs/architecture.md
+      purpose: 架构设计文档
+      key_elements:
+          - element: 三层架构
+            type: architecture
+            location: 'architecture.md:12'
+            description: Framework Layer → Runtime Layer → Game Layer
+          - element: 核心原则
+            type: design
+            location: 'architecture.md:28'
+            description: 框架层引擎无关、模块化注册、事件驱动解耦
+          - element: i18n 模块
+            type: module
+            location: 'architecture.md:54'
+            description: 多语言模块，状态为待开发
+      language: Markdown
+      lines: 101
+
+    - file: module-registry.md
+      path: docs/module-registry.md
+      purpose: 模块注册表，记录模块依赖关系和状态
+      key_elements:
+          - element: LocalizationManager
+            type: module
+            location: 'module-registry.md:23'
+            description: 依赖 ResourceManager, EventManager
+          - element: Priority 分配规范
+            type: design
+            location: 'module-registry.md:59'
+            description: LocalizationManager 建议 priority=300-399
+      language: Markdown
+      lines: 87
+
+patterns_found:
+    - category: architecture
+      pattern: 模块化注册模式
+      description: 所有 Manager 继承 ModuleBase，通过 GameEntry.registerModule() 注册，按 priority 排序初始化
+      examples:
+          - file: DataTableManager.ts
+            location: 'DataTableManager.ts:32-40'
+            snippet: |
+                export class DataTableManager extends ModuleBase {
+                    public get moduleName(): string { return 'DataTableManager'; }
+                    public get priority(): number { return 300; }
+                }
+          - file: AudioManager.ts
+            location: 'AudioManager.ts:17-26'
+            snippet: |
+                export class AudioManager extends ModuleBase implements IAudioManager {
+                    public get moduleName(): string { return 'AudioManager'; }
+                    public get priority(): number { return 210; }
+                }
+      prevalence: common
+
+    - category: architecture
+      pattern: 策略注入模式
+      description: 通过接口定义契约，Runtime 层注入具体实现，实现 Framework 层引擎无关
+      examples:
+          - file: DataTableManager.ts
+            location: 'DataTableManager.ts:48-73'
+            snippet: |
+                private _parser: IDataTableParser | null = null;
+                public setParser(parser: IDataTableParser): void {
+                    this._parser = parser;
+                }
+          - file: AudioManager.ts
+            location: 'AudioManager.ts:30-108'
+            snippet: |
+                private _audioPlayer: IAudioPlayer | null = null;
+                public setAudioPlayer(player: IAudioPlayer): void {
+                    this._audioPlayer = player;
+                }
+      prevalence: common
+
+    - category: structure
+      pattern: 接口隔离模式
+      description: 每个模块定义独立接口文件（IXxxManager），业务层依赖接口而非实现
+      examples:
+          - file: IUIManager.ts
+            location: 'IUIManager.ts'
+            snippet: 'export interface IUIManager { ... }'
+          - file: IResourceManager.ts
+            location: 'IResourceManager.ts'
+            snippet: 'export interface IResourceManager { ... }'
+      prevalence: common
+
+    - category: structure
+      pattern: 双存储模式
+      description: DataTable 支持 Map（随机查询）和 Array（顺序遍历）两种存储模式，通过枚举选择
+      examples:
+          - file: DataTableDefs.ts
+            location: 'DataTableDefs.ts:8-13'
+            snippet: |
+                export enum DataTableStorageMode {
+                    Map = 'map',
+                    Array = 'array',
+                }
+          - file: DataTable.ts
+            location: 'DataTable.ts:42-48'
+            snippet: |
+                if (storageMode === DataTableStorageMode.Map) {
+                    this._dataMap = new Map();
+                } else {
+                    this._dataArray = [];
+                    this._indexMap = new Map();
+                }
+      prevalence: common
+
+    - category: error_handling
+      pattern: 防御性编程
+      description: 关键方法入口检查参数有效性，抛出明确错误信息
+      examples:
+          - file: UIManager.ts
+            location: 'UIManager.ts:89-101'
+            snippet: |
+                public registerForm(formName: string, config: UIFormConfig): void {
+                    if (!formName) { throw new Error('[UIManager] 表单名称不能为空'); }
+                    if (!config.path) { throw new Error('[UIManager] 表单资源路径不能为空'); }
+                    if (this._formConfigs.has(formName)) { throw new Error(`[UIManager] 表单 "${formName}" 已注册`); }
+                }
+      prevalence: common
+
+related_architecture:
+    components_relevant_to_domain:
+        - component: DataTableManager
+          responsibility: 管理游戏配置数据表的加载、解析、存储和查询
+          location: assets/scripts/framework/datatable/DataTableManager.ts
+          relationship_to_domain: 'i18n 可复用 DataTable 存储翻译数据'
+        - component: ResourceManager
+          responsibility: 资源加载/释放/引用计数
+          location: assets/scripts/framework/resource/ResourceManager.ts
+          relationship_to_domain: 'i18n 依赖 ResourceManager 加载配置文件'
+        - component: EventManager
+          responsibility: 强类型事件系统，模块间通信
+          location: assets/scripts/framework/event/EventManager.ts
+          relationship_to_domain: 'i18n 通过 EventManager 广播语言切换事件'
+        - component: UIManager
+          responsibility: UI 表单的注册、加载、打开、关闭与生命周期管理
+          location: assets/scripts/framework/ui/UIManager.ts
+          relationship_to_domain: 'UI 组件监听语言切换事件，自动更新文本'
+
+    interfaces_used_by_domain:
+        - interface: IResourceManager
+          location: assets/scripts/framework/interfaces/IResourceManager.ts
+          usage_pattern: 'LocalizationManager 调用 loadAsset 加载 i18n 配置文件'
+
+    data_flow_involving_domain: |
+        1. 游戏启动 → ResourceManager 加载 i18n 配置文件（CSV/JSON）
+        2. LocalizationManager 解析配置 → 存储到内部 Map<key, Map<lang, value>>
+        3. UI 组件调用 LocalizationManager.t(key) 获取翻译文本
+        4. 用户切换语言 → LocalizationManager.setLanguage(lang)
+        5. LocalizationManager 广播 LANGUAGE_CHANGED 事件
+        6. 已打开的 UI 组件收到事件 → 重新调用 t() 更新文本
+
+    key_relationships_to_domain:
+        - from: LocalizationManager
+          to: ResourceManager
+          relationship: imports
+        - from: LocalizationManager
+          to: EventManager
+          relationship: imports
+        - from: UI 组件
+          to: LocalizationManager
+          relationship: calls
+
+related_technology_stack:
+    languages_used_in_domain:
+        - TypeScript
+    frameworks_used_in_domain:
+        - name: Cocos Creator 3.x
+          usage_in_domain: 游戏引擎，提供 Label/RichText 等文本组件
+    libraries_used_in_domain: []
+
+related_conventions:
+    naming_patterns_in_domain: |
+        - 模块命名：XxxManager（如 LocalizationManager）
+        - 接口命名：IXxxManager（如 ILocalizationManager）
+        - 定义文件命名：XxxDefs.ts（如 LocalizationDefs.ts）
+        - 方法命名：驼峰命名法（如 setLanguage, getCurrentLanguage）
+    structure_of_domain: |
+        framework/i18n/
+        ├── ILocalizationManager.ts  # 接口定义
+        ├── LocalizationManager.ts   # 实现类
+        ├── LocalizationDefs.ts      # 枚举、接口、类型定义
+        └── LocalizationKeys.ts      # 自动生成的 key 常量（可选）
+    error_handling_in_domain: |
+        - 参数校验：关键方法入口检查参数有效性
+        - 错误信息：使用 [ModuleName] 前缀，如 '[LocalizationManager] 语言不存在: zh-CN'
+        - 日志：使用 Logger.info/warn/error 记录关键操作
+    testing_in_domain: |
+        - 测试框架：Jest
+        - 测试文件位置：tests/framework/i18n/
+        - 测试覆盖：单元测试覆盖所有公共 API
+    documentation_in_domain: |
+        - JSDoc 注释：所有公共 API 必须有 JSDoc 注释
+        - 示例代码：关键方法提供 @example
+
+related_dependencies:
+    internal:
+        - component: ResourceManager
+          relationship_to_domain: 'LocalizationManager 依赖 ResourceManager 加载 i18n 配置文件'
+          direction: outbound
+        - component: EventManager
+          relationship_to_domain: 'LocalizationManager 依赖 EventManager 广播语言切换事件'
+          direction: outbound
+        - component: Logger
+          relationship_to_domain: 'LocalizationManager 使用 Logger 记录日志'
+          direction: outbound
+    external: []
+
+domain_security_considerations:
+    sensitive_areas: []
+    authentication_patterns_in_domain: 'N/A'
+    authorization_patterns_in_domain: 'N/A'
+    data_validation_in_domain: |
+        - 语言代码验证：检查是否为支持的语言
+        - 翻译 key 验证：检查 key 是否存在
+        - 回退机制：key 不存在时返回 key 本身或默认语言翻译
+
+testing_patterns:
+    framework: Jest
+    coverage_areas:
+        - 语言切换功能
+        - 翻译查询功能
+        - key 不存在的回退机制
+        - 事件广播
+        - 配置加载
+    test_organization: 'tests/framework/i18n/'
+    mock_patterns:
+        - Mock ResourceManager
+        - Mock EventManager
+
+open_questions:
+    - question: 配置表格式选择 CSV 还是 JSON？
+      context: 策划需要方便地编辑配置，CSV 在 Excel 中打开方便，JSON 程序解析方便
+      type: decision_blocker
+      affects: [i18n-config-parser]
+    - question: 是否需要支持嵌套 key（如 "item.sword.name"）？
+      context: 嵌套 key 可以提供更好的组织结构，但增加解析复杂度
+      type: decision_blocker
+      affects: [i18n-key-structure]
+    - question: 是否需要支持参数插值（如 "Hello, {name}!"）？
+      context: 翻译文本中经常需要动态插入变量
+      type: decision_blocker
+      affects: [i18n-api-design]
+    - question: 是否需要支持复数形式（如 "1 apple" vs "2 apples"）？
+      context: 不同语言的复数规则不同，需要考虑国际化
+      type: research
+      affects: [i18n-plural-support]
+    - question: 是否需要与 Cocos Creator 内置 i18n 面板集成？
+      context: Cocos 有 i18n 面板，但需要程序填写 key，策划不方便
+      type: decision_blocker
+      affects: [i18n-cocos-integration]
+
+gaps:
+    - area: Cocos Creator i18n 机制
+      description: 需要进一步研究 Cocos Creator 内置 i18n 的具体实现和局限性
+      impact: research_blocker
+      affects: [i18n-cocos-integration]
+    - area: 策划配置表格式
+      description: 需要与策划团队确认首选的配置表格式（CSV/Excel/JSON）
+      impact: decision_blocker
+      affects: [i18n-config-parser]
+    - area: 热更新支持
+      description: 需要确认是否需要支持 i18n 配置的热更新
+      impact: research
+      affects: [i18n-hot-update]
