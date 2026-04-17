@@ -1,0 +1,11 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["superpowers@git+https://github.com/obra/superpowers.git"],
+  "mcp": {
+    "obsidian": {
+      "type": "local",
+      "command": ["npx", "-y", "mcp-obsidian", "{env:OBSIDIAN_VAULT_PATH}"],
+      "enabled": true
+    }
+  }
+}
