@@ -82,6 +82,41 @@ assets/scripts/
 - [Code Review 检查清单](docs/code-review-checklist.md)
 - [培训进度](training/progress.md)
 
+## 🤖 OpenCode + Obsidian MCP 配置
+
+本项目使用 [OpenCode](https://opencode.ai) 作为 AI 编程助手，并集成 Obsidian MCP 服务器用于自动写学习笔记。
+
+### 首次设置（每台电脑只需一次）
+
+1. 复制 `.env.example` 为 `.env`：
+   ```bash
+   cp .env.example .env
+   ```
+
+2. 编辑 `.env`，填入你的 Obsidian Vault 路径：
+   ```env
+   # Windows 示例
+   OBSIDIAN_VAULT_PATH=D:\\WorkSpace\\CodeSpace\\ObsidianVault
+
+   # macOS 示例
+   OBSIDIAN_VAULT_PATH=/Volumes/Extreme SSD/BigroundObsidianVault/开发相关
+   ```
+
+### 启动 OpenCode
+
+```bash
+# Windows
+bin\opencode.cmd
+
+# macOS / Linux
+chmod +x bin/opencode.sh
+bin/opencode.sh
+```
+
+启动脚本会自动加载 `.env` 中的环境变量，OpenCode 通过 `{env:OBSIDIAN_VAULT_PATH}` 传递给 Obsidian MCP 服务器。
+
+> ⚠️ `.env` 已在 `.gitignore` 中排除，不会被提交。每台电脑各自配置即可。
+
 ## 📄 License
 
 MIT
