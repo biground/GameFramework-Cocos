@@ -1,0 +1,12 @@
+{
+    'status': 'completed',
+    'task_id': 'task_005',
+    'plan_id': 'i18n-module',
+    'summary': 'LocalizedLabel Runtime 组件已创建完成，包含完整的测试覆盖。组件支持翻译 key 配置、JSON 参数插值、自动监听语言切换事件，并在销毁时正确移除事件监听。',
+    'extra':
+        {
+            'execution_details':
+                { 'files_modified': 4, 'lines_changed': 345, 'time_elapsed': '15 minutes' },
+            'test_results': { 'total': 21, 'passed': 21, 'failed': 0, 'coverage': '100%' },
+        },
+}

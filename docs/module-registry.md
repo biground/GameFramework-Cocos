@@ -25,26 +25,26 @@ GameEntry（框架入口）
 
 ## 模块摘要
 
-| 模块       | 路径                  | 核心 API                                                                                                                                                                                                                 | 依赖                        | 状态      |
-| ---------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- | --------- |
-| Core       | framework/core/       | GameEntry.registerModule() / getModule() / update() / shutdown()                                                                                                                                                         | 无                          | ✅ 已完成 |
-| Event      | framework/event/      | EventKey<T> / on() / once() / off() / offAll() / offByCaller() / emit()                                                                                                                                                  | 无                          | ✅ 已完成 |
-| ObjectPool | framework/objectpool/ | acquire\<T\>() / release() / clearPool() / clearAll() / getStats() / setMaxSize()                                                                                                                                        | 无                          | ✅ 已完成 |
-| DI/IoC     | framework/di/         | @Injectable / @Inject / Container.resolve()                                                                                                                                                                              | 无                          | ✅ 已完成 |
-| FSM        | framework/fsm/        | createFsm\<T\>() / destroyFsm() / getFsm() / hasFsm() / IFsm.changeState() / IFsm.start()                                                                                                                                | 无                          | ✅ 已完成 |
-| Procedure  | framework/procedure/  | initialize() / startProcedure() / hasProcedure() / currentProcedure / changeProcedure()                                                                                                                                  | FSM                         | ✅ 已完成 |
-| Resource   | framework/resource/   | setResourceLoader() / loadAsset() / releaseAsset() / releaseByOwner() / preload() / hasAsset() / getAssetRefCount() / getAssetInfo()                                                                                     | Event, ObjectPool           | ✅ 已完成 |
-| UI         | framework/ui/         | setUIFormFactory() / registerForm() / openForm() / closeForm() / closeAllForms() / getForm() / hasForm()                                                                                                                 | Resource, Event, ObjectPool | ✅ 已完成 |
-| Entity     | framework/entity/     | showEntity() / hideEntity() / getEntity()                                                                                                                                                                                | Resource, Event, ObjectPool | ⬜ 待开发 |
-| Network    | framework/network/    | createChannel() / destroyChannel() / getChannel() / setHeartbeatHandler() / setEventManager() / Channel: connect() / send() / close()                                                                                    | Event                       | ✅ 已完成 |
-| Audio      | framework/audio/      | setAudioPlayer() / playMusic() / stopMusic() / pauseMusic() / resumeMusic() / playSound() / stopSound() / stopAllSounds() / set/getMasterVolume() / set/getMusicVolume() / set/getSoundVolume() / setMuted() / isMuted() | Resource                    | ✅ 已完成 |
-| Scene      | framework/scene/      | setSceneLoader() / loadScene() / currentScene / isLoading                                                                                                                                                                | Event（@todo 事件广播）     | ✅ 已完成 |
-| Timer      | framework/timer/      | addTimer() / removeTimer() / removeAllTimers() / removeTimersByTag() / pauseTimer() / resumeTimer() / pauseAllTimers() / resumeAllTimers() / pauseTimersByTag() / resumeTimersByTag() / getTimerInfo() / hasTimer() / timeScale / activeCount | 无                          | ✅ 已完成 |
-| gfc-timer-heap | packages/gfc-timer-heap/ | HeapTimerManager（ITimerManager 实现），MinHeap 数据结构；绝对到期时间 expireTime，无触发帧 O(1)，触发 O(k log n） | @gfc/core（peerDep）       | ✅ 已完成 |
-| gfc-timer-wheel | packages/gfc-timer-wheel/ | WheelTimerManager（ITimerManager 实现）；slot 数组 + tick 前进 + 多圈 remainingRounds，添加/触发 O(1) | @gfc/core（peerDep）       | ✅ 已完成 |
-| Data       | framework/data/       | loadTable\<T\>() / getRow() / getAllRows()                                                                                                                                                                               | Resource                    | ⬜ 待开发 |
-| i18n       | framework/i18n/       | t() / setLanguage() / getLanguage()                                                                                                                                                                                      | Resource, Event             | ⬜ 待开发 |
-| Debug      | framework/debug/      | Logger.info() / warn() / error() / DebugPanel                                                                                                                                                                            | 无                          | ⬜ 待开发 |
+| 模块            | 路径                      | 核心 API                                                                                                                                                                                                                                      | 依赖                        | 状态      |
+| --------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | --------- |
+| Core            | framework/core/           | GameEntry.registerModule() / getModule() / update() / shutdown()                                                                                                                                                                              | 无                          | ✅ 已完成 |
+| Event           | framework/event/          | EventKey<T> / on() / once() / off() / offAll() / offByCaller() / emit()                                                                                                                                                                       | 无                          | ✅ 已完成 |
+| ObjectPool      | framework/objectpool/     | acquire\<T\>() / release() / clearPool() / clearAll() / getStats() / setMaxSize()                                                                                                                                                             | 无                          | ✅ 已完成 |
+| DI/IoC          | framework/di/             | @Injectable / @Inject / Container.resolve()                                                                                                                                                                                                   | 无                          | ✅ 已完成 |
+| FSM             | framework/fsm/            | createFsm\<T\>() / destroyFsm() / getFsm() / hasFsm() / IFsm.changeState() / IFsm.start()                                                                                                                                                     | 无                          | ✅ 已完成 |
+| Procedure       | framework/procedure/      | initialize() / startProcedure() / hasProcedure() / currentProcedure / changeProcedure()                                                                                                                                                       | FSM                         | ✅ 已完成 |
+| Resource        | framework/resource/       | setResourceLoader() / loadAsset() / releaseAsset() / releaseByOwner() / preload() / hasAsset() / getAssetRefCount() / getAssetInfo()                                                                                                          | Event, ObjectPool           | ✅ 已完成 |
+| UI              | framework/ui/             | setUIFormFactory() / registerForm() / openForm() / closeForm() / closeAllForms() / getForm() / hasForm()                                                                                                                                      | Resource, Event, ObjectPool | ✅ 已完成 |
+| Entity          | framework/entity/         | showEntity() / hideEntity() / getEntity()                                                                                                                                                                                                     | Resource, Event, ObjectPool | ⬜ 待开发 |
+| Network         | framework/network/        | createChannel() / destroyChannel() / getChannel() / setHeartbeatHandler() / setEventManager() / Channel: connect() / send() / close()                                                                                                         | Event                       | ✅ 已完成 |
+| Audio           | framework/audio/          | setAudioPlayer() / playMusic() / stopMusic() / pauseMusic() / resumeMusic() / playSound() / stopSound() / stopAllSounds() / set/getMasterVolume() / set/getMusicVolume() / set/getSoundVolume() / setMuted() / isMuted()                      | Resource                    | ✅ 已完成 |
+| Scene           | framework/scene/          | setSceneLoader() / loadScene() / currentScene / isLoading                                                                                                                                                                                     | Event（@todo 事件广播）     | ✅ 已完成 |
+| Timer           | framework/timer/          | addTimer() / removeTimer() / removeAllTimers() / removeTimersByTag() / pauseTimer() / resumeTimer() / pauseAllTimers() / resumeAllTimers() / pauseTimersByTag() / resumeTimersByTag() / getTimerInfo() / hasTimer() / timeScale / activeCount | 无                          | ✅ 已完成 |
+| gfc-timer-heap  | packages/gfc-timer-heap/  | HeapTimerManager（ITimerManager 实现），MinHeap 数据结构；绝对到期时间 expireTime，无触发帧 O(1)，触发 O(k log n）                                                                                                                            | @gfc/core（peerDep）        | ✅ 已完成 |
+| gfc-timer-wheel | packages/gfc-timer-wheel/ | WheelTimerManager（ITimerManager 实现）；slot 数组 + tick 前进 + 多圈 remainingRounds，添加/触发 O(1)                                                                                                                                         | @gfc/core（peerDep）        | ✅ 已完成 |
+| Data            | framework/data/           | loadTable\<T\>() / getRow() / getAllRows()                                                                                                                                                                                                    | Resource                    | ⬜ 待开发 |
+| i18n            | framework/i18n/           | t() / setLanguage() / getLanguage()                                                                                                                                                                                                           | Resource, Event             | ✅ 已完成 |
+| Debug           | framework/debug/          | Logger.info() / warn() / error() / DebugPanel                                                                                                                                                                                                 | 无                          | ⬜ 待开发 |
 
 ## 模块间通信规则
 
@@ -56,32 +56,33 @@ GameEntry（框架入口）
 
 ## Priority 分配规范
 
-| 优先级范围 | 模块类型 | 说明                                                 |
-| ---------- | -------- | ---------------------------------------------------- |
-| 0 - 99     | 基础设施 | Logger, EventManager, TimerManager, ObjectPool       |
-| 100 - 199  | 核心服务 | ResourceManager, NetworkManager, FSM                 |
-| 200 - 299  | 业务框架 | UIManager, EntityManager, AudioManager, SceneManager |
-| 300 - 399  | 上层逻辑 | ProcedureManager, DataTableManager, LocalizationManager   |
-| 400+       | 调试工具 | DebugPanel                                           |
+| 优先级范围 | 模块类型 | 说明                                                    |
+| ---------- | -------- | ------------------------------------------------------- |
+| 0 - 99     | 基础设施 | Logger, EventManager, TimerManager, ObjectPool          |
+| 100 - 199  | 核心服务 | ResourceManager, NetworkManager, FSM                    |
+| 200 - 299  | 业务框架 | UIManager, EntityManager, AudioManager, SceneManager    |
+| 300 - 399  | 上层逻辑 | ProcedureManager, DataTableManager, LocalizationManager |
+| 400+       | 调试工具 | DebugPanel                                              |
 
 ## 变更日志
 
-| 日期       | 变更内容                                                                                                                                    | 操作人 |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| 2026-03-23 | 初始化模块注册表                                                                                                                            | 系统   |
-| 2026-03-30 | Event 模块完成，含 EventKey<T> 类型安全事件系统                                                                                             | 大圆   |
-| 2026-04-10 | Network 模块完成（NetworkDefs + NetworkChannel + NetworkManager），41 个测试全绿                                                            | 大圆   |
-| 2026-03-31 | ObjectPool + ReferencePool 完成（91/100），插件化架构方案确定                                                                               | 大圆   |
-| 2026-04-03 | DI Container 核心实现完成（10 个测试通过），装饰器待实现；更新模块状态                                                                      | 大圆   |
-| 2026-04-03 | DI 装饰器实现 + Container 自动注入集成（95/100），30 个测试全绿                                                                             | 大圆   |
-| 2026-04-04 | FSM 模块完成（FsmDefs + FsmState + Fsm + FsmManager），52 个测试全绿                                                                        | 大圆   |
-| 2026-04-07 | Procedure 模块完成（ProcedureBase + ProcedureManager），13 个测试全绿，94/100                                                               | 大圆   |
-| 2026-04-07 | Resource 模块完成（ResourceDefs + IResourceManager + ResourceManager），26 个测试全绿                                                       | 大圆   |
-| 2026-04-08 | UI 模块完成（UIDefs + UIFormBase + IUIManager + UIManager），31 个测试全绿                                                                  | 大圆   |
-| 2026-04-13 | Audio 模块完成（AudioDefs + IAudioManager + AudioManager），三级音量乘法链 + IAudioPlayer 策略注入，27 个测试全绿，Review 88 分             | 大圆   |
-| 2026-04-14 | Scene 模块完成（SceneDefs + ISceneManager + SceneManager），三层加载去重 + ISceneLoader 策略注入，15 个测试全绿，Review 90 分，Phase 2 完成 | 大圆   |
-| 2026-04-15 | Logger 模块完成（LoggerDefs + Logger），静态 API + ModuleBase 混合方案，priority=0，19 个测试全绿，Review 92 分                             | 大圆   |
-| 2026-04-16 | Timer 模块完成（TimerDefs + ITimerManager + TimerManager），mark-delete 遍历安全 + 溢出精度保留 + timeScale + tag 批量操作，35 个测试全绿，Review 88 分 | 大圆   |
-| 2026-04-16 | gfc-timer-heap 插件完成（MinHeap + HeapTimerManager），绝对到期时间 + 堆索引 O(1) 定位 + pause 分离列表，47 个测试全绿 | 大圆   |
-| 2026-04-16 | gfc-timer-wheel 插件完成（WheelTimerManager），slot 数组 + advance-first tick + 整数 tick 计数 + 多圈 remainingRounds + epsilon 浮点修正，39 个测试全绿 | 大圆   |
+| 日期       | 变更内容                                                                                                                                                        | 操作人 |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 2026-03-23 | 初始化模块注册表                                                                                                                                                | 系统   |
+| 2026-03-30 | Event 模块完成，含 EventKey<T> 类型安全事件系统                                                                                                                 | 大圆   |
+| 2026-04-10 | Network 模块完成（NetworkDefs + NetworkChannel + NetworkManager），41 个测试全绿                                                                                | 大圆   |
+| 2026-03-31 | ObjectPool + ReferencePool 完成（91/100），插件化架构方案确定                                                                                                   | 大圆   |
+| 2026-04-03 | DI Container 核心实现完成（10 个测试通过），装饰器待实现；更新模块状态                                                                                          | 大圆   |
+| 2026-04-03 | DI 装饰器实现 + Container 自动注入集成（95/100），30 个测试全绿                                                                                                 | 大圆   |
+| 2026-04-04 | FSM 模块完成（FsmDefs + FsmState + Fsm + FsmManager），52 个测试全绿                                                                                            | 大圆   |
+| 2026-04-07 | Procedure 模块完成（ProcedureBase + ProcedureManager），13 个测试全绿，94/100                                                                                   | 大圆   |
+| 2026-04-07 | Resource 模块完成（ResourceDefs + IResourceManager + ResourceManager），26 个测试全绿                                                                           | 大圆   |
+| 2026-04-08 | UI 模块完成（UIDefs + UIFormBase + IUIManager + UIManager），31 个测试全绿                                                                                      | 大圆   |
+| 2026-04-13 | Audio 模块完成（AudioDefs + IAudioManager + AudioManager），三级音量乘法链 + IAudioPlayer 策略注入，27 个测试全绿，Review 88 分                                 | 大圆   |
+| 2026-04-14 | Scene 模块完成（SceneDefs + ISceneManager + SceneManager），三层加载去重 + ISceneLoader 策略注入，15 个测试全绿，Review 90 分，Phase 2 完成                     | 大圆   |
+| 2026-04-15 | Logger 模块完成（LoggerDefs + Logger），静态 API + ModuleBase 混合方案，priority=0，19 个测试全绿，Review 92 分                                                 | 大圆   |
+| 2026-04-16 | Timer 模块完成（TimerDefs + ITimerManager + TimerManager），mark-delete 遍历安全 + 溢出精度保留 + timeScale + tag 批量操作，35 个测试全绿，Review 88 分         | 大圆   |
+| 2026-04-16 | gfc-timer-heap 插件完成（MinHeap + HeapTimerManager），绝对到期时间 + 堆索引 O(1) 定位 + pause 分离列表，47 个测试全绿                                          | 大圆   |
+| 2026-04-16 | gfc-timer-wheel 插件完成（WheelTimerManager），slot 数组 + advance-first tick + 整数 tick 计数 + 多圈 remainingRounds + epsilon 浮点修正，39 个测试全绿         | 大圆   |
 | 2026-04-16 | DataTable 模块完成（DataTableDefs + DataTable\<T\> + DataTableManager），双存储模式（Map/Array）+ IDataTableParser 策略注入 + indexMap O(1) 查询，41 个测试全绿 | 大圆   |
+| 2026-04-17 | i18n 模块完成（I18nDefs + I18nManager），多语言资源加载 + 动态语言切换 + 占位符替换 + 事件广播，测试全绿                                                        | 大圆   |

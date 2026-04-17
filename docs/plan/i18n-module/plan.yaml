@@ -1,0 +1,774 @@
+plan_id: i18n-module
+objective: 实现 i18n（多语言）模块，支持嵌套 key、参数插值、语言切换事件广播
+created_at: '2026-04-17T16:17:03+08:00'
+created_by: gem-planner
+status: pending_approval
+research_confidence: high
+
+plan_metrics:
+    wave_1_task_count: 2
+    total_dependencies: 8
+    risk_score: low
+
+tldr: |
+    - i18n 模块实现计划，遵循项目现有架构模式
+    - 4 个 Wave，共 8 个任务
+    - Wave 1: 类型定义和接口定义（并行）
+    - Wave 2: LocalizationManager 核心实现
+    - Wave 3: Runtime UI 组件
+    - Wave 4: 单元测试覆盖
+    - 配置表复用 DataTable 模块，Excel 编辑 → CSV 导出 → DataTable 加载
+
+open_questions:
+    - 是否需要支持复数形式？（当前决策：暂不支持，后续扩展）
+    - 是否需要热更新支持？（当前决策：暂不支持，后续扩展）
+
+pre_mortem:
+    overall_risk_level: low
+    critical_failure_modes:
+        - scenario: 嵌套 key 解析性能问题
+          likelihood: low
+          impact: medium
+          mitigation: 使用 Map 缓存解析结果，避免重复解析
+        - scenario: 语言切换时 UI 更新闪烁
+          likelihood: low
+          impact: low
+          mitigation: 使用帧末尾批量更新，避免逐个更新
+        - scenario: CSV 文件 UTF-8 BOM 导致解析失败
+          likelihood: medium
+          impact: medium
+          mitigation: 加载时移除 BOM 头（\uFEFF），使用 stripBOM 工具函数
+        - scenario: 语言切换时异步资源加载导致短暂显示错误语言
+          likelihood: medium
+          impact: low
+          mitigation: 使用加载占位符或保持当前翻译直到新语言加载完成
+        - scenario: 大翻译文件导致初始化时间过长
+          likelihood: low
+          impact: medium
+          mitigation: 支持懒加载模式，按需加载语言包而非全量加载
+    assumptions:
+        - DataTable 模块已完成且稳定
+        - ResourceManager 可以加载 CSV 格式文件
+        - EventManager 强类型事件系统可用
+        - CSV 文件使用 UTF-8 编码（无 BOM）
+
+implementation_specification:
+    code_structure: |
+        framework/i18n/
+        ├── LocalizationDefs.ts      # 枚举、接口、类型定义
+        ├── ILocalizationManager.ts  # 接口定义
+        └── LocalizationManager.ts   # 实现类
+
+        runtime/i18n/
+        ├── LocalizedLabel.ts        # 本地化 Label 组件
+        └── LocalizedSprite.ts       # 本地化 Sprite 组件
+
+        tests/framework/i18n/
+        └── localization-manager.test.ts
+
+    affected_areas:
+        - assets/scripts/framework/i18n/
+        - assets/scripts/runtime/i18n/
+        - tests/framework/i18n/
+        - docs/module-registry.md
+
+    component_details:
+        - component: LocalizationDefs
+          responsibility: 定义 Language 枚举、ILocalizationData 接口、LocalizationEvent 事件键
+          interfaces:
+              - Language enum (zh-CN, en-US, ja-JP, ko-KR)
+              - ILocalizationRow interface
+              - LanguageChangedData interface
+              - LocalizationEvent static event keys
+
+        - component: ILocalizationManager
+          responsibility: 定义 LocalizationManager 的公共契约
+          interfaces:
+              - 'getCurrentLanguage(): string'
+              - 'setLanguage(lang: string): void'
+              - 't(key: string, params?: Record<string, string>): string'
+              - 'hasKey(key: string): boolean'
+              - 'getAllLanguages(): string[]'
+
+        - component: LocalizationManager
+          responsibility: 实现多语言管理核心逻辑
+          interfaces:
+              - 继承 ModuleBase
+              - 实现 ILocalizationManager
+              - 内部存储: Map<string, Map<string, string>> (flatKey → lang → value)
+              - 嵌套 key 扁平化: _flattenObject() 方法
+              - 参数插值: _interpolate() 方法（含边界处理）
+              - 语言切换事件广播（相同语言不广播）
+
+        - component: LocalizedLabel
+          responsibility: Cocos Creator Label 组件，自动翻译文本
+          interfaces:
+              - key: string
+              - paramsJson: string
+              - 自动监听语言切换事件
+
+        - component: LocalizedSprite
+          responsibility: Cocos Creator Sprite 组件，根据语言切换图片
+          interfaces:
+              - key: string
+              - 自动监听语言切换事件
+
+    dependencies:
+        - component: LocalizationManager
+          relationship: 依赖 ResourceManager 加载配置文件
+        - component: LocalizationManager
+          relationship: 依赖 EventManager 广播语言切换事件
+        - component: LocalizedLabel
+          relationship: 依赖 LocalizationManager 获取翻译
+        - component: LocalizedSprite
+          relationship: 依赖 LocalizationManager 获取翻译
+
+    integration_points:
+        - GameEntry.registerModule(new LocalizationManager())
+        - ResourceManager.loadAsset()
+        - EventManager.emit()
+
+contracts:
+    - from_task: task_001
+      to_task: task_003
+      interface: LocalizationDefs 导出的枚举和接口
+      format: TypeScript enum, interface
+
+    - from_task: task_002
+      to_task: task_003
+      interface: ILocalizationManager 接口定义
+      format: TypeScript interface
+
+    - from_task: task_003
+      to_task: task_005
+      interface: LocalizationManager 实现的 API
+      format: t(key, params), setLanguage(lang), getCurrentLanguage()
+
+    - from_task: task_003
+      to_task: task_006
+      interface: LocalizationManager 实例和 LANGUAGE_CHANGED 事件
+      format: LocalizationManager instance, EventKey<LanguageChangedData>
+
+tasks:
+    - id: task_001
+      title: 创建 LocalizationDefs.ts 类型定义
+      description: |
+          创建 i18n 模块的类型定义文件，包含：
+          1. Language 枚举：zh-CN, en-US, ja-JP, ko-KR
+          2. ILocalizationRow 接口：翻译数据结构 (id, key, value)
+          3. LanguageChangedData 接口：语言切换事件数据
+          4. LocalizationEvent 静态类：事件键定义
+
+          文件路径：assets/scripts/framework/i18n/LocalizationDefs.ts
+
+          参考 EventDefs.ts 中 EventKey 的用法，参考 DataTableDefs.ts 中 IDataRow 的定义。
+      wave: 1
+      agent: gem-implementer
+      prototype: false
+      covers: []
+      priority: high
+      status: pending
+      dependencies: []
+      conflicts_with: []
+      context_files:
+          - path: assets/scripts/framework/event/EventDefs.ts
+            description: EventKey 类型定义参考
+          - path: assets/scripts/framework/datatable/DataTableDefs.ts
+            description: IDataRow 接口参考
+      estimated_effort: small
+      estimated_files: 1
+      estimated_lines: 50
+      focus_area: null
+      verification:
+          - TypeScript 编译通过
+          - 所有导出类型可正确引用
+      acceptance_criteria:
+          - Language 枚举包含 zh-CN, en-US, ja-JP, ko-KR
+          - ILocalizationRow 接口包含 id, key, value 字段
+          - LanguageChangedData 接口包含 previousLanguage, currentLanguage
+          - LocalizationEvent.LANGUAGE_CHANGED 使用 EventKey<LanguageChangedData>
+      failure_modes:
+          - scenario: EventKey 泛型类型不匹配
+            likelihood: low
+            impact: medium
+            mitigation: 参考 EventDefs.ts 中的 EventKey 用法
+      tech_stack:
+          - TypeScript
+      test_coverage: null
+      requires_review: false
+      review_depth: null
+      review_security_sensitive: false
+
+    - id: task_002
+      title: 创建 ILocalizationManager.ts 接口定义
+      description: |
+          创建 i18n 模块的接口定义文件，遵循项目接口隔离模式。
+
+          文件路径：assets/scripts/framework/interfaces/ILocalizationManager.ts
+
+          需要定义的方法：
+          - getCurrentLanguage(): string
+          - setLanguage(lang: string): void
+          - getAllLanguages(): string[]
+          - t(key: string, params?: Record<string, string>): string
+          - hasKey(key: string): boolean
+
+          注意：getTranslations() 方法不暴露到公共接口，标记为 @internal
+          原因：外部调用者应使用 t() 和 hasKey()，不应直接访问底层数据
+
+          参考 IResourceManager.ts 和 IUIManager.ts 的接口定义风格。
+      wave: 1
+      agent: gem-implementer
+      prototype: false
+      covers: []
+      priority: high
+      status: pending
+      dependencies: []
+      conflicts_with: []
+      context_files:
+          - path: assets/scripts/framework/interfaces/IResourceManager.ts
+            description: 接口定义参考
+          - path: assets/scripts/framework/interfaces/IUIManager.ts
+            description: 接口定义参考
+      estimated_effort: small
+      estimated_files: 1
+      estimated_lines: 40
+      focus_area: null
+      verification:
+          - TypeScript 编译通过
+          - 接口方法签名完整
+      acceptance_criteria:
+          - 'getCurrentLanguage() 返回 string'
+          - 'setLanguage(lang: string) 返回 void'
+          - 't(key: string, params?: Record<string, string>) 返回 string'
+          - 'hasKey(key: string) 返回 boolean'
+          - 'getAllLanguages() 返回 string[]'
+          - 不包含 getTranslations() 方法（标记为 @internal）
+      failure_modes:
+          - scenario: 接口方法命名不符合项目约定
+            likelihood: low
+            impact: low
+            mitigation: 参考 IResourceManager 和 IUIManager 命名
+      tech_stack:
+          - TypeScript
+      test_coverage: null
+      requires_review: false
+      review_depth: null
+      review_security_sensitive: false
+
+    - id: task_003
+      title: 实现 LocalizationManager 核心类
+      description: |
+          实现 LocalizationManager 核心逻辑，继承 ModuleBase，实现 ILocalizationManager。
+
+          文件路径：assets/scripts/framework/i18n/LocalizationManager.ts
+
+          核心实现要点：
+          1. 继承 ModuleBase，priority=350（上层逻辑层）
+          2. 内部存储：Map<string, Map<string, string>> (flatKey → lang → value)，使用扁平化 dot-notation key
+          3. 嵌套 key 解析：初始化时将嵌套 JSON 扁平化为 dot-notation keys
+          4. 参数插值：[name] → Player，支持转义 [[key]] → [key]，支持边界情况处理
+          5. 语言切换事件广播（相同语言不广播）
+
+          存储结构设计：
+          - 输入：嵌套 JSON 对象 { item: { sword: { name: "剑" } } }
+          - 存储：Map<flatKey, Map<lang, value>>，如 'item.sword.name' → { 'zh-CN': '剑', 'en-US': 'Sword' }
+          - 原因：支持多语言存储，扁平化 key 查询 O(1)，避免运行时递归解析
+
+          _flattenObject() 方法实现：
+          ```typescript
+          private _flattenObject(obj: Record<string, unknown>, prefix: string = ''): Map<string, string> {
+              const result = new Map<string, string>();
+              for (const [key, value] of Object.entries(obj)) {
+                  const fullKey = prefix ? `${prefix}.${key}` : key;
+                  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                      // 递归扁平化嵌套对象
+                      const nested = this._flattenObject(value as Record<string, unknown>, fullKey);
+                      for (const [nestedKey, nestedValue] of nested) {
+                          result.set(nestedKey, nestedValue);
+                      }
+                  } else {
+                      // 叶子节点：转换为字符串存储
+                      result.set(fullKey, String(value));
+                  }
+              }
+              return result;
+          }
+          ```
+
+          参数插值边界处理：
+          ```typescript
+          private _interpolate(template: string, params?: Record<string, string>): string {
+              if (!params) return template;
+              // 先处理转义：[[key]] → [key]
+              let result = template.replace(/\[\[(\w+)\]\]/g, '[$1]');
+              // 再处理参数插值
+              return result.replace(/\[(\w+)\]/g, (match, key) => {
+                  return params[key] ?? match;
+              });
+          }
+          ```
+          - 参数不存在：保留原始 [key] 标记（如 '[name]'）
+          - 支持转义：使用 [[key]] 表示字面量 [key]
+          - 嵌套括号：正则只匹配 [\w+]，忽略 [[...]] 转义
+
+          setLanguage() 边界处理：
+          ```typescript
+          public setLanguage(lang: string): void {
+              if (this._currentLanguage === lang) {
+                  // 相同语言不广播事件，直接返回
+                  return;
+              }
+              const previousLanguage = this._currentLanguage;
+              this._currentLanguage = lang;
+              // 广播语言切换事件
+              EventManager.emit(LocalizationEvent.LANGUAGE_CHANGED, {
+                  previousLanguage,
+                  currentLanguage: lang
+              });
+          }
+          ```
+
+          getTranslations() 方法评估：
+          - 决策：标记为 @internal，仅内部使用，不暴露到公共接口
+          - 原因：外部调用者应使用 t() 和 hasKey()，不应直接访问底层数据
+          - ILocalizationManager 接口中移除此方法
+
+          loadTranslations() 方法评估：
+          - 决策：标记为 @internal，仅内部使用，不暴露到公共接口
+          - 原因：此方法用于初始化时批量加载翻译数据，外部调用者不应直接调用
+          - 使用场景：onInit() 生命周期中调用 _loadAllTranslations()
+          - ILocalizationManager 接口中不包含此方法
+
+          实现步骤：
+          1. 创建类骨架，继承 ModuleBase
+          2. 实现 _flattenObject() 扁平化方法
+          3. 实现 _interpolate() 插值方法（含边界处理）
+          4. 实现 onInit/onShutdown 生命周期
+          5. 实现 setLanguage/getCurrentLanguage（相同语言检查）
+          6. 实现 t() 方法（扁平化查询 + 参数插值）
+          7. 实现 hasKey/getAllLanguages
+          8. 实现 loadTranslations() 方法加载翻译数据
+
+          参考 DataTableManager.ts 和 AudioManager.ts 的实现模式。
+      wave: 2
+      agent: gem-implementer
+      prototype: false
+      covers: []
+      priority: high
+      status: pending
+      dependencies:
+          - task_001
+          - task_002
+      conflicts_with: []
+      context_files:
+          - path: assets/scripts/framework/datatable/DataTableManager.ts
+            description: ModuleBase 实现参考
+          - path: assets/scripts/framework/audio/AudioManager.ts
+            description: 策略注入模式参考
+          - path: assets/scripts/framework/debug/Logger.ts
+            description: Logger 使用参考
+      estimated_effort: medium
+      estimated_files: 1
+      estimated_lines: 200
+      focus_area: null
+      verification:
+          - TypeScript 编译通过
+          - 单元测试通过
+      acceptance_criteria:
+          - 继承 ModuleBase，moduleName='LocalizationManager'，priority=350
+          - t() 支持嵌套 key（如 'item.sword.name'）
+          - t() 支持参数插值（[name] → Player）
+          - 参数不存在时保留原始 [key] 标记
+          - 支持 [[key]] 转义为字面量 [key]
+          - setLanguage() 广播 LANGUAGE_CHANGED 事件
+          - setLanguage() 相同语言时不广播事件
+          - key 不存在时返回 key 本身
+          - 嵌套 key 中间节点不存在时返回 key 本身
+          - 所有公共方法有 JSDoc 注释
+      failure_modes:
+          - scenario: 嵌套 key 解析逻辑错误
+            likelihood: medium
+            impact: medium
+            mitigation: 编写详细单元测试覆盖各种嵌套情况
+          - scenario: 参数插值正则表达式性能问题
+            likelihood: low
+            impact: low
+            mitigation: 使用简单字符串替换而非正则
+          - scenario: 嵌套 key 中间节点不存在导致运行时错误
+            likelihood: medium
+            impact: medium
+            mitigation: _flattenObject 递归时检查 null/undefined，安全降级
+      tech_stack:
+          - TypeScript
+      test_coverage: 100%
+      requires_review: true
+      review_depth: standard
+      review_security_sensitive: false
+
+    - id: task_004
+      title: 设计配置表格式和加载策略
+      description: |
+          设计 i18n 配置表格式，复用 DataTable 模块。
+
+          配置表设计：
+          1. 主表：languages.csv（定义支持的语言）
+          2. 翻译表：i18n_{lang}.csv（每种语言一个文件）
+
+          languages.csv 格式：
+          id,code,name
+          1,zh-CN,简体中文
+          2,en-US,English
+          3,ja-JP,日本語
+          4,ko-KR,한국어
+
+          i18n_{lang}.csv 格式：
+          id,key,value
+          1,game.title,游戏标题
+          2,item.sword.name,长剑
+          3,item.sword.desc,一把锋利的长剑
+          4,greeting.welcome,欢迎 [name]！
+
+          文件路径约定：
+          - resources/i18n/languages.csv
+          - resources/i18n/i18n_zh-CN.csv
+          - resources/i18n/i18n_en-US.csv
+          - resources/i18n/i18n_ja-JP.csv
+          - resources/i18n/i18n_ko-KR.csv
+
+          批量加载策略：
+          ```typescript
+          private async _loadAllTranslations(): Promise<void> {
+              const dataTableMgr = GameEntry.getModule<DataTableManager>('DataTableManager');
+              const languages = this.getAllLanguages();
+
+              // 批量加载所有语言的翻译文件
+              const loadPromises = languages.map(async (lang) => {
+                  const tableName = `i18n_${lang}`;
+                  try {
+                      // 使用 ResourceManager 加载 CSV 文件
+                      const csvData = await ResourceManager.loadAsset<string>(
+                          `resources/i18n/i18n_${lang}.csv`,
+                          AssetType.TEXT
+                      );
+                      // 移除 BOM 头，确保解析正确
+                      const cleanData = this._stripBOM(csvData);
+                      // 复用 DataTableManager 的 createTableFromRawData 方法
+                      dataTableMgr.createTableFromRawData<ILocalizationRow>(tableName, cleanData);
+                  } catch (error) {
+                      Logger.warn(`[LocalizationManager] 加载语言包失败: ${lang}`, error);
+                  }
+              });
+
+              await Promise.all(loadPromises);
+          }
+          ```
+
+          CSV 解析策略：
+          - 复用 DataTableManager 的 IDataTableParser 机制
+          - 需要实现 CsvDataTableParser（或使用已有的实现）
+          - CSV 文件第一行为表头：id,key,value
+
+          UTF-8 BOM 处理：
+          ```typescript
+          private _stripBOM(content: string): string {
+              // 移除 UTF-8 BOM 头（\uFEFF）
+              if (content.charCodeAt(0) === 0xFEFF) {
+                  return content.slice(1);
+              }
+              return content;
+          }
+          ```
+
+          加载到内存流程：
+          1. LocalizationManager.onInit() 时调用 _loadAllTranslations()
+          2. 对每种语言，加载 i18n_{lang}.csv
+          3. 使用 DataTableManager.createTableFromRawData() 解析 CSV
+          4. 遍历解析结果，使用 _flattenObject() 扁平化 key
+          5. 存储到内部 Map<flatKey, Map<lang, value>>
+
+          大文件优化：
+          - 当前决策：全量加载，后续可扩展懒加载
+          - 估算：10000 条翻译约 500KB，加载时间 < 100ms
+
+          创建文档说明配置表格式和使用方式。
+      wave: 2
+      agent: gem-documentation-writer
+      prototype: false
+      covers: []
+      priority: medium
+      status: pending
+      dependencies:
+          - task_001
+      conflicts_with: []
+      context_files:
+          - path: assets/scripts/framework/datatable/DataTableDefs.ts
+            description: IDataRow 接口参考
+      estimated_effort: small
+      estimated_files: 1
+      estimated_lines: 60
+      focus_area: null
+      verification:
+          - CSV 格式示例正确
+          - 加载策略描述清晰
+      acceptance_criteria:
+          - 包含 languages.csv 格式定义
+          - 包含 i18n_{lang}.csv 格式定义
+          - 包含加载策略说明
+          - 包含 Excel 编辑 → CSV 导出流程说明
+      failure_modes:
+          - scenario: CSV 格式不兼容 Excel
+            likelihood: low
+            impact: medium
+            mitigation: 使用标准 CSV 格式，UTF-8 编码
+          - scenario: UTF-8 BOM 导致第一行解析失败
+            likelihood: medium
+            impact: medium
+            mitigation: 加载时使用 _stripBOM() 移除 BOM 头
+          - scenario: 大文件加载超时
+            likelihood: low
+            impact: medium
+            mitigation: 使用异步加载，添加加载进度提示
+      tech_stack:
+          - Markdown
+      test_coverage: null
+      requires_review: false
+      review_depth: null
+      review_security_sensitive: false
+
+    - id: task_005
+      title: 创建 LocalizedLabel Runtime 组件
+      description: |
+          创建 Cocos Creator 本地化 Label 组件，自动翻译文本。
+
+          文件路径：assets/scripts/runtime/i18n/LocalizedLabel.ts
+
+          组件功能：
+          1. 使用 @ccclass 装饰器
+          2. key 属性：翻译 key（可在编辑器配置）
+          3. paramsJson 属性：JSON 格式插值参数
+          4. 自动监听 LANGUAGE_CHANGED 事件
+          5. 组件销毁时移除事件监听
+
+          参考 UIFormBase.ts 的组件写法。
+      wave: 3
+      agent: gem-implementer
+      prototype: false
+      covers: []
+      priority: medium
+      status: pending
+      dependencies:
+          - task_003
+      conflicts_with: []
+      context_files:
+          - path: assets/scripts/framework/ui/UIFormBase.ts
+            description: Cocos 组件参考
+      estimated_effort: medium
+      estimated_files: 1
+      estimated_lines: 80
+      focus_area: null
+      verification:
+          - TypeScript 编译通过
+          - 组件可在 Cocos Creator 编辑器中使用
+      acceptance_criteria:
+          - 使用 @ccclass 装饰器
+          - key 属性可在编辑器中配置
+          - paramsJson 属性支持 JSON 格式参数
+          - 自动监听 LANGUAGE_CHANGED 事件
+          - 组件销毁时正确移除事件监听
+      failure_modes:
+          - scenario: 组件加载时 LocalizationManager 未初始化
+            likelihood: low
+            impact: medium
+            mitigation: 添加空值检查，延迟加载
+      tech_stack:
+          - TypeScript
+          - Cocos Creator 3.x
+      test_coverage: null
+      requires_review: false
+      review_depth: null
+      review_security_sensitive: false
+
+    - id: task_006
+      title: 创建 LocalizedSprite Runtime 组件
+      description: |
+          创建 Cocos Creator 本地化 Sprite 组件，根据语言切换图片。
+
+          文件路径：assets/scripts/runtime/i18n/LocalizedSprite.ts
+
+          组件功能：
+          1. 使用 @ccclass 装饰器
+          2. key 属性：图片 key（可在编辑器配置）
+          3. 自动监听 LANGUAGE_CHANGED 事件
+          4. 根据当前语言加载对应 SpriteFrame
+
+          参考 LocalizedLabel.ts 的实现模式。
+      wave: 3
+      agent: gem-implementer
+      prototype: false
+      covers: []
+      priority: low
+      status: pending
+      dependencies:
+          - task_003
+          - task_005
+      conflicts_with: []
+      context_files:
+          - path: assets/scripts/runtime/i18n/LocalizedLabel.ts
+            description: LocalizedLabel 实现参考
+      estimated_effort: small
+      estimated_files: 1
+      estimated_lines: 60
+      focus_area: null
+      verification:
+          - TypeScript 编译通过
+          - 组件可在 Cocos Creator 编辑器中使用
+      acceptance_criteria:
+          - 使用 @ccclass 装饰器
+          - key 属性可在编辑器中配置
+          - 自动监听 LANGUAGE_CHANGED 事件
+          - 组件销毁时正确移除事件监听
+      failure_modes:
+          - scenario: 图片加载失败无回退
+            likelihood: medium
+            impact: low
+            mitigation: 提供默认图片或空图处理
+      tech_stack:
+          - TypeScript
+          - Cocos Creator 3.x
+      test_coverage: null
+      requires_review: false
+      review_depth: null
+      review_security_sensitive: false
+
+    - id: task_007
+      title: 编写 LocalizationManager 单元测试
+      description: |
+          编写 LocalizationManager 的完整单元测试。
+
+          文件路径：tests/framework/i18n/localization-manager.test.ts
+
+          测试用例分类：
+          1. 基础功能：初始化、默认语言、语言切换
+          2. 翻译查询：t() 返回正确翻译、嵌套 key 解析、key 不存在回退
+          3. 参数插值：[name] 替换、多个参数、参数不存在处理
+          4. 事件广播：setLanguage 广播事件、事件数据正确
+          5. 边界情况：空 key、空参数、重复设置相同语言
+
+          边界情况测试用例：
+          ```typescript
+          // 参数不存在时保留原始 [key]
+          test('参数不存在时保留原始标记', () => {
+              manager.loadTranslations({ 'greeting': 'Hello [name]!' });
+              expect(manager.t('greeting', {})).toBe('Hello [name]!');
+          });
+
+          // 转义括号 [[key]] → [key]
+          test('转义括号输出字面量', () => {
+              manager.loadTranslations({ 'format': 'Use [[brackets]] for params' });
+              expect(manager.t('format')).toBe('Use [brackets] for params');
+          });
+
+          // 嵌套 key 中间节点不存在
+          test('嵌套 key 中间节点不存在返回 key 本身', () => {
+              manager.loadTranslations({ 'item.shield.name': 'Shield' });
+              expect(manager.t('item.sword.name')).toBe('item.sword.name');
+          });
+
+          // 相同语言不广播事件
+          test('设置相同语言不触发事件', () => {
+              const spy = jest.fn();
+              EventManager.on(LocalizationEvent.LANGUAGE_CHANGED, spy);
+              manager.setLanguage('zh-CN'); // 默认已是 zh-CN
+              expect(spy).not.toHaveBeenCalled();
+          });
+          ```
+
+          参考 data-table-manager.test.ts 的测试模式。
+      wave: 4
+      agent: gem-implementer
+      prototype: false
+      covers: []
+      priority: high
+      status: pending
+      dependencies:
+          - task_003
+      conflicts_with: []
+      context_files:
+          - path: tests/datatable/data-table-manager.test.ts
+            description: 测试模式参考
+          - path: tests/event/event-manager.test.ts
+            description: 事件测试参考
+      estimated_effort: medium
+      estimated_files: 1
+      estimated_lines: 200
+      focus_area: null
+      verification:
+          - 所有测试通过
+          - 测试覆盖率 > 90%
+      acceptance_criteria:
+          - 覆盖所有公共 API
+          - 包含嵌套 key 测试
+          - 包含参数插值测试
+          - 包含事件广播测试
+          - 包含边界情况测试
+          - 测试参数不存在时保留原始 [key]
+          - 测试 [[key]] 转义为字面量 [key]
+          - 测试嵌套 key 中间节点不存在返回 key 本身
+          - 测试相同语言设置不触发事件
+      failure_modes:
+          - scenario: Mock EventManager 复杂
+            likelihood: medium
+            impact: low
+            mitigation: 使用真实 EventManager 实例
+      tech_stack:
+          - TypeScript
+          - Jest
+      test_coverage: 100%
+      requires_review: false
+      review_depth: null
+      review_security_sensitive: false
+
+    - id: task_008
+      title: 更新模块注册表和架构文档
+      description: |
+          更新项目文档，反映 i18n 模块完成状态。
+
+          需要更新的文件：
+          1. docs/module-registry.md - 更新 i18n 模块状态为 ✅ 已完成
+          2. docs/architecture.md - 更新 i18n 模块状态
+
+          更新内容：
+          - 模块状态从 ⬜ 待开发 改为 ✅ 已完成
+          - 添加变更日志记录
+      wave: 4
+      agent: gem-documentation-writer
+      prototype: false
+      covers: []
+      priority: low
+      status: pending
+      dependencies:
+          - task_007
+      conflicts_with: []
+      context_files:
+          - path: docs/module-registry.md
+            description: 模块注册表
+          - path: docs/architecture.md
+            description: 架构文档
+      estimated_effort: small
+      estimated_files: 2
+      estimated_lines: 20
+      focus_area: null
+      verification:
+          - Markdown 格式正确
+          - 链接有效
+      acceptance_criteria:
+          - module-registry.md 中 i18n 状态更新为 ✅ 已完成
+          - 变更日志添加 i18n 模块完成记录
+      failure_modes: []
+      tech_stack:
+          - Markdown
+      test_coverage: null
+      requires_review: false
+      review_depth: null
+      review_security_sensitive: false
