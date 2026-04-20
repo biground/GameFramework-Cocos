@@ -44,7 +44,7 @@ GameEntry（框架入口）
 | gfc-timer-wheel | packages/gfc-timer-wheel/ | WheelTimerManager（ITimerManager 实现）；slot 数组 + tick 前进 + 多圈 remainingRounds，添加/触发 O(1)                                                                                                                                         | @gfc/core（peerDep）        | ✅ 已完成 |
 | Data            | framework/data/           | loadTable\<T\>() / getRow() / getAllRows()                                                                                                                                                                                                    | Resource                    | ⬜ 待开发 |
 | i18n            | framework/i18n/           | t() / setLanguage() / getLanguage()                                                                                                                                                                                                           | Resource, Event             | ✅ 已完成 |
-| Debug           | framework/debug/          | Logger.info() / warn() / error() / DebugPanel                                                                                                                                                                                                 | 无                          | ⬜ 待开发 |
+| Debug           | framework/debug/          | Logger.info() / warn() / error() / DebugManager: registerDataSource() / unregisterDataSource() / collectAll() / getLastSnapshot() / getSnapshot() / setConfig() / getDataSource() | Logger; DataSource 可选依赖 GameModule, EventManager | ✅ 已完成 |
 
 ## 模块间通信规则
 
@@ -85,4 +85,5 @@ GameEntry（框架入口）
 | 2026-04-16 | gfc-timer-heap 插件完成（MinHeap + HeapTimerManager），绝对到期时间 + 堆索引 O(1) 定位 + pause 分离列表，47 个测试全绿                                          | 大圆   |
 | 2026-04-16 | gfc-timer-wheel 插件完成（WheelTimerManager），slot 数组 + advance-first tick + 整数 tick 计数 + 多圈 remainingRounds + epsilon 浮点修正，39 个测试全绿         | 大圆   |
 | 2026-04-16 | DataTable 模块完成（DataTableDefs + DataTable\<T\> + DataTableManager），双存储模式（Map/Array）+ IDataTableParser 策略注入 + indexMap O(1) 查询，41 个测试全绿 | 大圆   |
+| 2026-04-20 | DebugPanel 模块完成（DebugDefs + DebugManager + ModuleDataSource + EventDataSource），DataSource 插件化采集 + 分层采集频率 + 容错隔离 + 快照缓存，69+ 测试全绿 | 大圆   |
 | 2026-04-17 | i18n 模块完成（I18nDefs + I18nManager），多语言资源加载 + 动态语言切换 + 占位符替换 + 事件广播，测试全绿                                                        | 大圆   |

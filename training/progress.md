@@ -3,9 +3,9 @@
 ## 基本信息
 
 - 开始日期：2026-03-23
-- 当前日期：2026-04-14
-- 当前周次：Week 4 / 8
-- 总完成度：65%
+- 当前日期：2026-04-20
+- 当前周次：Week 5 / 8
+- 总完成度：70%
 
 ## 模块开发进度
 
@@ -32,7 +32,7 @@
 | Logger（日志管理器）                        | ✅ 已完成 | 2026-04-15 | 93          | Week 4 Day 4-5；基础 19 测 + 增强 48 测（ILogOutput/Tag 过滤/时间戳/堆栈/Ring Buffer/颜色/time-timeEnd/GFC_DEBUG 裁剪）；全框架 Logger 集成（~96 调试日志 + 46 错误日志） |
 | BenchmarkRunner（性能基准测试）            | ✅ 已完成 | 2026-04-14 | 82          | Week 4 Day 6；预热+计时+统计（avg/min/max/p95/p99/stddev/opsPerSec）+Markdown报告；3个基准测试 |
 | 性能优化（EventManager + ObjectPool）    | ✅ 已完成 | 2026-04-14 | -           | Week 4 Day 6；emit 消除快照拷贝（emitDepth+_removed）；release Set查重 O(1)                                                                     |
-| DebugPanel（调试面板）                      | ⬜ 未开始 | -          | -           | Week 5-6                                                                                                                                                                  |
+| DebugPanel（调试面板）                      | ✅ 已完成 | 2026-04-20 | -           | Week 5 Day 1；DebugManager + ModuleDataSource + EventDataSource，DataSource 插件化采集 + 分层采集频率 + 容错隔离，69+ 测试 |
 | CI/CD Pipeline（持续集成流水线）            | ✅ 已完成 | 2026-04-16 | -           | Week 4 Day 8；Jenkins vs GitLab CI 原理教学 + .gitlab-ci.yml 配置（install→lint+test并行→quality_gate门禁）                                                               |
 | 综合 Demo 项目                              | ⬜ 未开始 | -          | -           | Week 7                                                                                                                                                                    |
 | 面试冲刺                                    | ⬜ 未开始 | -          | -           | Week 8                                                                                                                                                                    |
@@ -98,8 +98,8 @@
 
 ## 上次会话断点
 
-- 最后操作：Week 4 Day 9 — DataTable 模块完成（双存储模式 + 策略注入 + 41 测试全绿）
-- 下次继续：Phase 3 继续 — i18n / DebugPanel / 热更新
+- 最后操作：Week 5 Day 1 — DebugPanel 模块完成（DebugManager + DataSource 插件化采集 + 69+ 测试全绿）
+- 下次继续：Phase 3 继续 — 热更新 / Entity 模块完善 / 综合 Demo
 - 未完成事项：无
-- 额外成就：学员主动提出双存储模式设计，已纳入实现
-- 更新日期：2026-04-16
+- 额外成就：无
+- 更新日期：2026-04-20

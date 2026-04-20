@@ -136,3 +136,209 @@ if (Logger.isDebugEnabled) {
 - 测试文件路径：`tests/debug/logger.test.ts`
 - 测试数量：19 个
 - 覆盖场景：初始化/优先级、级别过滤（Debug/Warn/Error/None）、格式化输出、静态 API、isDebugEnabled 守卫、性能考量（过滤时零调用）、生命周期（onInit/onShutdown）
+
+---
+
+# DebugPanel（调试面板 / 运行时可观测性）
+
+## 职责
+
+运行时采集并展示游戏框架内部状态（模块注册情况、事件绑定统计等），为开发者提供可观测性支持。**不负责**日志输出（Logger 模块）、性能 Profiler（独立工具）、可视化 UI 渲染（由 Runtime 层桥接）。
+
+## 核心概念
+
+### DataSource 插件化采集
+
+DebugPanel 采用 **DataSource 插件模式**：
+
+- **IDebugDataSource 接口**：所有数据源实现 `collect()` 方法，返回统一的 `DebugSectionData` 结构
+- **DebugManager 管理器**：负责 DataSource 的注册/注销、定时采集、格式化输出
+- **容错隔离**：每个 DataSource 的 `collect()` 独立 try-catch，单个异常不中断其他采集
+
+### 采集频率分层
+
+通过 `collectPriority` 控制不同数据源的采集频率：
+
+| 优先级   | 行为                       | 适用场景           |
+| -------- | -------------------------- | ------------------ |
+| `high`   | 每次 collectAll 都采集     | 关键指标（FPS 等） |
+| `normal` | 按 collectInterval 采集    | 常规状态信息       |
+| `low`    | 每 5 次 collectAll 采集 1 次 | 低频变化的数据     |
+
+### 快照缓存
+
+`getLastSnapshot()` 返回上次采集的缓存快照，不触发新采集，适用于 UI 层按需读取。
+
+## 文件清单
+
+| 文件                            | 职责                                         |
+| ------------------------------- | -------------------------------------------- |
+| `DebugDefs.ts`                  | 类型定义（DebugEntry / DebugSectionData / DebugSnapshot / IDebugDataSource / DebugManagerConfig） |
+| `DebugManager.ts`               | 调试管理器（DataSource 注册/注销、定时采集、格式化输出） |
+| `datasources/ModuleDataSource.ts` | 模块状态数据源（采集已注册模块及 priority）   |
+| `datasources/EventDataSource.ts`  | 事件统计数据源（采集事件类型数及监听器数量）   |
+
+## 对外 API
+
+```typescript
+class DebugManager extends ModuleBase {
+    // 模块信息
+    readonly moduleName: string;  // "DebugManager"
+    readonly priority: number;    // 400
+
+    // 生命周期
+    onInit(): void;
+    onUpdate(deltaTime: number): void;
+    onShutdown(): void;
+
+    // 配置
+    setConfig(config: Partial<DebugManagerConfig>): void;
+
+    // DataSource 管理
+    registerDataSource(source: IDebugDataSource): void;
+    unregisterDataSource(name: string): boolean;
+    getDataSource(name: string): IDebugDataSource | undefined;
+
+    // 数据采集
+    collectAll(): DebugSnapshot;
+    getLastSnapshot(): DebugSnapshot | null;
+    getSnapshot(): string;  // 格式化字符串输出
+}
+```
+
+### IDebugDataSource 接口
+
+```typescript
+interface IDebugDataSource {
+    readonly name: string;
+    readonly collectPriority?: 'high' | 'normal' | 'low';
+    collect(): DebugSectionData;
+}
+```
+
+### DebugManagerConfig 配置
+
+```typescript
+interface DebugManagerConfig {
+    collectInterval: number;  // 自动采集间隔（秒），默认 1
+    autoCollect: boolean;     // 是否自动采集，默认 true
+}
+```
+
+## 已有 DataSource
+
+### ModuleDataSource
+
+采集 `GameModule.getRegisteredModules()` 返回的所有模块信息：
+
+- 模块数量
+- 各模块名称及 priority
+
+### EventDataSource
+
+采集 `EventManager.getEventStats()` 返回的事件系统统计：
+
+- 事件类型数
+- 总监听器数
+- 各事件的监听器数量
+
+## 自定义 DataSource 示例
+
+```typescript
+import { IDebugDataSource, DebugSectionData } from '@framework/debug/DebugDefs';
+
+class FpsDataSource implements IDebugDataSource {
+    readonly name = 'FPS';
+    readonly collectPriority = 'high' as const;
+
+    private _frameCount = 0;
+    private _elapsed = 0;
+    private _fps = 0;
+
+    tick(dt: number): void {
+        this._frameCount++;
+        this._elapsed += dt;
+        if (this._elapsed >= 1) {
+            this._fps = this._frameCount / this._elapsed;
+            this._frameCount = 0;
+            this._elapsed = 0;
+        }
+    }
+
+    collect(): DebugSectionData {
+        return {
+            title: 'Performance',
+            entries: [{ label: 'FPS', value: Math.round(this._fps) }],
+        };
+    }
+}
+
+// 注册
+debugManager.registerDataSource(new FpsDataSource());
+```
+
+## 使用示例
+
+```typescript
+// 获取 DebugManager
+const debugMgr = GameModule.getModule<DebugManager>('DebugManager');
+
+// 注册数据源
+debugMgr.registerDataSource(new ModuleDataSource());
+debugMgr.registerDataSource(new EventDataSource());
+
+// 手动采集
+const snapshot = debugMgr.collectAll();
+
+// 获取格式化输出
+const text = debugMgr.getSnapshot();
+// === Debug Snapshot [12:34:56.789] ===
+// [Modules]
+//   模块数量: 5
+// [Events]
+//   事件类型数: 3
+//   总监听器数: 12
+// ===================================
+
+// 获取上次缓存快照（不触发新采集）
+const cached = debugMgr.getLastSnapshot();
+
+// 修改配置
+debugMgr.setConfig({ collectInterval: 2, autoCollect: false });
+
+// 注销数据源
+debugMgr.unregisterDataSource('Modules');
+```
+
+## 设计决策
+
+| 决策                  | 选择                          | 原因                                                         |
+| --------------------- | ----------------------------- | ------------------------------------------------------------ |
+| priority = 400        | 调试工具层                    | 确保在所有业务模块之后初始化，能采集到完整的模块状态         |
+| DataSource 插件模式   | IDebugDataSource 接口         | 可扩展性强，新增数据源无需修改 DebugManager                   |
+| collectAll 容错       | try-catch 每个 DataSource     | 单个数据源异常不中断全局采集                                   |
+| 快照缓存              | getLastSnapshot()             | 避免 UI 层频繁触发采集，减少性能开销                           |
+| 分层采集频率          | high / normal / low           | 不同数据源变化频率不同，避免低频数据的无效采集                 |
+| autoCollect 开关      | DebugManagerConfig.autoCollect | 支持按需模式，生产环境可关闭自动采集                           |
+
+## 依赖
+
+- Logger（日志输出）
+- GameModule（ModuleDataSource 依赖 getRegisteredModules）
+- EventManager（EventDataSource 依赖 getEventStats）
+
+## 被谁依赖
+
+- 无（顶层调试工具）
+
+## 已知限制
+
+- 无可视化 UI 渲染（需 Runtime 层桥接 CocosCreator UI 组件）
+- 无网络远程调试支持
+- 无历史快照回溯（仅缓存最近一次快照）
+
+## 关联测试
+
+- 测试文件路径：`tests/debug/debug-manager.test.ts`
+- 测试数量：69+ 个
+- 覆盖场景：DataSource 注册/注销/重复注册、collectAll 采集与容错、分层采集频率、autoCollect 开关、快照缓存、格式化输出、onUpdate 节流、setConfig 运行时配置修改
