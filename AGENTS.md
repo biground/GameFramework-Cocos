@@ -100,6 +100,7 @@ npm run format        # Prettier 格式化
 | Logger | ✅ | `framework/debug/Logger.ts`, `LoggerDefs.ts` |
 | Entity | ⬜ | 待开发 |
 | Data | ⬜ | 待开发 |
+| HotUpdate | ✅ | `framework/hotupdate/HotUpdateManager.ts`, `HotUpdateDefs.ts`, `interfaces/IHotUpdateManager.ts` |
 | DebugPanel | ✅ | `framework/debug/DebugManager.ts`, `DebugDefs.ts`, `datasources/ModuleDataSource.ts`, `datasources/EventDataSource.ts` |
 
 ---

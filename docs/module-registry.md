@@ -20,6 +20,7 @@ GameEntry（框架入口）
   ├── UIManager（依赖 → ResourceManager, EventManager, ObjectPool）
   ├── EntityManager（依赖 → ResourceManager, EventManager, ObjectPool）
   ├── NetworkManager（依赖 → EventManager）
+  ├── HotUpdateManager（依赖 → EventManager, Logger）
   └── LocalizationManager（依赖 → ResourceManager, EventManager）
 ```
 
@@ -39,6 +40,7 @@ GameEntry（框架入口）
 | Network         | framework/network/        | createChannel() / destroyChannel() / getChannel() / setHeartbeatHandler() / setEventManager() / Channel: connect() / send() / close()                                                                                                         | Event                       | ✅ 已完成 |
 | Audio           | framework/audio/          | setAudioPlayer() / playMusic() / stopMusic() / pauseMusic() / resumeMusic() / playSound() / stopSound() / stopAllSounds() / set/getMasterVolume() / set/getMusicVolume() / set/getSoundVolume() / setMuted() / isMuted()                      | Resource                    | ✅ 已完成 |
 | Scene           | framework/scene/          | setSceneLoader() / loadScene() / currentScene / isLoading                                                                                                                                                                                     | Event（@todo 事件广播）     | ✅ 已完成 |
+| HotUpdate       | framework/hotupdate/      | setAdapter() / setComparator() / setConfig() / checkForUpdate() / startUpdate() / applyUpdate() / getState() / getProgress() / getLocalVersion() / getRemoteVersion()                                                                        | Event, Logger               | ✅ 已完成 |
 | Timer           | framework/timer/          | addTimer() / removeTimer() / removeAllTimers() / removeTimersByTag() / pauseTimer() / resumeTimer() / pauseAllTimers() / resumeAllTimers() / pauseTimersByTag() / resumeTimersByTag() / getTimerInfo() / hasTimer() / timeScale / activeCount | 无                          | ✅ 已完成 |
 | gfc-timer-heap  | packages/gfc-timer-heap/  | HeapTimerManager（ITimerManager 实现），MinHeap 数据结构；绝对到期时间 expireTime，无触发帧 O(1)，触发 O(k log n）                                                                                                                            | @gfc/core（peerDep）        | ✅ 已完成 |
 | gfc-timer-wheel | packages/gfc-timer-wheel/ | WheelTimerManager（ITimerManager 实现）；slot 数组 + tick 前进 + 多圈 remainingRounds，添加/触发 O(1)                                                                                                                                         | @gfc/core（peerDep）        | ✅ 已完成 |
@@ -87,3 +89,4 @@ GameEntry（框架入口）
 | 2026-04-16 | DataTable 模块完成（DataTableDefs + DataTable\<T\> + DataTableManager），双存储模式（Map/Array）+ IDataTableParser 策略注入 + indexMap O(1) 查询，41 个测试全绿 | 大圆   |
 | 2026-04-20 | DebugPanel 模块完成（DebugDefs + DebugManager + ModuleDataSource + EventDataSource），DataSource 插件化采集 + 分层采集频率 + 容错隔离 + 快照缓存，69+ 测试全绿 | 大圆   |
 | 2026-04-17 | i18n 模块完成（I18nDefs + I18nManager），多语言资源加载 + 动态语言切换 + 占位符替换 + 事件广播，测试全绿                                                        | 大圆   |
+| 2026-04-20 | HotUpdate 模块完成（HotUpdateDefs + HotUpdateManager + IHotUpdateManager + SemverComparator），两阶段检查 + 差量下载 + MD5 校验 + 回退机制 + Push/Pull 混合通知，36 个测试全绿 | 大圆   |

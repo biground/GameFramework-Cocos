@@ -33,6 +33,7 @@
 | BenchmarkRunner（性能基准测试）            | ✅ 已完成 | 2026-04-14 | 82          | Week 4 Day 6；预热+计时+统计（avg/min/max/p95/p99/stddev/opsPerSec）+Markdown报告；3个基准测试 |
 | 性能优化（EventManager + ObjectPool）    | ✅ 已完成 | 2026-04-14 | -           | Week 4 Day 6；emit 消除快照拷贝（emitDepth+_removed）；release Set查重 O(1)                                                                     |
 | DebugPanel（调试面板）                      | ✅ 已完成 | 2026-04-20 | -           | Week 5 Day 1；DebugManager + ModuleDataSource + EventDataSource，DataSource 插件化采集 + 分层采集频率 + 容错隔离，69+ 测试 |
+| HotUpdateManager（热更新管理器）            | ✅ 已完成 | 2026-04-20 | -           | Week 5 Day 1（追加）；HotUpdateDefs + HotUpdateManager + SemverComparator，两阶段版本检查 + 差量下载 + MD5 校验 + 回退机制 + Push/Pull 混合通知，36 个测试 |
 | CI/CD Pipeline（持续集成流水线）            | ✅ 已完成 | 2026-04-16 | -           | Week 4 Day 8；Jenkins vs GitLab CI 原理教学 + .gitlab-ci.yml 配置（install→lint+test并行→quality_gate门禁）                                                               |
 | 综合 Demo 项目                              | ⬜ 未开始 | -          | -           | Week 7                                                                                                                                                                    |
 | 面试冲刺                                    | ⬜ 未开始 | -          | -           | Week 8                                                                                                                                                                    |
@@ -91,6 +92,7 @@
 - [x] ✅ 最小堆定时器：数组二叉堆、siftUp/siftDown、heapIndex O(1) 定位、绝对到期时间 expireTime、pause 分离列表重算 expireTime
 - [x] ✅ 时间轮定时器：slot 数组 + tick 前进 + 整数 tick 计数避免浮点漂移 + 多圈 remainingRounds + epsilon 修正 ceil 精度 + advance-first-then-process
 - [x] ✅ DataTable 数据表模式：泛型容器 DataTable\<T extends IDataRow\>、双存储模式（Map 随机查询 / Array 顺序遍历）、indexMap 空间换时间 O(1)、IDataTableParser 策略注入
+- [x] ✅ HotUpdate 热更新模式：两阶段版本检查（轻量版本号 + 完整清单）、MD5 差量计算、IHotUpdateAdapter 策略注入、SemverComparator 可替换、失败重试 + 回退机制、Push 事件 + Pull getter 混合通知
 
 ## 面试题积累
 
@@ -98,8 +100,8 @@
 
 ## 上次会话断点
 
-- 最后操作：Week 5 Day 1 — DebugPanel 模块完成（DebugManager + DataSource 插件化采集 + 69+ 测试全绿）
-- 下次继续：Phase 3 继续 — 热更新 / Entity 模块完善 / 综合 Demo
+- 最后操作：Week 5 Day 1 — DebugPanel 模块 + HotUpdate 模块完成
+- 下次继续：Phase 3 继续 — Entity 模块完善 / 综合 Demo
 - 未完成事项：无
-- 额外成就：无
+- 额外成就：HotUpdate 模块当日追加完成（两阶段检查 + 差量下载 + 回退机制 + 36 测试）
 - 更新日期：2026-04-20
