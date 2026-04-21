@@ -148,11 +148,15 @@ export class IdleClickerDemo extends DemoBase {
         // 1. 初始化框架和游戏系统
         this.bootstrap();
 
-        // 2. 启动流程链（此时数据表已注册）
+        // 2. 预加载配置到游戏系统（Procedure 链通过 setTimeout 延迟执行，
+        //    需要在 _setupUI() 之前确保配置已注入 BuildingSystem）
+        this._preloadGameConfigs();
+
+        // 3. 启动流程链（此时数据表已注册）
         const procMgr = this.getModule<ProcedureManager>('ProcedureManager');
         procMgr.startProcedure(LaunchProcedure);
 
-        // 3. 创建 UI 面板
+        // 4. 创建 UI 面板
         this._setupUI();
 
         // 4. 注册事件日志监听
@@ -166,6 +170,26 @@ export class IdleClickerDemo extends DemoBase {
 
         this.htmlRenderer.log('🎮 Idle Clicker Demo 已启动！', LOG_COLORS.SUCCESS);
         Logger.info(TAG, 'Idle Clicker Demo 启动完成');
+    }
+
+    /**
+     * 预加载配置到游戏系统
+     *
+     * Procedure 链通过 setTimeout 延迟执行状态切换，
+     * 导致 PreloadProcedure 在 _setupUI() 之后才运行。
+     * 此方法在 UI 创建前直接从 DataTableManager 加载配置，确保按钮可渲染。
+     */
+    private _preloadGameConfigs(): void {
+        const dtMgr = this.getModule<DataTableManager>('DataTableManager');
+
+        const buildingConfigs = dtMgr.getAllRows<BuildingConfigRow>('building_config');
+        const upgradeCurves = dtMgr.getAllRows<UpgradeCurveRow>('upgrade_curve');
+        const achievementConfigs = dtMgr.getAllRows<AchievementConfigRow>('achievement_config');
+
+        this._buildingSystem.loadConfigs([...buildingConfigs], [...upgradeCurves]);
+        this._achievementSystem.loadConfigs([...achievementConfigs]);
+
+        Logger.info(TAG, `预加载配置完成: ${buildingConfigs.length} 建筑, ${upgradeCurves.length} 升级曲线, ${achievementConfigs.length} 成就`);
     }
 
     /**
