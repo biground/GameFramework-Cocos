@@ -182,6 +182,7 @@ describe('IdleProcedures — 流程测试', () => {
             const mockFsm = createMockFsm(env.ctx);
 
             proc.onEnter(mockFsm);
+            jest.runAllTimers();
 
             expect(mockFsm.changeState).toHaveBeenCalledTimes(1);
             expect(mockFsm.changeState).toHaveBeenCalledWith(PreloadProcedure);
@@ -198,6 +199,7 @@ describe('IdleProcedures — 流程测试', () => {
             const loadAchSpy = jest.spyOn(env.achievementSystem, 'loadConfigs');
 
             proc.onEnter(mockFsm);
+            jest.runAllTimers();
 
             expect(loadConfigsSpy).toHaveBeenCalledTimes(1);
             expect(loadAchSpy).toHaveBeenCalledTimes(1);
@@ -228,6 +230,7 @@ describe('IdleProcedures — 流程测试', () => {
             const mockFsm = createMockFsm(env.ctx);
 
             proc.onEnter(mockFsm);
+            jest.runAllTimers();
 
             expect(mockFsm.changeState).toHaveBeenCalledWith(MainProcedure);
         });
@@ -252,6 +255,7 @@ describe('IdleProcedures — 流程测试', () => {
             const proc = new OfflineSettleProcedure();
             const mockFsm = createMockFsm(env.ctx);
             proc.onEnter(mockFsm);
+            jest.runAllTimers();
 
             // 验证离线收益被计算
             expect(rewardSpy).toHaveBeenCalledTimes(1);

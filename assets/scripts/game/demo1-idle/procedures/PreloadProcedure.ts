@@ -56,6 +56,7 @@ export class PreloadProcedure extends ProcedureBase {
         ctx.achievementSystem.loadConfigs([...achievementConfigs]);
 
         Logger.info(TAG, '配置表加载完成，切换到离线结算流程');
-        this.changeProcedure(fsm, OfflineSettleProcedure);
+        // 延迟到下一个宏任务，避免 FSM 递归切换
+        setTimeout(() => this.changeProcedure(fsm, OfflineSettleProcedure), 0);
     }
 }

@@ -83,6 +83,7 @@ export class OfflineSettleProcedure extends ProcedureBase {
         }
 
         Logger.info(TAG, '离线结算完成，切换到主流程');
-        this.changeProcedure(fsm, MainProcedure);
+        // 延迟到下一个宏任务，避免 FSM 递归切换
+        setTimeout(() => this.changeProcedure(fsm, MainProcedure), 0);
     }
 }
