@@ -1,231 +1,307 @@
 /**
- * Demo 0 基础设施集成测试
- * 验证所有 Mock 对象的基本功能和接口兼容性
- *
- * @description
- * 测试 Demo 0 所需的所有基础设施组件，确保 Mock 对象
- * 正确实现了各自的接口，并能在 Demo 环境中正常工作。
+ * @jest-environment jsdom
  */
 
-import { MockVersionComparator } from '@game/shared/MockVersionComparator';
-import { VersionCompareResult } from '@framework/hotupdate/HotUpdateDefs';
+/**
+ * Demo 0 基础设施集成测试
+ *
+ * 验证 DemoBase 的完整生命周期：
+ * - 15 个框架模块的 bootstrap 注册
+ * - 主循环驱动
+ * - Mock 策略注入
+ * - HtmlRenderer DOM 集成
+ * - shutdown 清理
+ */
 
-describe('Demo 0 Infrastructure Integration Tests', () => {
-    /**
-     * 测试 MockResourceLoader 基本功能
-     */
-    describe('MockResourceLoader', () => {
-        it('should implement IResourceLoader interface', () => {
-            // TODO: 实现接口兼容性测试
+import { DemoBase } from '@game/shared/DemoBase';
+import { GameModule } from '@framework/core/GameModule';
+import { EventManager } from '@framework/event/EventManager';
+import { TimerManager } from '@framework/timer/TimerManager';
+import { FsmManager } from '@framework/fsm/FsmManager';
+import { ProcedureManager } from '@framework/procedure/ProcedureManager';
+import { ResourceManager } from '@framework/resource/ResourceManager';
+import { AudioManager } from '@framework/audio/AudioManager';
+import { SceneManager } from '@framework/scene/SceneManager';
+import { UIManager } from '@framework/ui/UIManager';
+import { EntityManager } from '@framework/entity/EntityManager';
+import { NetworkManager } from '@framework/network/NetworkManager';
+import { DataTableManager } from '@framework/datatable/DataTableManager';
+import { LocalizationManager } from '@framework/i18n/LocalizationManager';
+import { HotUpdateManager } from '@framework/hotupdate/HotUpdateManager';
+import { DebugManager } from '@framework/debug/DebugManager';
+
+// Mock Logger — 同时满足静态方法和 new 实例化（bootstrap 中 new Logger()）
+jest.mock('@framework/debug/Logger', () => {
+    // eslint-disable-next-line @typescript-eslint/no-extraneous-class
+    class MockLogger {
+        moduleName = 'Logger';
+        priority = 0;
+        onInit = jest.fn();
+        onUpdate = jest.fn();
+        onShutdown = jest.fn();
+
+        static debug = jest.fn();
+        static info = jest.fn();
+        static warn = jest.fn();
+        static error = jest.fn();
+    }
+    return { Logger: MockLogger };
+});
+
+/** 测试用 DemoBase 子类 */
+class TestDemo extends DemoBase {
+    setupProceduresCalled = false;
+    setupDataTablesCalled = false;
+
+    constructor() {
+        super('集成测试 Demo');
+    }
+
+    setupProcedures(): void {
+        this.setupProceduresCalled = true;
+    }
+
+    setupDataTables(): void {
+        this.setupDataTablesCalled = true;
+    }
+
+    /** 暴露 htmlRenderer 给测试用 */
+    getRenderer() {
+        return this.htmlRenderer;
+    }
+}
+
+/**
+ * DemoBase bootstrap 注册的全部 15 个模块名称
+ */
+const ALL_MODULE_NAMES = [
+    'Logger',
+    'EventManager',
+    'TimerManager',
+    'ResourceManager',
+    'NetworkManager',
+    'FsmManager',
+    'HotUpdateManager',
+    'EntityManager',
+    'UIManager',
+    'AudioManager',
+    'SceneManager',
+    'ProcedureManager',
+    'DataTableManager',
+    'LocalizationManager',
+    'DebugManager',
+];
+
+describe('Demo 0 基础设施集成测试', () => {
+    let demo: TestDemo;
+
+    beforeEach(() => {
+        GameModule.shutdownAll();
+        demo = new TestDemo();
+    });
+
+    afterEach(() => {
+        demo.shutdown();
+        document.body.innerHTML = '';
+    });
+
+    // ─── 场景 1：全部模块初始化 ────────────────────────
+
+    describe('全部模块初始化', () => {
+        it('bootstrap 后全部 15 个模块均可通过 hasModule 检测到', () => {
+            demo.bootstrap();
+
+            for (const name of ALL_MODULE_NAMES) {
+                expect(GameModule.hasModule(name)).toBe(true);
+            }
         });
 
-        it('should load registered mock assets', () => {
-            // TODO: 实现资源加载测试
+        it('各模块类型正确', () => {
+            demo.bootstrap();
+
+            expect(GameModule.getModule('EventManager')).toBeInstanceOf(EventManager);
+            expect(GameModule.getModule('TimerManager')).toBeInstanceOf(TimerManager);
+            expect(GameModule.getModule('FsmManager')).toBeInstanceOf(FsmManager);
+            expect(GameModule.getModule('ProcedureManager')).toBeInstanceOf(ProcedureManager);
+            expect(GameModule.getModule('ResourceManager')).toBeInstanceOf(ResourceManager);
+            expect(GameModule.getModule('AudioManager')).toBeInstanceOf(AudioManager);
+            expect(GameModule.getModule('SceneManager')).toBeInstanceOf(SceneManager);
+            expect(GameModule.getModule('UIManager')).toBeInstanceOf(UIManager);
+            expect(GameModule.getModule('EntityManager')).toBeInstanceOf(EntityManager);
+            expect(GameModule.getModule('NetworkManager')).toBeInstanceOf(NetworkManager);
+            expect(GameModule.getModule('DataTableManager')).toBeInstanceOf(DataTableManager);
+            expect(GameModule.getModule('LocalizationManager')).toBeInstanceOf(LocalizationManager);
+            expect(GameModule.getModule('HotUpdateManager')).toBeInstanceOf(HotUpdateManager);
+            expect(GameModule.getModule('DebugManager')).toBeInstanceOf(DebugManager);
         });
 
-        it('should fail loading unregistered assets', () => {
-            // TODO: 实现加载失败测试
-        });
-
-        it('should release assets correctly', () => {
-            // TODO: 实现资源释放测试
+        it('子类扩展点 setupProcedures 和 setupDataTables 被调用', () => {
+            demo.bootstrap();
+            expect(demo.setupProceduresCalled).toBe(true);
+            expect(demo.setupDataTablesCalled).toBe(true);
         });
     });
 
-    /**
-     * 测试 MockAudioPlayer 基本功能
-     */
-    describe('MockAudioPlayer', () => {
-        it('should implement IAudioPlayer interface', () => {
-            // TODO: 实现接口兼容性测试
-        });
+    // ─── 场景 2：主循环模拟 ────────────────────────────
 
-        it('should play audio and return instance', () => {
-            // TODO: 实现播放测试
-        });
-
-        it('should stop all playing audio', () => {
-            // TODO: 实现停止测试
-        });
-    });
-
-    /**
-     * 测试 MockSceneLoader 基本功能
-     */
-    describe('MockSceneLoader', () => {
-        it('should implement ISceneLoader interface', () => {
-            // TODO: 实现接口兼容性测试
-        });
-
-        it('should load registered scenes', () => {
-            // TODO: 实现场景加载测试
-        });
-
-        it('should fail loading unregistered scenes', () => {
-            // TODO: 实现加载失败测试
-        });
-    });
-
-    /**
-     * 测试 MockNetworkSocket 基本功能
-     */
-    describe('MockNetworkSocket', () => {
-        it('should implement INetworkSocket interface', () => {
-            // TODO: 实现接口兼容性测试
-        });
-
-        it('should connect and trigger onOpen callback', () => {
-            // TODO: 实现连接测试
-        });
-
-        it('should send data when connected', () => {
-            // TODO: 实现发送测试
-        });
-
-        it('should close and trigger onClose callback', () => {
-            // TODO: 实现关闭测试
-        });
-    });
-
-    /**
-     * 测试 MockDataTableParser 基本功能
-     */
-    describe('MockDataTableParser', () => {
-        it('should implement IDataTableParser interface', () => {
-            // TODO: 实现接口兼容性测试
-        });
-
-        it('should parse CSV data correctly', () => {
-            // TODO: 实现 CSV 解析测试
-        });
-
-        it('should parse JSON array data', () => {
-            // TODO: 实现 JSON 解析测试
-        });
-    });
-
-    /**
-     * 测试 MockHotUpdateAdapter 基本功能
-     */
-    describe('MockHotUpdateAdapter', () => {
-        it('should implement IHotUpdateAdapter interface', () => {
-            // TODO: 实现接口兼容性测试
-        });
-
-        it('should get local manifest', () => {
-            // TODO: 实现 manifest 获取测试
-        });
-
-        it('should fetch remote version', () => {
-            // TODO: 实现版本下载测试
-        });
-    });
-
-    /**
-     * 测试 MockVersionComparator 基本功能
-     */
-    describe('MockVersionComparator', () => {
-        let comparator: MockVersionComparator;
-
+    describe('主循环模拟', () => {
         beforeEach(() => {
-            comparator = new MockVersionComparator();
+            jest.useFakeTimers();
         });
 
-        it('should implement IVersionComparator interface', () => {
-            expect(typeof comparator.compare).toBe('function');
+        afterEach(() => {
+            jest.useRealTimers();
         });
 
-        it('should compare versions correctly - remote newer', () => {
-            expect(comparator.compare('1.0.0', '1.1.0')).toBe(VersionCompareResult.Newer);
-            expect(comparator.compare('1.0.0', '2.0.0')).toBe(VersionCompareResult.Newer);
-            expect(comparator.compare('1.0.0', '1.0.1')).toBe(VersionCompareResult.Newer);
+        it('startMainLoop 后 GameModule.update 被周期性驱动', () => {
+            demo.bootstrap();
+            const updateSpy = jest.spyOn(GameModule, 'update');
+
+            demo.startMainLoop(10); // 10fps → 100ms 间隔
+            jest.advanceTimersByTime(500); // 500ms → 至少 4 次调用
+
+            expect(updateSpy).toHaveBeenCalled();
+            expect(updateSpy.mock.calls.length).toBeGreaterThanOrEqual(4);
+
+            // 每次调用的 deltaTime 参数均 >= 0
+            for (const call of updateSpy.mock.calls) {
+                expect(call[0]).toBeGreaterThanOrEqual(0);
+            }
+
+            updateSpy.mockRestore();
         });
 
-        it('should compare versions correctly - local newer', () => {
-            expect(comparator.compare('1.1.0', '1.0.0')).toBe(VersionCompareResult.Older);
-            expect(comparator.compare('2.0.0', '1.0.0')).toBe(VersionCompareResult.Older);
-            expect(comparator.compare('1.0.1', '1.0.0')).toBe(VersionCompareResult.Older);
-        });
+        it('stopMainLoop 后不再驱动 update', () => {
+            demo.bootstrap();
+            const updateSpy = jest.spyOn(GameModule, 'update');
 
-        it('should handle equal versions', () => {
-            expect(comparator.compare('1.0.0', '1.0.0')).toBe(VersionCompareResult.Same);
-            expect(comparator.compare('2.3.4', '2.3.4')).toBe(VersionCompareResult.Same);
-        });
+            demo.startMainLoop(10);
+            jest.advanceTimersByTime(200);
+            const countBefore = updateSpy.mock.calls.length;
 
-        it('should handle versions with different segment counts', () => {
-            expect(comparator.compare('1.0', '1.0.1')).toBe(VersionCompareResult.Newer);
-            expect(comparator.compare('1.0.1', '1.0')).toBe(VersionCompareResult.Older);
-            expect(comparator.compare('1.0', '1.0')).toBe(VersionCompareResult.Same);
-        });
+            demo.stopMainLoop();
+            jest.advanceTimersByTime(500);
+            const countAfter = updateSpy.mock.calls.length;
 
-        it('should support forced result override', () => {
-            comparator.setForcedResult(VersionCompareResult.Newer);
-            expect(comparator.compare('2.0.0', '1.0.0')).toBe(VersionCompareResult.Newer);
+            expect(countAfter).toBe(countBefore);
+            expect(demo.isRunning).toBe(false);
 
-            comparator.setForcedResult(VersionCompareResult.Older);
-            expect(comparator.compare('1.0.0', '2.0.0')).toBe(VersionCompareResult.Older);
-
-            comparator.setForcedResult(null);
-            expect(comparator.compare('1.0.0', '2.0.0')).toBe(VersionCompareResult.Newer);
-        });
-
-        it('should support version map override', () => {
-            const versionMap = new Map<string, VersionCompareResult>();
-            versionMap.set('1.0.0|2.0.0', VersionCompareResult.Same);
-            comparator.setVersionMap(versionMap);
-
-            expect(comparator.compare('1.0.0', '2.0.0')).toBe(VersionCompareResult.Same);
-            expect(comparator.compare('1.0.0', '1.5.0')).toBe(VersionCompareResult.Newer);
-        });
-
-        it('should track compare calls', () => {
-            comparator.compare('1.0.0', '1.1.0');
-            comparator.compare('2.0.0', '1.0.0');
-
-            expect(comparator.compareCalls.length).toBe(2);
-            expect(comparator.compareCalls[0]).toEqual({
-                local: '1.0.0',
-                remote: '1.1.0',
-                result: VersionCompareResult.Newer,
-            });
-            expect(comparator.compareCalls[1]).toEqual({
-                local: '2.0.0',
-                remote: '1.0.0',
-                result: VersionCompareResult.Older,
-            });
-        });
-
-        it('should throw error when configured', () => {
-            const testError = new Error('Test compare error');
-            comparator.setErrorOnCompare(testError);
-
-            expect(() => comparator.compare('1.0.0', '2.0.0')).toThrow('Test compare error');
-
-            // 错误只抛出一次
-            expect(() => comparator.compare('1.0.0', '2.0.0')).not.toThrow();
-        });
-
-        it('should reset all state', () => {
-            comparator.setForcedResult(VersionCompareResult.Newer);
-            comparator.compare('1.0.0', '2.0.0');
-
-            comparator.reset();
-
-            expect(comparator.compareCalls.length).toBe(0);
-            expect(comparator.compare('1.0.0', '2.0.0')).toBe(VersionCompareResult.Newer);
+            updateSpy.mockRestore();
         });
     });
 
-    /**
-     * 测试 MockLocalizationLoader 基本功能
-     */
-    describe('MockLocalizationLoader', () => {
-        it('should load registered language data', () => {
-            // TODO: 实现语言加载测试
+    // ─── 场景 3：Mock 策略注入验证 ─────────────────────
+
+    describe('Mock 策略注入验证', () => {
+        beforeEach(() => {
+            demo.bootstrap();
         });
 
-        it('should return supported languages', () => {
-            // TODO: 实现语言列表测试
+        it('ResourceManager 使用 MockResourceLoader（loadAsset 不抛"未设置"异常）', () => {
+            const resMgr = GameModule.getModule<ResourceManager>('ResourceManager');
+
+            // loadAsset 不抛异常 → 说明 loader 已注入
+            expect(() => {
+                resMgr.loadAsset('test/asset.png', 'test-owner', {
+                    onSuccess: () => {
+                        /* noop */
+                    },
+                });
+            }).not.toThrow();
+        });
+
+        it('AudioManager 使用 MockAudioPlayer（playMusic/playSound 不抛异常）', () => {
+            const audioMgr = GameModule.getModule<AudioManager>('AudioManager');
+
+            // playMusic 不抛"未设置 audioPlayer"异常 → MockAudioPlayer 已注入
+            expect(() => {
+                audioMgr.playMusic('bgm_test');
+            }).not.toThrow();
+
+            expect(() => {
+                audioMgr.playSound('sfx_click');
+            }).not.toThrow();
+        });
+
+        it('DataTableManager 使用 MockDataTableParser（createTableFromRawData 可解析数据）', () => {
+            const dtMgr = GameModule.getModule<DataTableManager>('DataTableManager');
+
+            const testData = JSON.stringify([
+                { id: 1, name: '测试1' },
+                { id: 2, name: '测试2' },
+            ]);
+
+            // createTableFromRawData 不抛"未设置 Parser"异常 → MockDataTableParser 已注入
+            expect(() => {
+                dtMgr.createTableFromRawData('TestTable', testData);
+            }).not.toThrow();
+
+            expect(dtMgr.hasTable('TestTable')).toBe(true);
+        });
+    });
+
+    // ─── 场景 4：HtmlRenderer 集成 ────────────────────
+
+    describe('HtmlRenderer 集成', () => {
+        it('bootstrap 后 DOM 中存在 HtmlRenderer 创建的元素', () => {
+            demo.bootstrap();
+
+            // HtmlRenderer 构造时在 document.body 中插入了根容器
+            const allElements = document.body.querySelectorAll('div');
+            expect(allElements.length).toBeGreaterThan(0);
+
+            // 标题文本应包含构造时传入的 title
+            expect(document.body.innerHTML).toContain('集成测试 Demo');
+        });
+
+        it('HtmlRenderer 日志方法可正常调用并写入 DOM', () => {
+            demo.bootstrap();
+            const renderer = demo.getRenderer();
+
+            expect(() => {
+                renderer.log('测试日志消息', '#4CAF50');
+            }).not.toThrow();
+
+            expect(document.body.innerHTML).toContain('测试日志消息');
+        });
+    });
+
+    // ─── 场景 5：shutdown 清理 ─────────────────────────
+
+    describe('shutdown 清理', () => {
+        it('shutdown 后主循环停止', () => {
+            jest.useFakeTimers();
+            demo.bootstrap();
+            demo.startMainLoop(10);
+            expect(demo.isRunning).toBe(true);
+
+            demo.shutdown();
+            expect(demo.isRunning).toBe(false);
+
+            jest.useRealTimers();
+        });
+
+        it('shutdown 后所有模块被清理', () => {
+            demo.bootstrap();
+
+            for (const name of ALL_MODULE_NAMES) {
+                expect(GameModule.hasModule(name)).toBe(true);
+            }
+
+            demo.shutdown();
+
+            for (const name of ALL_MODULE_NAMES) {
+                expect(GameModule.hasModule(name)).toBe(false);
+            }
+        });
+
+        it('shutdown 后 getModule 抛出异常', () => {
+            demo.bootstrap();
+            demo.shutdown();
+
+            expect(() => {
+                GameModule.getModule('EventManager');
+            }).toThrow();
         });
     });
 });
