@@ -14,6 +14,7 @@
  */
 
 import { DemoBase } from '@game/shared/DemoBase';
+import { HtmlRenderer } from '@game/shared/HtmlRenderer';
 import { GameModule } from '@framework/core/GameModule';
 import { EventManager } from '@framework/event/EventManager';
 import { TimerManager } from '@framework/timer/TimerManager';
@@ -66,7 +67,7 @@ class TestDemo extends DemoBase {
     }
 
     /** 暴露 htmlRenderer 给测试用 */
-    getRenderer() {
+    getRenderer(): HtmlRenderer {
         return this.htmlRenderer;
     }
 }

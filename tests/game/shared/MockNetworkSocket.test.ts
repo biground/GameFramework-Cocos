@@ -42,7 +42,8 @@ describe('MockNetworkSocket', () => {
             const data = new ArrayBuffer(4);
             socket.send(data);
             expect(onError).toHaveBeenCalledTimes(1);
-            expect(onError.mock.calls[0][0]).toBeInstanceOf(Error);
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            expect((onError.mock.calls as unknown[][])[0][0]).toBeInstanceOf(Error);
         });
 
         it('记录到 sendHistory', () => {
