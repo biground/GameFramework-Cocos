@@ -1,60 +1,93 @@
-import {
-    IResourceLoader,
-    LoadAssetCallbacks,
-} from '@framework/resource/ResourceDefs';
+import { IResourceLoader, LoadAssetCallbacks } from '@framework/resource/ResourceDefs';
+import { Logger } from '@framework/debug/Logger';
 
 /**
  * 模拟资源加载器
  * 用于 Demo 和测试环境的资源加载模拟
- * 
- * @description
- * 实现 IResourceLoader 接口，在不依赖 CocosCreator 引擎的情况下
- * 模拟资源加载行为，用于单元测试和 Demo 演示。
  */
 export class MockResourceLoader implements IResourceLoader {
     private static readonly TAG = 'MockResourceLoader';
+    private _registeredAssets: Map<string, unknown> = new Map();
+    readonly loadRequests: Map<string, LoadAssetCallbacks> = new Map();
+    readonly releaseRequests: string[] = [];
+    private _autoSuccess: boolean = false;
+    private _loadDelay: number = 0;
 
-    /** 模拟资源存储 */
-    private _mockAssets: Map<string, unknown> = new Map();
-
-    /** 模拟加载延迟（毫秒） */
-    private _mockDelay: number = 0;
-
-    // Constructor
-    constructor(mockDelay: number = 0) {
-        this._mockDelay = mockDelay;
-    }
-
-    /**
-     * 执行资源加载（模拟）
-     * @param path 资源路径
-     * @param callbacks 加载回调
-     */
     public loadAsset(path: string, callbacks: LoadAssetCallbacks): void {
-        // TODO: 实现模拟加载逻辑
-        const asset = this._mockAssets.get(path);
-        if (asset !== undefined) {
-            callbacks.onSuccess?.(path, asset);
-        } else {
-            callbacks.onFailure?.(path, new Error(`[MockResourceLoader] 资源不存在: ${path}`));
+        Logger.debug(MockResourceLoader.TAG, `loadAsset: ${path}`);
+        if (this._autoSuccess) {
+            const asset = this._registeredAssets.get(path) ?? { type: 'mock', path };
+            this._scheduleCallback(() => {
+                callbacks.onSuccess?.(path, asset);
+            });
+            return;
         }
+        this.loadRequests.set(path, callbacks);
     }
 
-    /**
-     * 执行资源释放（模拟）
-     * @param path 资源路径
-     */
     public releaseAsset(path: string): void {
-        // TODO: 实现模拟释放逻辑
-        this._mockAssets.delete(path);
+        Logger.debug(MockResourceLoader.TAG, `releaseAsset: ${path}`);
+        this.releaseRequests.push(path);
+        this._registeredAssets.delete(path);
     }
 
-    /**
-     * 注册模拟资源（仅用于测试）
-     * @param path 资源路径
-     * @param asset 资源对象
-     */
-    public registerMockAsset(path: string, asset: unknown): void {
-        this._mockAssets.set(path, asset);
+    public registerAsset(path: string, asset: unknown): void {
+        this._registeredAssets.set(path, asset);
+        Logger.debug(MockResourceLoader.TAG, `registerAsset: ${path}`);
+    }
+
+    public resolve(path: string, asset?: unknown): void {
+        const callbacks = this.loadRequests.get(path);
+        if (!callbacks) {
+            Logger.warn(MockResourceLoader.TAG, `resolve: 未找到待处理请求 ${path}`);
+            return;
+        }
+        const resolvedAsset = asset ?? this._registeredAssets.get(path) ?? { type: 'mock', path };
+        this.loadRequests.delete(path);
+        this._scheduleCallback(() => {
+            Logger.debug(MockResourceLoader.TAG, `resolve: ${path}`);
+            callbacks.onSuccess?.(path, resolvedAsset);
+        });
+    }
+
+    public reject(path: string, error?: Error): void {
+        const callbacks = this.loadRequests.get(path);
+        if (!callbacks) {
+            Logger.warn(MockResourceLoader.TAG, `reject: 未找到待处理请求 ${path}`);
+            return;
+        }
+        const resolvedError = error ?? new Error(`[MockResourceLoader] load failed: ${path}`);
+        this.loadRequests.delete(path);
+        this._scheduleCallback(() => {
+            Logger.debug(MockResourceLoader.TAG, `reject: ${path}`);
+            callbacks.onFailure?.(path, resolvedError);
+        });
+    }
+
+    public progress(path: string, value: number): void {
+        const callbacks = this.loadRequests.get(path);
+        if (!callbacks) {
+            Logger.warn(MockResourceLoader.TAG, `progress: 未找到待处理请求 ${path}`);
+            return;
+        }
+        callbacks.onProgress?.(path, value);
+    }
+
+    public setAutoSuccess(enabled: boolean): void {
+        this._autoSuccess = enabled;
+        Logger.debug(MockResourceLoader.TAG, `setAutoSuccess: ${enabled}`);
+    }
+
+    public setLoadDelay(ms: number): void {
+        this._loadDelay = ms;
+        Logger.debug(MockResourceLoader.TAG, `setLoadDelay: ${ms}ms`);
+    }
+
+    private _scheduleCallback(callback: () => void): void {
+        if (this._loadDelay > 0) {
+            setTimeout(callback, this._loadDelay);
+        } else {
+            callback();
+        }
     }
 }
