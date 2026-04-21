@@ -1,0 +1,787 @@
+plan_id: demo0-infrastructure
+objective: 实现 Demo 0（共享基础设施层），为 6 个游戏 Demo 提供 Mock 策略实现、HtmlRenderer 渲染器和 DemoBase 基类
+created_at: '2026-04-21T00:00:00+08:00'
+created_by: gem-planner
+status: pending_approval
+research_confidence: high
+
+plan_metrics:
+  wave_1_task_count: 5
+  total_dependencies: 28
+  risk_score: low
+
+tldr: |
+  Demo 0 是所有 6 个游戏 Demo 的共享依赖层。
+  
+  核心交付物：
+  - 11 个 Mock 策略实现（ResourceLoader, AudioPlayer, SceneLoader, NetworkSocket, UIFormFactory, EntityFactory, DataTableParser, HotUpdateAdapter, VersionComparator, LocalizationLoader）
+  - HtmlRenderer：彩色日志 + 按钮 + 状态面板 + 表格的纯 HTML 渲染器
+  - DemoBase：所有 Demo 的抽象基类，提供 bootstrap() 统一注册 17 个模块
+  - 集成测试：验证 GameEntry + 全部 Mock 策略的端到端初始化
+  - README 文档
+  
+  设计要点：
+  - Mock 类必须可控（手动 resolve/reject），而非仅自动成功
+  - MockNetworkSocket 需模拟延迟(50-200ms)、丢包、断线/重连
+  - HtmlRenderer 按设计文档的颜色规范输出日志
+  - 所有代码 TypeScript strict mode，无 any，无 console.*，中文 JSDoc
+open_questions:
+  - HtmlRenderer 是否需要支持 Markdown 子集（粗体/斜体/链接）？当前设计仅支持纯文本 + 颜色
+  - MockEntityFactory 创建的 MockEntity 是否需要支持 FSM 绑定？当前设计暂不包含
+  - DemoBase.bootstrap() 是否应该支持可选模块（如 HotUpdateManager 在某些 Demo 中不需要）？
+
+pre_mortem:
+  overall_risk_level: low
+  critical_failure_modes:
+    - scenario: MockNetworkSocket 的延迟模拟使用 setTimeout 导致测试不可控
+      likelihood: medium
+      impact: high
+      mitigation: 延迟模拟采用可注入的时钟接口，测试中可替换为同步执行
+    - scenario: HtmlRenderer 在 Node.js 环境下测试时缺少 DOM API
+      likelihood: high
+      impact: medium
+      mitigation: 使用 jsdom 或 mock DOM 环境，测试文件顶部配置 @jest-environment jsdom
+    - scenario: DemoBase.bootstrap() 注册 17 个模块时 priority 冲突导致初始化顺序错误
+      likelihood: low
+      impact: critical
+      mitigation: 严格遵循 module-registry.md 的 priority 分配规范，集成测试验证初始化顺序
+    - scenario: Mock 策略与框架模块接口不完全匹配导致类型错误
+      likelihood: medium
+      impact: medium
+      mitigation: TDD 先行，测试中严格检查接口实现（implements 关键字 + 类型断言）
+  assumptions:
+    - 所有框架模块接口已稳定，不会在 Demo 开发期间大幅变更
+    - Jest 测试环境已配置 jsdom 支持
+    - GameEntry 的 registerModule 和 getModule API 保持不变
+    - Logger 模块已可用且 API 稳定
+
+implementation_specification:
+  code_structure: |
+    assets/scripts/game/shared/
+    ├── DemoBase.ts                  # 抽象基类
+    ├── HtmlRenderer.ts              # HTML 渲染器
+    ├── MockResourceLoader.ts        # 资源加载 Mock
+    ├── MockAudioPlayer.ts           # 音频播放 Mock
+    ├── MockSceneLoader.ts           # 场景加载 Mock
+    ├── MockNetworkSocket.ts         # 网络 Socket Mock
+    ├── MockUIFormFactory.ts         # UI 工厂 Mock
+    ├── MockEntityFactory.ts         # 实体工厂 Mock
+    ├── MockDataTableParser.ts       # 数据表解析 Mock
+    ├── MockHotUpdateAdapter.ts      # 热更新适配器 Mock
+    ├── MockVersionComparator.ts     # 版本比较 Mock
+    ├── MockLocalizationLoader.ts    # 本地化加载 Mock
+    └── README.md                    # 模块文档
+    
+    tests/integration/
+    └── demo0-infrastructure.test.ts # 集成测试
+  affected_areas:
+    - assets/scripts/game/shared/ (新建目录)
+    - tests/integration/ (新建目录)
+    - assets/scripts/framework/interfaces/ (读取接口定义)
+    - assets/scripts/framework/resource/ResourceDefs.ts (读取 IResourceLoader)
+    - assets/scripts/framework/audio/AudioDefs.ts (读取 IAudioPlayer)
+    - assets/scripts/framework/network/NetworkDefs.ts (读取 INetworkSocket)
+    - assets/scripts/framework/ui/UIDefs.ts (读取 IUIFormFactory)
+    - assets/scripts/framework/hotupdate/HotUpdateDefs.ts (读取 IHotUpdateAdapter, IVersionComparator)
+  component_details:
+    - component: DemoBase
+      responsibility: 所有 Demo 的抽象基类，提供统一的框架初始化流程
+      interfaces:
+        - "bootstrap(): Promise<void> — 注册 17 个模块并注入 Mock 策略"
+        - "setupProcedures(): void — 抽象方法，子类实现"
+        - "setupDataTables(): void — 抽象方法，子类实现"
+        - "startMainLoop(fps?: number): void — 启动 setInterval 主循环"
+        - "stopMainLoop(): void — 停止主循环"
+        - "getModule<T>(name: string): T — 类型安全获取模块"
+    - component: HtmlRenderer
+      responsibility: 纯 HTML 日志输出和交互控件渲染
+      interfaces:
+        - "log(message: string, color?: string): void"
+        - "separator(title?: string): void"
+        - "createButtonGroup(name: string): HTMLElement"
+        - "addButton(group, label, onClick, disabled?): HTMLButtonElement"
+        - "clearLog(): void"
+        - "createStatusPanel(id, title): StatusPanel"
+        - "updateStatus(panelId, key, value): void"
+        - "createTable(headers, rows): HTMLElement"
+    - component: MockResourceLoader
+      responsibility: 模拟资源加载/释放，支持手动控制和自动成功模式
+      interfaces:
+        - "registerAsset(path, asset): void"
+        - "loadAsset(path, callbacks): void"
+        - "releaseAsset(path): void"
+        - "resolve(path, asset?): void — 手动触发成功"
+        - "reject(path, error?): void — 手动触发失败"
+        - "progress(path, value): void — 手动触发进度"
+    - component: MockNetworkSocket
+      responsibility: 模拟 WebSocket 通信，含延迟、丢包、断线/重连
+      interfaces:
+        - "connect(url): void / send(data): void / close(): void"
+        - "registerAutoResponse(requestId, handler): void"
+        - "setPacketLossRate(rate): void — 0~1 丢包率"
+        - "simulateDisconnect(): void / simulateReconnect(): void"
+        - "onOpen / onClose / onMessage / onError 回调属性"
+    - component: MockAudioPlayer
+      responsibility: 模拟音频播放，记录播放历史
+      interfaces:
+        - "play(audioClip, config): IAudioInstance"
+        - "stopAll(): void"
+        - "createInstance(info): IAudioInstance"
+        - "destroyInstance(instance): void"
+        - "playHistory: readonly array — 只读历史记录"
+    - component: MockSceneLoader
+      responsibility: 模拟场景加载，记录场景切换历史
+      interfaces:
+        - "loadScene(name, callbacks): void"
+        - "unloadScene(name): void"
+        - "resolve(name): void / reject(name, error?): void"
+        - "progress(name, value): void"
+    - component: MockUIFormFactory
+      responsibility: 创建轻量级 Mock UI 表单实例
+      interfaces:
+        - "createForm(name, config, asset): UIFormBase"
+        - "destroyForm(form): void"
+        - "createdForms: readonly array"
+    - component: MockEntityFactory
+      responsibility: 创建 Mock 实体实例
+      interfaces:
+        - "createEntity(groupName): EntityBase"
+        - "destroyEntity(entity): void"
+        - "createdEntities: readonly array"
+    - component: MockDataTableParser
+      responsibility: 直接接收 JSON 数组，无需文件解析
+      interfaces:
+        - "parse<T>(rawData): T[]"
+    - component: MockHotUpdateAdapter
+      responsibility: 模拟热更新流程（版本检查、清单对比、下载）
+      interfaces:
+        - "getLocalManifest(): Manifest | null"
+        - "fetchRemoteVersion(): Promise<string>"
+        - "fetchRemoteManifest(): Promise<Manifest>"
+        - "downloadAsset(asset): Promise<void>"
+        - "verifyFile(asset): Promise<boolean>"
+        - "applyUpdate(): Promise<void>"
+        - "rollback(): Promise<void>"
+    - component: MockVersionComparator
+      responsibility: 可编程的版本比较结果
+      interfaces:
+        - "compare(local, remote): VersionCompareResult"
+        - "setNextResult(result): void — 预设下次比较结果"
+    - component: MockLocalizationLoader
+      responsibility: 内存中多语言数据加载
+      interfaces:
+        - "loadLanguage(lang): Promise<Record<string, string>>"
+        - "registerLanguage(lang, data): void"
+  dependencies:
+    - component: DemoBase
+      relationship: 依赖所有 Mock 策略，通过 setter 注入到框架模块
+    - component: HtmlRenderer
+      relationship: 独立组件，被 DemoBase 组合使用
+    - component: Mock 策略类
+      relationship: 独立实现，通过接口注入到对应框架模块
+  integration_points:
+    - DemoBase.bootstrap() 调用 GameEntry.registerModule() 注册 17 个模块
+    - DemoBase.bootstrap() 调用各模块的 setXxx() 方法注入 Mock 策略
+    - HtmlRenderer 通过 document.createElement 创建 DOM 元素
+    - Mock 策略通过框架模块的 setter 方法注入
+
+contracts:
+  - from_task: task-mock-resource-loader
+    to_task: task-integration-test
+    interface: "MockResourceLoader 类实现 IResourceLoader 接口，提供 resolve/reject/progress 手动控制方法"
+    format: "TypeScript class with registerAsset, loadAsset, releaseAsset, resolve, reject, progress methods"
+  - from_task: task-mock-network-socket
+    to_task: task-integration-test
+    interface: "MockNetworkSocket 类实现 INetworkSocket 接口，提供延迟模拟和丢包控制"
+    format: "TypeScript class with connect, send, close, callbacks, registerAutoResponse, setPacketLossRate, simulateDisconnect, simulateReconnect"
+  - from_task: task-mock-audio-player
+    to_task: task-integration-test
+    interface: "MockAudioPlayer 类实现 IAudioPlayer 接口，提供 playHistory 追踪"
+    format: "TypeScript class with play, stopAll, createInstance, destroyInstance, playHistory"
+  - from_task: task-mock-scene-loader
+    to_task: task-integration-test
+    interface: "MockSceneLoader 类实现 ISceneLoader 接口，提供场景加载历史追踪"
+    format: "TypeScript class with loadScene, unloadScene, resolve, reject, progress"
+  - from_task: task-mock-ui-factory
+    to_task: task-integration-test
+    interface: "MockUIFormFactory 类实现 IUIFormFactory 接口，创建 MockUIForm 实例"
+    format: "TypeScript class with createForm, destroyForm, createdForms"
+  - from_task: task-mock-entity-factory
+    to_task: task-integration-test
+    interface: "MockEntityFactory 类实现 IEntityFactory 接口，创建 MockEntity 实例"
+    format: "TypeScript class with createEntity, destroyEntity, createdEntities"
+  - from_task: task-mock-datatable-parser
+    to_task: task-integration-test
+    interface: "MockDataTableParser 类实现 IDataTableParser 接口，直接解析 JSON 数组"
+    format: "TypeScript class with parse<T> method"
+  - from_task: task-mock-hotupdate
+    to_task: task-integration-test
+    interface: "MockHotUpdateAdapter 和 MockVersionComparator 实现热更新策略接口"
+    format: "TypeScript classes implementing IHotUpdateAdapter and IVersionComparator"
+  - from_task: task-mock-localization-loader
+    to_task: task-integration-test
+    interface: "MockLocalizationLoader 提供内存中多语言数据加载"
+    format: "TypeScript class with loadLanguage, registerLanguage methods"
+  - from_task: task-html-renderer
+    to_task: task-demo-base
+    interface: "HtmlRenderer 类提供 log, separator, createButtonGroup, addButton, createStatusPanel, updateStatus, createTable 方法"
+    format: "TypeScript class with DOM manipulation methods"
+  - from_task: task-demo-base
+    to_task: task-integration-test
+    interface: "DemoBase 抽象类提供 bootstrap, startMainLoop, stopMainLoop, getModule 方法"
+    format: "TypeScript abstract class with concrete bootstrap implementation"
+
+tasks:
+  # ─── Wave 1: 独立 Mock 策略（无依赖，可并行） ───
+
+  - id: task-mock-resource-loader
+    title: 实现 MockResourceLoader
+    description: |
+      创建 MockResourceLoader 类，实现 IResourceLoader 接口。
+      
+      实现要点：
+      1. 使用 Map<string, unknown> 存储预设资源
+      2. 使用 Map<string, LoadAssetCallbacks> 存储待回调的加载请求
+      3. loadAsset 时检查预设资源：存在则立即回调 onSuccess，不存在则存储 callbacks 等待手动控制
+      4. releaseAsset 记录到 releaseRequests 数组
+      5. 提供 resolve(path, asset?) / reject(path, error?) / progress(path, value) 手动控制方法
+      6. 提供 registerAsset(path, asset) 预设资源方法
+      
+      参照 tests/resource/resource-manager.test.ts 中的 MockResourceLoader 模式。
+      
+      文件路径：assets/scripts/game/shared/MockResourceLoader.ts
+    wave: 1
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - AC-MOCK-001
+      - AC-MOCK-002
+    priority: high
+    status: pending
+    dependencies: []
+    context_files:
+      - path: assets/scripts/framework/resource/ResourceDefs.ts
+        description: IResourceLoader 接口定义和 LoadAssetCallbacks 类型
+      - path: tests/resource/resource-manager.test.ts
+        description: 现有 MockResourceLoader 参考实现
+
+  - id: task-mock-audio-player
+    title: 实现 MockAudioPlayer
+    description: |
+      创建 MockAudioPlayer 类，实现 IAudioPlayer 接口。
+      
+      实现要点：
+      1. play(audioClip, config) 创建 MockAudioInstance 并记录到 playHistory
+      2. MockAudioInstance 实现 IAudioInstance 接口（play/stop/pause/resume/setVolume/onComplete）
+      3. MockAudioInstance 内部用状态标记（_isPlaying, _isPaused）跟踪状态
+      4. stopAll() 停止所有活跃实例
+      5. playHistory 为 readonly 数组，记录 { id, type, timestamp, config }
+      6. createInstance(info) 和 destroyInstance(instance) 用于 AudioManager 的实例管理
+      
+      文件路径：assets/scripts/game/shared/MockAudioPlayer.ts
+    wave: 1
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - AC-MOCK-003
+    priority: medium
+    status: pending
+    dependencies: []
+    context_files:
+      - path: assets/scripts/framework/audio/AudioDefs.ts
+        description: IAudioPlayer 和 IAudioInstance 接口定义
+
+  - id: task-mock-scene-loader
+    title: 实现 MockSceneLoader
+    description: |
+      创建 MockSceneLoader 类，实现 ISceneLoader 接口。
+      
+      实现要点：
+      1. loadScene(name, callbacks) 存储 callbacks 到 Map<string, SceneLoadCallbacks>
+      2. unloadScene(name) 记录到 unloadRequests 数组
+      3. 提供 resolve(name) / reject(name, error?) / progress(name, value) 手动控制方法
+      4. 记录场景加载历史：loadedScenes 数组
+      5. 支持预设自动成功场景：registerAutoLoadScene(name)
+      
+      文件路径：assets/scripts/game/shared/MockSceneLoader.ts
+    wave: 1
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - AC-MOCK-004
+    priority: medium
+    status: pending
+    dependencies: []
+    context_files:
+      - path: assets/scripts/framework/scene/SceneDefs.ts
+        description: ISceneLoader 接口定义
+
+  - id: task-mock-datatable-parser
+    title: 实现 MockDataTableParser
+    description: |
+      创建 MockDataTableParser 类，实现 IDataTableParser 接口。
+      
+      实现要点：
+      1. parse<T>(rawData: string): T[] 直接 JSON.parse(rawData) 返回数组
+      2. 无需文件 I/O，纯内存解析
+      3. 处理 JSON 解析异常：抛出 [MockDataTableParser] 格式的错误
+      
+      文件路径：assets/scripts/game/shared/MockDataTableParser.ts
+    wave: 1
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - AC-MOCK-007
+    priority: low
+    status: pending
+    dependencies: []
+    context_files:
+      - path: assets/scripts/framework/datatable/DataTableDefs.ts
+        description: IDataTableParser 接口定义
+
+  - id: task-mock-localization-loader
+    title: 实现 MockLocalizationLoader
+    description: |
+      创建 MockLocalizationLoader 类，提供内存中多语言数据加载。
+      
+      实现要点：
+      1. registerLanguage(lang: string, data: Record<string, string>) 预设语言数据
+      2. loadLanguage(lang: string): Promise<Record<string, string>> 返回预设数据
+      3. 未注册的语言返回空对象 {}
+      4. 提供 setLoadDelay(ms) 模拟异步加载延迟
+      5. 提供 setLoadError(lang, error) 模拟加载失败
+      
+      文件路径：assets/scripts/game/shared/MockLocalizationLoader.ts
+    wave: 1
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - AC-MOCK-010
+    priority: low
+    status: pending
+    dependencies: []
+    context_files:
+      - path: assets/scripts/framework/i18n/LocalizationDefs.ts
+        description: 本地化相关类型定义
+
+  # ─── Wave 2: 复杂 Mock 策略（依赖 Wave 1 模式） ───
+
+  - id: task-mock-network-socket
+    title: 实现 MockNetworkSocket（含延迟和丢包模拟）
+    description: |
+      创建 MockNetworkSocket 类，实现 INetworkSocket 接口。
+      
+      实现要点：
+      1. connect(url) 记录 URL，不立即触发 onOpen
+      2. send(data) 记录数据，检查丢包率决定是否触发 onMessage
+      3. close() 记录调用次数，触发 onClose
+      4. 提供 simulateOpen() / simulateClose(code, reason) / simulateMessage(data) / simulateError(error) 手动触发方法
+      5. setPacketLossRate(rate: number) 设置丢包率 0~1，send 时 Math.random() < rate 则丢弃
+      6. simulateDisconnect() 触发 onClose(4000, 'disconnected')
+      7. simulateReconnect() 触发 onOpen
+      8. registerAutoResponse(requestId, handler) 注册自动回复：收到指定 id 消息后自动调用 handler 并 send 响应
+      9. 延迟模拟：setLatencyRange(min, max)，send 后 setTimeout 延迟触发 onMessage（测试时可设为 0）
+      
+      注意：延迟模拟使用 setTimeout，集成测试中设置 latencyRange 为 [0, 0] 以同步执行。
+      
+      文件路径：assets/scripts/game/shared/MockNetworkSocket.ts
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - AC-MOCK-005
+      - AC-MOCK-006
+    priority: high
+    status: pending
+    dependencies:
+      - task-mock-resource-loader
+    context_files:
+      - path: assets/scripts/framework/network/NetworkDefs.ts
+        description: INetworkSocket 接口定义和 NetworkPacket 类型
+      - path: tests/network/network-manager.test.ts
+        description: 现有 MockSocket 参考实现
+
+  - id: task-mock-ui-factory
+    title: 实现 MockUIFormFactory
+    description: |
+      创建 MockUIFormFactory 类，实现 IUIFormFactory 接口。
+      
+      实现要点：
+      1. createForm(formName, config, asset) 创建 MockUIForm 实例（继承 UIFormBase）
+      2. MockUIForm 实现 onInit/onOpen/onClose/onDestroy 生命周期钩子（空实现或 Logger 记录）
+      3. MockUIForm 内部跟踪 isOpen, isDestroyed 状态
+      4. destroyForm(form) 调用 form.onDestroy() 并标记 isDestroyed
+      5. createdForms 为 readonly 数组，记录所有创建的表单
+      6. 提供 setCreateError(formName, error) 模拟创建失败
+      
+      文件路径：assets/scripts/game/shared/MockUIFormFactory.ts
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - AC-MOCK-008
+    priority: medium
+    status: pending
+    dependencies:
+      - task-mock-resource-loader
+    context_files:
+      - path: assets/scripts/framework/ui/UIDefs.ts
+        description: IUIFormFactory 接口定义
+      - path: assets/scripts/framework/ui/UIFormBase.ts
+        description: UIFormBase 基类
+
+  - id: task-mock-entity-factory
+    title: 实现 MockEntityFactory
+    description: |
+      创建 MockEntityFactory 类，实现 IEntityFactory 接口。
+      
+      实现要点：
+      1. createEntity(groupName) 创建 MockEntity 实例（继承 EntityBase）
+      2. MockEntity 实现 onInit/onShow/onHide/onDestroy 生命周期钩子
+      3. MockEntity 内部跟踪 isActive, isDestroyed 状态
+      4. destroyEntity(entity) 调用 entity.onDestroy() 并标记 isDestroyed
+      5. createdEntities 为 readonly 数组，记录所有创建的实体
+      6. 提供 setCreateError(groupName, error) 模拟创建失败
+      
+      文件路径：assets/scripts/game/shared/MockEntityFactory.ts
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - AC-MOCK-009
+    priority: medium
+    status: pending
+    dependencies:
+      - task-mock-resource-loader
+    context_files:
+      - path: assets/scripts/framework/entity/EntityDefs.ts
+        description: IEntityFactory 接口定义
+      - path: assets/scripts/framework/entity/EntityBase.ts
+        description: EntityBase 基类
+
+  - id: task-mock-hotupdate
+    title: 实现 MockHotUpdateAdapter 和 MockVersionComparator
+    description: |
+      创建两个类：MockHotUpdateAdapter（实现 IHotUpdateAdapter）和 MockVersionComparator（实现 IVersionComparator）。
+      
+      MockHotUpdateAdapter 实现要点：
+      1. getLocalManifest() 返回预设的 Manifest 对象或 null
+      2. fetchRemoteVersion() 返回预设的远程版本号
+      3. fetchRemoteManifest() 返回预设的远程 Manifest
+      4. downloadAsset(asset) 模拟下载：setTimeout 延迟 50ms 后 resolve
+      5. verifyFile(asset) 返回 true（或预设失败的文件列表）
+      6. applyUpdate() 模拟应用更新
+      7. rollback() 模拟回滚
+      8. 提供 setLocalManifest(manifest) / setRemoteVersion(version) / setRemoteManifest(manifest) 预设方法
+      9. 提供 setDownloadError(asset, error) / setVerifyFailure(asset) 模拟错误场景
+      
+      MockVersionComparator 实现要点：
+      1. compare(local, remote) 返回 VersionCompareResult
+      2. setNextResult(result) 预设下次比较结果
+      3. 默认行为：语义化版本比较（major.minor.patch）
+      
+      文件路径：assets/scripts/game/shared/MockHotUpdateAdapter.ts, assets/scripts/game/shared/MockVersionComparator.ts
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - AC-MOCK-011
+      - AC-MOCK-012
+    priority: medium
+    status: pending
+    dependencies:
+      - task-mock-resource-loader
+    context_files:
+      - path: assets/scripts/framework/hotupdate/HotUpdateDefs.ts
+        description: IHotUpdateAdapter, IVersionComparator, VersionCompareResult 定义
+
+  # ─── Wave 3: HtmlRenderer（依赖 Wave 1 的模式参考） ───
+
+  - id: task-html-renderer
+    title: 实现 HtmlRenderer（彩色日志 + 按钮 + 状态面板 + 表格）
+    description: |
+      创建 HtmlRenderer 类，提供纯 HTML 渲染能力。
+      
+      实现要点：
+      1. 构造函数接收 container: HTMLElement 参数（日志输出容器）
+      2. log(message, color?) 创建 <div> 元素，style.color 设为指定颜色，添加到 container
+      3. 颜色常量：SUCCESS='#4CAF50', INFO='#2196F3', WARNING='#FF9800', ERROR='#F44336', NETWORK='#9C27B0', DEBUG='#9E9E9E', BATTLE='#FF5722', TIMER='#00BCD4'
+      4. separator(title?) 创建 <hr> + 可选标题 <span>
+      5. createButtonGroup(name) 创建 <div class="button-group"> 容器
+      6. addButton(group, label, onClick, disabled?) 创建 <button> 添加到 group，绑定 click 事件
+      7. clearLog() 清空 container 所有子元素
+      8. createStatusPanel(panelId, title) 创建 <div class="status-panel"> 包含标题和键值对区域，返回 StatusPanel 对象
+      9. StatusPanel 提供 update(key, value) 方法更新显示值
+      10. updateStatus(panelId, key, value) 通过 panelId 查找面板并更新
+      11. createTable(headers, rows) 创建 <table> 元素，包含 <thead> 和 <tbody>
+      12. 自动滚动：每次 log 后 container.scrollTop = container.scrollHeight
+      
+      注意：所有 DOM 操作使用 document.createElement，不引入任何 UI 框架。
+      测试环境需要 jsdom 支持。
+      
+      文件路径：assets/scripts/game/shared/HtmlRenderer.ts
+    wave: 3
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - AC-RENDERER-001
+      - AC-RENDERER-002
+      - AC-RENDERER-003
+    priority: high
+    status: pending
+    dependencies:
+      - task-mock-resource-loader
+    context_files:
+      - path: docs/demo-design.md
+        description: HtmlRenderer API 设计和颜色规范
+
+  # ─── Wave 4: DemoBase（依赖 HtmlRenderer 和所有 Mock 策略） ───
+
+  - id: task-demo-base
+    title: 实现 DemoBase 抽象基类
+    description: |
+      创建 DemoBase 抽象类，提供统一的 Demo 初始化流程。
+      
+      实现要点：
+      1. 受保护属性：_gameEntry: GameEntry, _renderer: HtmlRenderer, _mainLoopId: number | null
+      2. bootstrap(): Promise<void> 实现：
+         a. 创建 GameEntry 实例
+         b. 创建所有 Mock 策略实例
+         c. 按 priority 顺序注册 17 个模块（参照 module-registry.md）：
+            - Logger (0), EventManager (10), ObjectPool (20), TimerManager (30)
+            - FSMManager (100), ResourceManager (110), NetworkManager (120), HotUpdateManager (130)
+            - UIManager (200), AudioManager (210), SceneManager (220), EntityManager (230)
+            - ProcedureManager (300), DataTableManager (310), LocalizationManager (320)
+            - DebugManager (400)
+         d. 通过 setter 注入 Mock 策略：
+            - ResourceManager.setResourceLoader(mockLoader)
+            - AudioManager.setAudioPlayer(mockAudioPlayer)
+            - SceneManager.setSceneLoader(mockSceneLoader)
+            - NetworkManager 创建 channel 时传入 mockSocket
+            - UIManager.setUIFormFactory(mockUIFactory)
+            - EntityManager 需要 mockEntityFactory
+            - DataTableManager 需要 mockDataTableParser
+            - HotUpdateManager.setAdapter(mockHotUpdateAdapter) / setComparator(mockVersionComparator)
+         e. 调用 GameEntry.update(0) 触发所有模块 onInit
+         f. 调用 setupDataTables() 和 setupProcedures() 抽象方法
+      3. setupProcedures(): void — 抽象方法，子类实现
+      4. setupDataTables(): void — 抽象方法，子类实现
+      5. startMainLoop(fps=60): void — setInterval 调用 GameEntry.update(1/fps)
+      6. stopMainLoop(): void — clearInterval
+      7. getModule<T>(name: string): T — GameEntry.getModule<T>(name)
+      8. shutdown(): void — stopMainLoop + GameEntry.shutdown()
+      
+      文件路径：assets/scripts/game/shared/DemoBase.ts
+    wave: 4
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - AC-DEMOBASE-001
+      - AC-DEMOBASE-002
+      - AC-DEMOBASE-003
+    priority: high
+    status: pending
+    dependencies:
+      - task-html-renderer
+      - task-mock-network-socket
+      - task-mock-ui-factory
+      - task-mock-entity-factory
+      - task-mock-hotupdate
+      - task-mock-audio-player
+      - task-mock-scene-loader
+      - task-mock-datatable-parser
+      - task-mock-localization-loader
+    context_files:
+      - path: docs/demo-design.md
+        description: DemoBase API 设计和 bootstrap 流程
+      - path: docs/module-registry.md
+        description: 模块 priority 分配和依赖关系
+      - path: assets/scripts/framework/core/GameEntry.ts
+        description: GameEntry API
+
+  # ─── Wave 5: 集成测试 ───
+
+  - id: task-integration-test
+    title: 编写 Demo 0 集成测试
+    description: |
+      创建 tests/integration/demo0-infrastructure.test.ts 集成测试文件。
+      
+      测试用例：
+      
+      1. "MockResourceLoader 实现 IResourceLoader 接口"
+         - 创建 MockResourceLoader，验证 loadAsset/releaseAsset 方法存在
+         - registerAsset 后 loadAsset 立即回调 onSuccess
+         - 未 registerAsset 时 loadAsset 等待，手动 resolve 后回调
+         - 手动 reject 触发 onFailure
+         - releaseAsset 记录到 releaseRequests
+      
+      2. "MockNetworkSocket 实现 INetworkSocket 接口"
+         - connect/send/close 方法存在
+         - simulateOpen/simulateClose/simulateMessage/simulateError 正确触发回调
+         - setPacketLossRate(1) 时所有 send 都被丢弃
+         - setPacketLossRate(0) 时所有 send 都不丢弃
+         - simulateDisconnect 触发 onClose(4000, 'disconnected')
+         - simulateReconnect 触发 onOpen
+      
+      3. "MockAudioPlayer 实现 IAudioPlayer 接口"
+         - play 返回 IAudioInstance，playHistory 记录
+         - MockAudioInstance 的 play/stop/pause/resume 正确更新状态
+         - stopAll 停止所有实例
+      
+      4. "MockSceneLoader 实现 ISceneLoader 接口"
+         - loadScene 存储回调，resolve 触发 onSuccess
+         - unloadScene 记录到 unloadRequests
+      
+      5. "MockUIFormFactory 创建 MockUIForm"
+         - createForm 返回 UIFormBase 实例
+         - createdForms 记录创建的表单
+         - destroyForm 标记 isDestroyed
+      
+      6. "MockEntityFactory 创建 MockEntity"
+         - createEntity 返回 EntityBase 实例
+         - createdEntities 记录创建的实体
+         - destroyEntity 标记 isDestroyed
+      
+      7. "MockDataTableParser 解析 JSON"
+         - parse 返回 JSON.parse 结果
+         - 无效 JSON 抛出错误
+      
+      8. "MockHotUpdateAdapter 模拟热更新流程"
+         - fetchRemoteVersion 返回预设版本
+         - downloadAsset 延迟后 resolve
+         - verifyFile 返回预设结果
+      
+      9. "MockVersionComparator 版本比较"
+         - compare 返回正确结果
+         - setNextResult 覆盖默认行为
+      
+      10. "MockLocalizationLoader 加载语言数据"
+          - registerLanguage 后 loadLanguage 返回数据
+          - 未注册的语言返回空对象
+      
+      11. "HtmlRenderer 渲染日志和按钮"
+          - log 创建带颜色的 div 元素
+          - createButtonGroup 和 addButton 创建按钮
+          - clearLog 清空容器
+          - createStatusPanel 和 updateStatus 更新显示
+      
+      12. "DemoBase.bootstrap 注册全部 17 个模块"
+          - 创建 DemoBase 子类实例（实现 setupProcedures 和 setupDataTables 空方法）
+          - 调用 bootstrap()
+          - 验证 GameEntry.getModule 能获取所有 17 个模块
+          - 验证 ResourceManager 注入了 MockResourceLoader
+          - 验证 startMainLoop/stopMainLoop 正常工作
+      
+      测试环境配置：
+      - 文件顶部添加 /** @jest-environment jsdom */
+      - Mock cc 命名空间（如需要）
+      
+      文件路径：tests/integration/demo0-infrastructure.test.ts
+    wave: 5
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - AC-INTEGRATION-001
+      - AC-INTEGRATION-002
+      - AC-INTEGRATION-003
+    priority: high
+    status: pending
+    dependencies:
+      - task-demo-base
+    context_files:
+      - path: tests/resource/resource-manager.test.ts
+        description: 测试模式参考
+      - path: jest.config.js
+        description: Jest 配置
+
+  # ─── Wave 6: 文档 ───
+
+  - id: task-readme
+    title: 编写 Demo 0 README 文档
+    description: |
+      创建 assets/scripts/game/shared/README.md 文档。
+      
+      内容结构：
+      1. 概述：Demo 0 的职责和定位
+      2. 文件清单：列出所有文件及其用途
+      3. Mock 策略使用说明：
+         - 可控模式 vs 自动成功模式
+         - 各 Mock 类的关键 API
+      4. HtmlRenderer 使用示例
+      5. DemoBase 使用示例（创建 Demo1 子类）
+      6. 颜色规范表
+      7. 注意事项（jsdom 环境、延迟模拟等）
+      
+      参照 docs/module-readme-template.md 模板。
+      
+      文件路径：assets/scripts/game/shared/README.md
+    wave: 6
+    agent: gem-documentation-writer
+    prototype: false
+    covers:
+      - AC-DOC-001
+    priority: medium
+    status: pending
+    dependencies:
+      - task-integration-test
+    context_files:
+      - path: docs/module-readme-template.md
+        description: README 模板
+
+planning_pass: 1
+planning_history:
+  - pass: 1
+    reason: 初始计划创建
+    timestamp: '2026-04-21T00:00:00+08:00'
+    estimated_effort: large
+    estimated_files: 14
+    estimated_lines: 2800
+    focus_area: Demo 0 共享基础设施层
+    verification:
+      - npm test — 所有集成测试通过
+      - npm run lint — ESLint 无错误
+      - TypeScript 编译无类型错误
+    acceptance_criteria:
+      - AC-MOCK-001: MockResourceLoader 实现 IResourceLoader 接口，支持手动 resolve/reject/progress
+      - AC-MOCK-002: MockResourceLoader 支持 registerAsset 预设资源
+      - AC-MOCK-003: MockAudioPlayer 实现 IAudioPlayer 接口，playHistory 记录播放历史
+      - AC-MOCK-004: MockSceneLoader 实现 ISceneLoader 接口，支持手动控制
+      - AC-MOCK-005: MockNetworkSocket 实现 INetworkSocket 接口，支持延迟模拟
+      - AC-MOCK-006: MockNetworkSocket 支持丢包率设置和断线/重连模拟
+      - AC-MOCK-007: MockDataTableParser 实现 IDataTableParser 接口，直接解析 JSON
+      - AC-MOCK-008: MockUIFormFactory 实现 IUIFormFactory 接口，创建 MockUIForm
+      - AC-MOCK-009: MockEntityFactory 实现 IEntityFactory 接口，创建 MockEntity
+      - AC-MOCK-010: MockLocalizationLoader 支持内存中多语言数据加载
+      - AC-MOCK-011: MockHotUpdateAdapter 实现 IHotUpdateAdapter 接口
+      - AC-MOCK-012: MockVersionComparator 实现 IVersionComparator 接口
+      - AC-RENDERER-001: HtmlRenderer 支持彩色日志输出（8 种颜色）
+      - AC-RENDERER-002: HtmlRenderer 支持按钮组和状态面板
+      - AC-RENDERER-003: HtmlRenderer 支持表格渲染
+      - AC-DEMOBASE-001: DemoBase.bootstrap() 注册全部 17 个模块
+      - AC-DEMOBASE-002: DemoBase.bootstrap() 注入所有 Mock 策略
+      - AC-DEMOBASE-003: DemoBase 提供 startMainLoop/stopMainLoop/getModule
+      - AC-INTEGRATION-001: 所有 Mock 类通过接口合规性测试
+      - AC-INTEGRATION-002: DemoBase.bootstrap() 端到端测试通过
+      - AC-INTEGRATION-003: HtmlRenderer 在 jsdom 环境下测试通过
+      - AC-DOC-001: README.md 包含完整的使用说明和示例
+    failure_modes:
+      - scenario: jsdom 环境未正确配置导致 HtmlRenderer 测试失败
+        likelihood: medium
+        impact: high
+        mitigation: 测试文件顶部添加 @jest-environment jsdom 注释，验证 jest.config.js 包含 jsdom
+      - scenario: Mock 策略与框架接口不匹配
+        likelihood: low
+        impact: high
+        mitigation: 使用 implements 关键字强制类型检查，编译阶段即可发现
+      - scenario: DemoBase.bootstrap() 模块注册顺序错误
+        likelihood: low
+        impact: critical
+        mitigation: 严格参照 module-registry.md 的 priority 分配，集成测试验证初始化顺序
+    tech_stack:
+      - TypeScript strict mode
+      - Jest + jsdom
+      - 框架现有接口定义（IResourceLoader, IAudioPlayer, INetworkSocket 等）
+    test_coverage: 集成测试覆盖所有 Mock 类的接口合规性和 DemoBase 端到端流程
+    requires_review: true
+    review_depth: full
+    review_security_sensitive: false
