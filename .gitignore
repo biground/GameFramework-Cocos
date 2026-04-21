@@ -12,6 +12,7 @@ node_modules/
 
 # ===== 构建输出 =====
 dist/
+!dist/demo1/index.html
 
 # ===== CI 产物 =====
 junit.xml
