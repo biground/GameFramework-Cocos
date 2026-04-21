@@ -6,8 +6,8 @@ status: pending_approval
 research_confidence: high
 
 plan_metrics:
-  wave_1_task_count: 5
-  total_dependencies: 28
+  wave_1_task_count: 6
+  total_dependencies: 24
   risk_score: low
 
 tldr: |
@@ -16,7 +16,7 @@ tldr: |
   核心交付物：
   - 11 个 Mock 策略实现（ResourceLoader, AudioPlayer, SceneLoader, NetworkSocket, UIFormFactory, EntityFactory, DataTableParser, HotUpdateAdapter, VersionComparator, LocalizationLoader）
   - HtmlRenderer：彩色日志 + 按钮 + 状态面板 + 表格的纯 HTML 渲染器
-  - DemoBase：所有 Demo 的抽象基类，提供 bootstrap() 统一注册 17 个模块
+  - DemoBase：所有 Demo 的抽象基类，提供 bootstrap() 统一注册 16 个模块
   - 集成测试：验证 GameEntry + 全部 Mock 策略的端到端初始化
   - README 文档
   
@@ -41,7 +41,7 @@ pre_mortem:
       likelihood: high
       impact: medium
       mitigation: 使用 jsdom 或 mock DOM 环境，测试文件顶部配置 @jest-environment jsdom
-    - scenario: DemoBase.bootstrap() 注册 17 个模块时 priority 冲突导致初始化顺序错误
+    - scenario: DemoBase.bootstrap() 注册 16 个模块时 priority 冲突导致初始化顺序错误
       likelihood: low
       impact: critical
       mitigation: 严格遵循 module-registry.md 的 priority 分配规范，集成测试验证初始化顺序
@@ -124,11 +124,10 @@ implementation_specification:
     - component: MockAudioPlayer
       responsibility: 模拟音频播放，记录播放历史
       interfaces:
-        - "play(audioClip, config): IAudioInstance"
-        - "stopAll(): void"
-        - "createInstance(info): IAudioInstance"
-        - "destroyInstance(instance): void"
-        - "playHistory: readonly array — 只读历史记录"
+        - "play(audioClip, config): IAudioInstance — IAudioPlayer 接口方法"
+        - "stopAll(): void — IAudioPlayer 接口方法"
+        - "playHistory: readonly array — 只读历史记录（MockAudioPlayer 额外属性）"
+        - "注意：createInstance/destroyInstance 不是 IAudioPlayer 接口要求，是 MockAudioPlayer 内部辅助方法"
     - component: MockSceneLoader
       responsibility: 模拟场景加载，记录场景切换历史
       interfaces:
@@ -151,17 +150,17 @@ implementation_specification:
     - component: MockDataTableParser
       responsibility: 直接接收 JSON 数组，无需文件解析
       interfaces:
-        - "parse<T>(rawData): T[]"
+        - "parse<T extends IDataRow>(rawData: unknown): T[] — 注意：泛型约束 T extends IDataRow，参数类型为 unknown"
     - component: MockHotUpdateAdapter
       responsibility: 模拟热更新流程（版本检查、清单对比、下载）
       interfaces:
-        - "getLocalManifest(): Manifest | null"
-        - "fetchRemoteVersion(): Promise<string>"
-        - "fetchRemoteManifest(): Promise<Manifest>"
-        - "downloadAsset(asset): Promise<void>"
-        - "verifyFile(asset): Promise<boolean>"
-        - "applyUpdate(): Promise<void>"
-        - "rollback(): Promise<void>"
+        - "getLocalManifest(): Promise<ManifestInfo | null>"
+        - "fetchRemoteVersion(url: string): Promise<string> — 注意：需要传入 url 参数"
+        - "fetchRemoteManifest(url: string): Promise<ManifestInfo> — 注意：需要传入 url 参数"
+        - "downloadAsset(url: string, savePath: string): Promise<boolean> — 注意：双参数，返回 boolean"
+        - "verifyFile(filePath: string, expectedMd5: string): Promise<boolean> — 注意：双参数，返回 boolean"
+        - "applyUpdate(): Promise<boolean>"
+        - "rollback(): Promise<boolean>"
     - component: MockVersionComparator
       responsibility: 可编程的版本比较结果
       interfaces:
@@ -197,7 +196,7 @@ contracts:
   - from_task: task-mock-audio-player
     to_task: task-integration-test
     interface: "MockAudioPlayer 类实现 IAudioPlayer 接口，提供 playHistory 追踪"
-    format: "TypeScript class with play, stopAll, createInstance, destroyInstance, playHistory"
+    format: "TypeScript class with play(audioClip, config): IAudioInstance, stopAll(): void, playHistory: readonly array"
   - from_task: task-mock-scene-loader
     to_task: task-integration-test
     interface: "MockSceneLoader 类实现 ISceneLoader 接口，提供场景加载历史追踪"
@@ -213,11 +212,11 @@ contracts:
   - from_task: task-mock-datatable-parser
     to_task: task-integration-test
     interface: "MockDataTableParser 类实现 IDataTableParser 接口，直接解析 JSON 数组"
-    format: "TypeScript class with parse<T> method"
+    format: "TypeScript class with parse<T extends IDataRow>(rawData: unknown): T[] method"
   - from_task: task-mock-hotupdate
     to_task: task-integration-test
     interface: "MockHotUpdateAdapter 和 MockVersionComparator 实现热更新策略接口"
-    format: "TypeScript classes implementing IHotUpdateAdapter and IVersionComparator"
+    format: "MockHotUpdateAdapter: getLocalManifest(), fetchRemoteVersion(url), fetchRemoteManifest(url), downloadAsset(url, savePath), verifyFile(filePath, expectedMd5), applyUpdate(), rollback(). MockVersionComparator: compare(local, remote), setNextResult(result)"
   - from_task: task-mock-localization-loader
     to_task: task-integration-test
     interface: "MockLocalizationLoader 提供内存中多语言数据加载"
@@ -232,7 +231,49 @@ contracts:
     format: "TypeScript abstract class with concrete bootstrap implementation"
 
 tasks:
-  # ─── Wave 1: 独立 Mock 策略（无依赖，可并行） ───
+  # ─── Wave 1: 独立 Mock 策略 + HtmlRenderer（无依赖，可并行） ───
+
+  - id: task-html-renderer
+    title: 实现 HtmlRenderer（彩色日志 + 按钮 + 状态面板 + 表格）
+    description: |
+      创建 HtmlRenderer 类，提供纯 HTML 渲染能力。
+      
+      实现要点：
+      1. 构造函数接收 container: HTMLElement 参数（日志输出容器）
+      2. log(message, color?) 创建 <div> 元素，style.color 设为指定颜色，添加到 container
+      3. 颜色常量：SUCCESS='#4CAF50', INFO='#2196F3', WARNING='#FF9800', ERROR='#F44336', NETWORK='#9C27B0', DEBUG='#9E9E9E', BATTLE='#FF5722', TIMER='#00BCD4'
+      4. separator(title?) 创建 <hr> + 可选标题 <span>
+      5. createButtonGroup(name) 创建 <div class="button-group"> 容器
+      6. addButton(group, label, onClick, disabled?) 创建 <button> 添加到 group，绑定 click 事件
+      7. clearLog() 清空 container 所有子元素
+      8. createStatusPanel(panelId, title) 创建 <div class="status-panel"> 包含标题和键值对区域，返回 StatusPanel 对象
+      9. StatusPanel 提供 update(key, value) 方法更新显示值
+      10. updateStatus(panelId, key, value) 通过 panelId 查找面板并更新
+      11. createTable(headers, rows) 创建 <table> 元素，包含 <thead> 和 <tbody>
+      12. 自动滚动：每次 log 后 container.scrollTop = container.scrollHeight
+      
+      注意：所有 DOM 操作使用 document.createElement，不引入任何 UI 框架。
+      测试环境需要 jsdom 支持，测试文件顶部添加 /** @jest-environment jsdom */。
+      
+      前置条件：验证 jest.config.js 已配置 jsdom 环境。
+      
+      文件路径：assets/scripts/game/shared/HtmlRenderer.ts
+    wave: 1
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - AC-RENDERER-001
+      - AC-RENDERER-002
+      - AC-RENDERER-003
+    priority: high
+    status: pending
+    dependencies: []
+    estimated_lines: 180
+    context_files:
+      - path: docs/demo-design.md
+        description: HtmlRenderer API 设计和颜色规范
+      - path: jest.config.js
+        description: 验证 jsdom 环境配置
 
   - id: task-mock-resource-loader
     title: 实现 MockResourceLoader
@@ -259,11 +300,22 @@ tasks:
     priority: high
     status: pending
     dependencies: []
+    estimated_lines: 120
     context_files:
       - path: assets/scripts/framework/resource/ResourceDefs.ts
         description: IResourceLoader 接口定义和 LoadAssetCallbacks 类型
       - path: tests/resource/resource-manager.test.ts
         description: 现有 MockResourceLoader 参考实现
+    
+    # TDD 步骤
+    test_first: true
+    red_green_refactor:
+      - "RED: 编写 MockResourceLoader 接口合规性测试（implements IResourceLoader 编译检查）"
+      - "RED: 编写 registerAsset + loadAsset 立即回调测试"
+      - "GREEN: 实现 Map 存储预设资源，loadAsset 检查预设并回调"
+      - "RED: 编写未预设资源时等待手动 resolve 的测试"
+      - "GREEN: 实现 pending callbacks Map 和 resolve/reject/progress 方法"
+      - "REFACTOR: 提取回调触发逻辑为私有方法 emitSuccess/emitFailure/emitProgress"
 
   - id: task-mock-audio-player
     title: 实现 MockAudioPlayer
@@ -276,7 +328,7 @@ tasks:
       3. MockAudioInstance 内部用状态标记（_isPlaying, _isPaused）跟踪状态
       4. stopAll() 停止所有活跃实例
       5. playHistory 为 readonly 数组，记录 { id, type, timestamp, config }
-      6. createInstance(info) 和 destroyInstance(instance) 用于 AudioManager 的实例管理
+      6. 注意：IAudioPlayer 接口只有 play() 和 stopAll() 两个方法，不包含 createInstance/destroyInstance
       
       文件路径：assets/scripts/game/shared/MockAudioPlayer.ts
     wave: 1
@@ -287,9 +339,20 @@ tasks:
     priority: medium
     status: pending
     dependencies: []
+    estimated_lines: 100
     context_files:
       - path: assets/scripts/framework/audio/AudioDefs.ts
         description: IAudioPlayer 和 IAudioInstance 接口定义
+    
+    # TDD 步骤
+    test_first: true
+    red_green_refactor:
+      - "RED: 编写 MockAudioPlayer 接口合规性测试（implements IAudioPlayer）"
+      - "RED: 编写 play() 返回 IAudioInstance 并记录到 playHistory 的测试"
+      - "GREEN: 实现 MockAudioInstance 类和 play() 方法"
+      - "RED: 编写 stopAll() 停止所有实例的测试"
+      - "GREEN: 实现 stopAll() 遍历活跃实例调用 stop"
+      - "REFACTOR: 提取实例状态管理逻辑"
 
   - id: task-mock-scene-loader
     title: 实现 MockSceneLoader
@@ -312,9 +375,20 @@ tasks:
     priority: medium
     status: pending
     dependencies: []
+    estimated_lines: 110
     context_files:
       - path: assets/scripts/framework/scene/SceneDefs.ts
         description: ISceneLoader 接口定义
+    
+    # TDD 步骤
+    test_first: true
+    red_green_refactor:
+      - "RED: 编写 MockSceneLoader 接口合规性测试"
+      - "RED: 编写 loadScene + resolve 触发 onSuccess 测试"
+      - "GREEN: 实现 callbacks Map 和 resolve 方法"
+      - "RED: 编写 unloadScene 记录测试"
+      - "GREEN: 实现 unloadRequests 数组"
+      - "REFACTOR: 提取回调触发逻辑"
 
   - id: task-mock-datatable-parser
     title: 实现 MockDataTableParser
@@ -322,9 +396,10 @@ tasks:
       创建 MockDataTableParser 类，实现 IDataTableParser 接口。
       
       实现要点：
-      1. parse<T>(rawData: string): T[] 直接 JSON.parse(rawData) 返回数组
-      2. 无需文件 I/O，纯内存解析
-      3. 处理 JSON 解析异常：抛出 [MockDataTableParser] 格式的错误
+      1. parse<T extends IDataRow>(rawData: unknown): T[] 直接 JSON.parse(rawData as string) 返回数组
+      2. 注意：泛型约束必须为 T extends IDataRow，参数类型为 unknown（不是 string）
+      3. 无需文件 I/O，纯内存解析
+      4. 处理 JSON 解析异常：抛出 [MockDataTableParser] 格式的错误
       
       文件路径：assets/scripts/game/shared/MockDataTableParser.ts
     wave: 1
@@ -335,9 +410,19 @@ tasks:
     priority: low
     status: pending
     dependencies: []
+    estimated_lines: 40
     context_files:
       - path: assets/scripts/framework/datatable/DataTableDefs.ts
         description: IDataTableParser 接口定义
+    
+    # TDD 步骤
+    test_first: true
+    red_green_refactor:
+      - "RED: 编写 MockDataTableParser 接口合规性测试"
+      - "RED: 编写 parse 返回 JSON.parse 结果测试"
+      - "GREEN: 实现 parse 方法"
+      - "RED: 编写无效 JSON 抛出错误测试"
+      - "GREEN: 添加 try-catch 错误处理"
 
   - id: task-mock-localization-loader
     title: 实现 MockLocalizationLoader
@@ -360,9 +445,20 @@ tasks:
     priority: low
     status: pending
     dependencies: []
+    estimated_lines: 70
     context_files:
       - path: assets/scripts/framework/i18n/LocalizationDefs.ts
         description: 本地化相关类型定义
+    
+    # TDD 步骤
+    test_first: true
+    red_green_refactor:
+      - "RED: 编写 registerLanguage + loadLanguage 返回数据测试"
+      - "GREEN: 实现 Map 存储语言数据"
+      - "RED: 编写未注册语言返回空对象测试"
+      - "GREEN: 添加 fallback 逻辑"
+      - "RED: 编写 setLoadError 模拟失败测试"
+      - "GREEN: 实现错误模拟"
 
   # ─── Wave 2: 复杂 Mock 策略（依赖 Wave 1 模式） ───
 
@@ -381,8 +477,9 @@ tasks:
       7. simulateReconnect() 触发 onOpen
       8. registerAutoResponse(requestId, handler) 注册自动回复：收到指定 id 消息后自动调用 handler 并 send 响应
       9. 延迟模拟：setLatencyRange(min, max)，send 后 setTimeout 延迟触发 onMessage（测试时可设为 0）
+      10. setClock(clock: { setTimeout: Function, clearTimeout: Function }) 注入自定义时钟，用于确定性测试
       
-      注意：延迟模拟使用 setTimeout，集成测试中设置 latencyRange 为 [0, 0] 以同步执行。
+      注意：延迟模拟默认使用全局 setTimeout，集成测试中通过 setClock 注入同步时钟或设置 latencyRange 为 [0, 0]。
       
       文件路径：assets/scripts/game/shared/MockNetworkSocket.ts
     wave: 2
@@ -395,11 +492,26 @@ tasks:
     status: pending
     dependencies:
       - task-mock-resource-loader
+    estimated_lines: 180
     context_files:
       - path: assets/scripts/framework/network/NetworkDefs.ts
         description: INetworkSocket 接口定义和 NetworkPacket 类型
       - path: tests/network/network-manager.test.ts
         description: 现有 MockSocket 参考实现
+    
+    # TDD 步骤
+    test_first: true
+    red_green_refactor:
+      - "RED: 编写 MockNetworkSocket 接口合规性测试"
+      - "RED: 编写 connect/send/close 基本方法测试"
+      - "GREEN: 实现基本方法"
+      - "RED: 编写 simulateOpen/simulateClose/simulateMessage/simulateError 测试"
+      - "GREEN: 实现手动触发方法"
+      - "RED: 编写 setPacketLossRate(1) 全部丢弃测试"
+      - "GREEN: 实现丢包逻辑"
+      - "RED: 编写 setClock 注入时钟测试"
+      - "GREEN: 实现时钟注入"
+      - "REFACTOR: 提取消息处理逻辑"
 
   - id: task-mock-ui-factory
     title: 实现 MockUIFormFactory
@@ -424,11 +536,24 @@ tasks:
     status: pending
     dependencies:
       - task-mock-resource-loader
+    estimated_lines: 100
     context_files:
       - path: assets/scripts/framework/ui/UIDefs.ts
         description: IUIFormFactory 接口定义
       - path: assets/scripts/framework/ui/UIFormBase.ts
         description: UIFormBase 基类
+    
+    # TDD 步骤
+    test_first: true
+    red_green_refactor:
+      - "RED: 编写 MockUIFormFactory 接口合规性测试"
+      - "RED: 编写 createForm 返回 UIFormBase 实例测试"
+      - "GREEN: 实现 MockUIForm 类和 createForm 方法"
+      - "RED: 编写 destroyForm 标记 isDestroyed 测试"
+      - "GREEN: 实现 destroyForm 方法"
+      - "REFACTOR: 提取表单生命周期管理"
+    
+    # 前置条件：UIFormBase 必须已存在（framework/ui/UIFormBase.ts）
 
   - id: task-mock-entity-factory
     title: 实现 MockEntityFactory
@@ -453,11 +578,24 @@ tasks:
     status: pending
     dependencies:
       - task-mock-resource-loader
+    estimated_lines: 100
     context_files:
       - path: assets/scripts/framework/entity/EntityDefs.ts
         description: IEntityFactory 接口定义
       - path: assets/scripts/framework/entity/EntityBase.ts
         description: EntityBase 基类
+    
+    # TDD 步骤
+    test_first: true
+    red_green_refactor:
+      - "RED: 编写 MockEntityFactory 接口合规性测试"
+      - "RED: 编写 createEntity 返回 EntityBase 实例测试"
+      - "GREEN: 实现 MockEntity 类和 createEntity 方法"
+      - "RED: 编写 destroyEntity 标记 isDestroyed 测试"
+      - "GREEN: 实现 destroyEntity 方法"
+      - "REFACTOR: 提取实体生命周期管理"
+    
+    # 前置条件：EntityBase 必须已存在（framework/entity/EntityBase.ts）
 
   - id: task-mock-hotupdate
     title: 实现 MockHotUpdateAdapter 和 MockVersionComparator
@@ -465,15 +603,15 @@ tasks:
       创建两个类：MockHotUpdateAdapter（实现 IHotUpdateAdapter）和 MockVersionComparator（实现 IVersionComparator）。
       
       MockHotUpdateAdapter 实现要点：
-      1. getLocalManifest() 返回预设的 Manifest 对象或 null
-      2. fetchRemoteVersion() 返回预设的远程版本号
-      3. fetchRemoteManifest() 返回预设的远程 Manifest
-      4. downloadAsset(asset) 模拟下载：setTimeout 延迟 50ms 后 resolve
-      5. verifyFile(asset) 返回 true（或预设失败的文件列表）
-      6. applyUpdate() 模拟应用更新
-      7. rollback() 模拟回滚
+      1. getLocalManifest(): Promise<ManifestInfo | null> 返回预设的 ManifestInfo 对象或 null
+      2. fetchRemoteVersion(url: string): Promise<string> 返回预设的远程版本号（注意：需要 url 参数）
+      3. fetchRemoteManifest(url: string): Promise<ManifestInfo> 返回预设的远程 ManifestInfo（注意：需要 url 参数）
+      4. downloadAsset(url: string, savePath: string): Promise<boolean> 模拟下载：setTimeout 延迟 50ms 后 resolve true（注意：双参数）
+      5. verifyFile(filePath: string, expectedMd5: string): Promise<boolean> 返回 true（或预设失败的文件列表）（注意：双参数）
+      6. applyUpdate(): Promise<boolean> 模拟应用更新
+      7. rollback(): Promise<boolean> 模拟回滚
       8. 提供 setLocalManifest(manifest) / setRemoteVersion(version) / setRemoteManifest(manifest) 预设方法
-      9. 提供 setDownloadError(asset, error) / setVerifyFailure(asset) 模拟错误场景
+      9. 提供 setDownloadError(url, error) / setVerifyFailure(filePath) 模拟错误场景
       
       MockVersionComparator 实现要点：
       1. compare(local, remote) 返回 VersionCompareResult
@@ -491,51 +629,26 @@ tasks:
     status: pending
     dependencies:
       - task-mock-resource-loader
+    estimated_lines: 160
     context_files:
       - path: assets/scripts/framework/hotupdate/HotUpdateDefs.ts
         description: IHotUpdateAdapter, IVersionComparator, VersionCompareResult 定义
+    
+    # TDD 步骤
+    test_first: true
+    red_green_refactor:
+      - "RED: 编写 MockHotUpdateAdapter 接口合规性测试"
+      - "RED: 编写 fetchRemoteVersion(url) 返回预设版本测试"
+      - "GREEN: 实现 fetchRemoteVersion"
+      - "RED: 编写 downloadAsset(url, savePath) 延迟后 resolve 测试"
+      - "GREEN: 实现 downloadAsset"
+      - "RED: 编写 verifyFile(filePath, expectedMd5) 返回预设结果测试"
+      - "GREEN: 实现 verifyFile"
+      - "RED: 编写 MockVersionComparator.compare 测试"
+      - "GREEN: 实现 compare 和 setNextResult"
+      - "REFACTOR: 提取预设数据管理逻辑"
 
-  # ─── Wave 3: HtmlRenderer（依赖 Wave 1 的模式参考） ───
-
-  - id: task-html-renderer
-    title: 实现 HtmlRenderer（彩色日志 + 按钮 + 状态面板 + 表格）
-    description: |
-      创建 HtmlRenderer 类，提供纯 HTML 渲染能力。
-      
-      实现要点：
-      1. 构造函数接收 container: HTMLElement 参数（日志输出容器）
-      2. log(message, color?) 创建 <div> 元素，style.color 设为指定颜色，添加到 container
-      3. 颜色常量：SUCCESS='#4CAF50', INFO='#2196F3', WARNING='#FF9800', ERROR='#F44336', NETWORK='#9C27B0', DEBUG='#9E9E9E', BATTLE='#FF5722', TIMER='#00BCD4'
-      4. separator(title?) 创建 <hr> + 可选标题 <span>
-      5. createButtonGroup(name) 创建 <div class="button-group"> 容器
-      6. addButton(group, label, onClick, disabled?) 创建 <button> 添加到 group，绑定 click 事件
-      7. clearLog() 清空 container 所有子元素
-      8. createStatusPanel(panelId, title) 创建 <div class="status-panel"> 包含标题和键值对区域，返回 StatusPanel 对象
-      9. StatusPanel 提供 update(key, value) 方法更新显示值
-      10. updateStatus(panelId, key, value) 通过 panelId 查找面板并更新
-      11. createTable(headers, rows) 创建 <table> 元素，包含 <thead> 和 <tbody>
-      12. 自动滚动：每次 log 后 container.scrollTop = container.scrollHeight
-      
-      注意：所有 DOM 操作使用 document.createElement，不引入任何 UI 框架。
-      测试环境需要 jsdom 支持。
-      
-      文件路径：assets/scripts/game/shared/HtmlRenderer.ts
-    wave: 3
-    agent: gem-implementer
-    prototype: false
-    covers:
-      - AC-RENDERER-001
-      - AC-RENDERER-002
-      - AC-RENDERER-003
-    priority: high
-    status: pending
-    dependencies:
-      - task-mock-resource-loader
-    context_files:
-      - path: docs/demo-design.md
-        description: HtmlRenderer API 设计和颜色规范
-
-  # ─── Wave 4: DemoBase（依赖 HtmlRenderer 和所有 Mock 策略） ───
+  # ─── Wave 3: DemoBase（依赖 HtmlRenderer 和所有 Mock 策略） ───
 
   - id: task-demo-base
     title: 实现 DemoBase 抽象基类
@@ -547,12 +660,13 @@ tasks:
       2. bootstrap(): Promise<void> 实现：
          a. 创建 GameEntry 实例
          b. 创建所有 Mock 策略实例
-         c. 按 priority 顺序注册 17 个模块（参照 module-registry.md）：
+         c. 按 priority 升序注册 16 个模块（参照 module-registry.md）：
             - Logger (0), EventManager (10), ObjectPool (20), TimerManager (30)
             - FSMManager (100), ResourceManager (110), NetworkManager (120), HotUpdateManager (130)
-            - UIManager (200), AudioManager (210), SceneManager (220), EntityManager (230)
+            - UIManager (200), AudioManager (210), SceneManager (220)
             - ProcedureManager (300), DataTableManager (310), LocalizationManager (320)
             - DebugManager (400)
+            - 注意：EntityManager 尚未实现，暂不注册
          d. 通过 setter 注入 Mock 策略：
             - ResourceManager.setResourceLoader(mockLoader)
             - AudioManager.setAudioPlayer(mockAudioPlayer)
@@ -572,7 +686,7 @@ tasks:
       8. shutdown(): void — stopMainLoop + GameEntry.shutdown()
       
       文件路径：assets/scripts/game/shared/DemoBase.ts
-    wave: 4
+    wave: 3
     agent: gem-implementer
     prototype: false
     covers:
@@ -591,6 +705,7 @@ tasks:
       - task-mock-scene-loader
       - task-mock-datatable-parser
       - task-mock-localization-loader
+    estimated_lines: 150
     context_files:
       - path: docs/demo-design.md
         description: DemoBase API 设计和 bootstrap 流程
@@ -599,7 +714,7 @@ tasks:
       - path: assets/scripts/framework/core/GameEntry.ts
         description: GameEntry API
 
-  # ─── Wave 5: 集成测试 ───
+  # ─── Wave 4: 集成测试 ───
 
   - id: task-integration-test
     title: 编写 Demo 0 集成测试
@@ -647,9 +762,9 @@ tasks:
          - 无效 JSON 抛出错误
       
       8. "MockHotUpdateAdapter 模拟热更新流程"
-         - fetchRemoteVersion 返回预设版本
-         - downloadAsset 延迟后 resolve
-         - verifyFile 返回预设结果
+         - fetchRemoteVersion(url) 返回预设版本
+         - downloadAsset(url, savePath) 延迟后 resolve true
+         - verifyFile(filePath, expectedMd5) 返回预设结果
       
       9. "MockVersionComparator 版本比较"
          - compare 返回正确结果
@@ -665,19 +780,20 @@ tasks:
           - clearLog 清空容器
           - createStatusPanel 和 updateStatus 更新显示
       
-      12. "DemoBase.bootstrap 注册全部 17 个模块"
+      12. "DemoBase.bootstrap 注册全部 16 个模块"
           - 创建 DemoBase 子类实例（实现 setupProcedures 和 setupDataTables 空方法）
           - 调用 bootstrap()
-          - 验证 GameEntry.getModule 能获取所有 17 个模块
+          - 验证 GameEntry.getModule 能获取所有 16 个模块（EntityManager 暂不包含）
           - 验证 ResourceManager 注入了 MockResourceLoader
           - 验证 startMainLoop/stopMainLoop 正常工作
       
       测试环境配置：
       - 文件顶部添加 /** @jest-environment jsdom */
+      - 前置检查：运行 jest --showConfig 验证 jsdom 已安装
       - Mock cc 命名空间（如需要）
       
       文件路径：tests/integration/demo0-infrastructure.test.ts
-    wave: 5
+    wave: 4
     agent: gem-implementer
     prototype: false
     covers:
@@ -688,13 +804,14 @@ tasks:
     status: pending
     dependencies:
       - task-demo-base
+    estimated_lines: 350
     context_files:
       - path: tests/resource/resource-manager.test.ts
         description: 测试模式参考
       - path: jest.config.js
         description: Jest 配置
 
-  # ─── Wave 6: 文档 ───
+  # ─── Wave 5: 文档 ───
 
   - id: task-readme
     title: 编写 Demo 0 README 文档
@@ -715,7 +832,7 @@ tasks:
       参照 docs/module-readme-template.md 模板。
       
       文件路径：assets/scripts/game/shared/README.md
-    wave: 6
+    wave: 5
     agent: gem-documentation-writer
     prototype: false
     covers:
@@ -724,6 +841,7 @@ tasks:
     status: pending
     dependencies:
       - task-integration-test
+    estimated_lines: 150
     context_files:
       - path: docs/module-readme-template.md
         description: README 模板
@@ -757,7 +875,7 @@ planning_history:
       - AC-RENDERER-001: HtmlRenderer 支持彩色日志输出（8 种颜色）
       - AC-RENDERER-002: HtmlRenderer 支持按钮组和状态面板
       - AC-RENDERER-003: HtmlRenderer 支持表格渲染
-      - AC-DEMOBASE-001: DemoBase.bootstrap() 注册全部 17 个模块
+      - AC-DEMOBASE-001: DemoBase.bootstrap() 注册全部 16 个模块（EntityManager 除外）
       - AC-DEMOBASE-002: DemoBase.bootstrap() 注入所有 Mock 策略
       - AC-DEMOBASE-003: DemoBase 提供 startMainLoop/stopMainLoop/getModule
       - AC-INTEGRATION-001: 所有 Mock 类通过接口合规性测试
