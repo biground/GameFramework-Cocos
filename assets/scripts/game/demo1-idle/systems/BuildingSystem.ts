@@ -248,6 +248,15 @@ export class BuildingSystem {
     }
 
     /**
+     * 获取建筑配置
+     * @param buildingId 建筑配置 ID
+     * @returns 建筑配置行，不存在时返回 undefined
+     */
+    getBuildingConfig(buildingId: number): BuildingConfigRow | undefined {
+        return this._buildingConfigs.find((c) => c.id === buildingId);
+    }
+
+    /**
      * 检查建筑是否可解锁（累计金币是否达标）
      * @param buildingId 建筑配置 ID
      * @returns 是否已解锁

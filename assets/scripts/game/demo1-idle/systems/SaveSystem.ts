@@ -129,6 +129,14 @@ export class SaveSystem {
     hasSave(): boolean {
         return this._storage.getItem(this._saveKey) !== null;
     }
+
+    /**
+     * 清除存档数据
+     */
+    clearSave(): void {
+        this._storage.removeItem(this._saveKey);
+        Logger.info(TAG, `存档已清除, key=${this._saveKey}`);
+    }
 }
 
 /**
