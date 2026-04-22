@@ -62,6 +62,7 @@ export class HtmlRenderer {
         string,
         { element: HTMLElement; entries: Map<string, HTMLElement> }
     > = new Map();
+    private readonly liveEntries: Map<string, HTMLElement> = new Map();
 
     /**
      * 创建 HTML 渲染器并构建完整布局
@@ -131,6 +132,33 @@ export class HtmlRenderer {
 
         this.logContainer.appendChild(entry);
         this.logContainer.scrollTop = this.logContainer.scrollHeight;
+    }
+
+    /**
+     * 原地更新日志行（高频事件专用）
+     *
+     * 相同 key 的日志只保留一条，反复更新其内容和时间戳，
+     * 避免高频事件（如挖矿、自动保存）导致日志爆炸式增长。
+     *
+     * @param key 日志行唯一标识
+     * @param message 日志消息内容
+     * @param color CSS 颜色值，默认为 #d4d4d4（浅灰）
+     */
+    public updateLog(key: string, message: string, color?: string): void {
+        const timestamp = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+        const text = `[${timestamp}] ${message}`;
+
+        let entry = this.liveEntries.get(key);
+        if (entry) {
+            entry.textContent = text;
+            entry.style.color = color ?? '#d4d4d4';
+        } else {
+            entry = document.createElement('div');
+            entry.style.cssText = `color: ${color ?? '#d4d4d4'}; padding: 1px 0; white-space: pre-wrap; word-break: break-all;`;
+            entry.textContent = text;
+            this.logContainer.appendChild(entry);
+            this.liveEntries.set(key, entry);
+        }
     }
 
     /**
