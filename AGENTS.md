@@ -1,4 +1,4 @@
-# GameFramework-Cocos — Agent Rules
+# GameForge Cinder — Agent Rules
 
 > 本文件是 OpenCode AI agent 的仓库级规则。所有 AI 会话自动加载此文件。
 > 优先级：用户指令 > 本文件 > 默认系统提示。
@@ -7,7 +7,7 @@
 
 ## 项目概述
 
-CocosCreator 3.x 模块化游戏框架（参照 Unity GameFramework），TypeScript 实现。
+引擎无关的模块化 TypeScript 游戏框架，灵感源自 Unity GameFramework，通过 IoC/DI 实现引擎解耦。
 兼作 8 周主程培训项目。
 
 ### Build & Test

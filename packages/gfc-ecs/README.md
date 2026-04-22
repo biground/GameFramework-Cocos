@@ -1,10 +1,10 @@
 # @gfc/ecs
 
-> GameFramework-Cocos 的高性能 ECS 插件，基于 SparseSet 架构。Generational Entity ID、多字位掩码（BitMask）、查询缓存、响应式分组（ReactiveGroup）、命令缓冲区——为游戏逻辑提供数据驱动的开发范式。
+> GameForge Cinder 的高性能 ECS 插件，基于 SparseSet 架构。Generational Entity ID、多字位掩码（BitMask）、查询缓存、响应式分组（ReactiveGroup）、命令缓冲区——为游戏逻辑提供数据驱动的开发范式。
 
 ## 安装
 
-`@gfc/ecs` 是 GameFramework-Cocos 的独立插件包，位于 `packages/gfc-ecs/`。
+`@gfc/ecs` 是 GameForge Cinder 的独立插件包，位于 `packages/gfc-ecs/`。
 
 ```jsonc
 // package.json

@@ -1,7 +1,7 @@
 {
-  "name": "gameframework-cocos",
+  "name": "gameforge-cinder",
   "version": "0.1.0",
-  "description": "基于 Unity GameFramework 设计思想的 CocosCreator 3.x 游戏框架",
+  "description": "引擎无关的模块化 TypeScript 游戏框架，灵感源自 Unity GameFramework",
   "scripts": {
     "lint": "eslint 'assets/scripts/**/*.ts' 'tests/**/*.ts'",
     "lint:fix": "eslint 'assets/scripts/**/*.ts' 'tests/**/*.ts' --fix",
@@ -17,7 +17,7 @@
     "cocos-creator",
     "game-framework",
     "typescript",
-    "gameframework"
+    "gameforge"
   ],
   "author": "biground",
   "license": "MIT",

@@ -1,5 +1,5 @@
 plan_id: i18n-module
-objective: 研究 GameFramework-Cocos 项目的 i18n（多语言）模块需求和架构设计
+objective: 研究 GameForge Cinder 项目的 i18n（多语言）模块需求和架构设计
 focus_area: i18n_localization
 created_at: '2026-04-17T15:56:47+08:00'
 created_by: gem-researcher

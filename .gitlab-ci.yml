@@ -1,5 +1,5 @@
 # =============================================================================
-# GameFramework-Cocos GitLab CI/CD 配置
+# GameForge Cinder GitLab CI/CD 配置
 # =============================================================================
 # 触发条件：push 到任意分支、Merge Request
 # 流水线结构：check（lint + test 并行）→ report
