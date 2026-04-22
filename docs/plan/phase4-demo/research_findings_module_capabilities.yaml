@@ -448,7 +448,7 @@ uncovered_capabilities:
       suggestion_for_demo: '网络聊天 Demo 用真实 WebSocket（可使用简单 Echo Server）'
 
     - area: 'fbi-ecs 插件'
-      description: 'packages/gfc-ecs/ 目录已存在但未在进度中提及，状态未知'
+      description: 'packages/fbi-ecs/ 目录已存在但未在进度中提及，状态未知'
       note: '如果已完成可在 Demo 中对比 Entity 与 ECS 模式'
 
 # ═══════════════════════════════════════════════════════
@@ -478,6 +478,6 @@ gaps:
       affects: []
 
     - area: 'fbi-ecs 包状态不明'
-      description: 'packages/gfc-ecs/ 目录存在，有 src/ 和 tests/，但 training/progress.md 未提及'
+      description: 'packages/fbi-ecs/ 目录存在，有 src/ 和 tests/，但 training/progress.md 未提及'
       impact: nice_to_know
       affects: []

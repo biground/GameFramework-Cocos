@@ -12,7 +12,7 @@
 对比 EC（Entity-Component）和 ECS（Entity-Component-System）两种架构，为 fbi-ecs 插件设计方案定稿。
 
 ### 具体内容
-1. 阅读 `packages/gfc-ecs/` 现有代码和 README
+1. 阅读 `packages/fbi-ecs/` 现有代码和 README
 2. 梳理 ECS 核心概念：Entity 只是 ID、Component 纯数据、System 纯逻辑
 3. 设计 Query API：如何高效查询"拥有 Position + Velocity 的所有实体"
 4. 考虑与现有 EntityManager（EC 模式）的共存策略

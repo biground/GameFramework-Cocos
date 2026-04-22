@@ -1,6 +1,6 @@
 plan_id: ecs-optimization
 objective: "研究 5 个 ECS 优化方向（Generational ID / Bitwise Mask / Query Cache / Command Buffer / System Phase），输出设计方案"
-focus_area: "packages/gfc-ecs/src — ECS 核心优化"
+focus_area: "packages/fbi-ecs/src — ECS 核心优化"
 created_at: "2026-04-09"
 created_by: researcher
 status: completed
@@ -13,7 +13,7 @@ tldr: |
 
 research_metadata:
   methodology: "read_file 逐文件精读 + 结构分析 + 业界 ECS 实践对比"
-  scope: "packages/gfc-ecs/src 全部 5 个源文件 + 4 个测试文件"
+  scope: "packages/fbi-ecs/src 全部 5 个源文件 + 4 个测试文件"
   confidence: high
   coverage: 100
   decision_blockers: 0
@@ -25,7 +25,7 @@ research_metadata:
 
 files_analyzed:
   - file: EcsDefs.ts
-    path: packages/gfc-ecs/src/EcsDefs.ts
+    path: packages/fbi-ecs/src/EcsDefs.ts
     purpose: "类型定义：ComponentType（phantom type + 自增 typeId）、EcsEntityId、ISystem、IEcsWorldAccess、QueryDescriptor"
     key_elements:
       - element: ComponentType
@@ -48,7 +48,7 @@ files_analyzed:
     lines: 115
 
   - file: SparseSet.ts
-    path: packages/gfc-ecs/src/SparseSet.ts
+    path: packages/fbi-ecs/src/SparseSet.ts
     purpose: "泛型稀疏集合，entityId → data 映射，swap-remove O(1)"
     key_elements:
       - element: SparseSet
@@ -59,7 +59,7 @@ files_analyzed:
     lines: 120
 
   - file: ComponentStorage.ts
-    path: packages/gfc-ecs/src/ComponentStorage.ts
+    path: packages/fbi-ecs/src/ComponentStorage.ts
     purpose: "SparseSet 的薄封装，per ComponentType 一个实例"
     key_elements:
       - element: ComponentStorage
@@ -70,7 +70,7 @@ files_analyzed:
     lines: 78
 
   - file: SystemManager.ts
-    path: packages/gfc-ecs/src/SystemManager.ts
+    path: packages/fbi-ecs/src/SystemManager.ts
     purpose: "System 注册/排序/调度，脏标记排序优化"
     key_elements:
       - element: SystemManager
@@ -81,7 +81,7 @@ files_analyzed:
     lines: 76
 
   - file: EcsWorld.ts
-    path: packages/gfc-ecs/src/EcsWorld.ts
+    path: packages/fbi-ecs/src/EcsWorld.ts
     purpose: "核心容器：Entity 管理（ID 回收）、Component CRUD、Query、System 生命周期"
     key_elements:
       - element: _recycledIds
