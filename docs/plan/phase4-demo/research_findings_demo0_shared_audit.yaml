@@ -1,0 +1,473 @@
+plan_id: phase4-demo
+objective: "审计 Demo0 共享基础设施所有文件的实现状态，对比 demo-design.md 规范，识别差距"
+focus_area: demo0-shared-infrastructure-audit
+created_at: "2026-04-21"
+created_by: gem-researcher
+status: completed
+
+tldr: |
+  - 12 个共享文件中：1 个完整实现（MockResourceLoader），2 个部分实现（DemoBase、MockNetworkSocket），2 个骨架（HtmlRenderer、MockVersionComparator — 有类/方法但逻辑未实现），7 个空文件
+  - 6 个测试文件全部为空（0 行测试代码），1 个集成测试文件也为空
+  - MockResourceLoader 是唯一可立即使用的 Mock，具备完整的异步加载、resolve/reject、autoSuccess、延迟模拟功能
+  - DemoBase 与规范差距巨大：规范要求 bootstrap()、startMainLoop()、getModule()、setupProcedures()、setupDataTables()；当前只有 start()/stop()/isRunning
+  - HtmlRenderer 规范要求 log()、separator()、createButtonGroup()、addButton()、createStatusPanel()、updateStatus()、createTable()；当前仅有 render()/renderWithStyle()（完全不匹配）
+  - MockNetworkSocket 有基本的 connect/send/close/simulateMessage，但缺少规范中的 latency 模拟、autoResponse、丢包率、simulateDisconnect/Reconnect
+
+research_metadata:
+  methodology: "逐文件 read_file 全量读取 + 框架接口 Defs 文件交叉验证 + demo-design.md 规范对比"
+  scope: "assets/scripts/game/shared/ 全部 12 文件 + tests/game/ 4 文件 + tests/game/shared/ 1 文件 + tests/integration/ 1 文件 + 10 个框架接口定义文件"
+  confidence: high
+  coverage: 100
+  decision_blockers: 0
+  research_blockers: 0
+
+# ═══════════════════════════════════════════════════════════
+# 文件逐一分析
+# ═══════════════════════════════════════════════════════════
+
+files_analyzed:
+
+  # ─── 1. DemoBase.ts ───────────────────────────────────
+  - file: DemoBase.ts
+    path: assets/scripts/game/shared/DemoBase.ts
+    purpose: "所有 Demo 的抽象基类"
+    language: TypeScript
+    lines: 41
+    status: skeleton
+    key_elements:
+      - element: DemoBase
+        type: class
+        location: "DemoBase.ts:10"
+        description: "abstract class，有 _isRunning 属性和 isRunning getter"
+      - element: start
+        type: method
+        location: "DemoBase.ts:24"
+        description: "abstract start(): void"
+      - element: stop
+        type: method
+        location: "DemoBase.ts:30"
+        description: "abstract stop(): void"
+      - element: isRunning
+        type: property
+        location: "DemoBase.ts:37"
+        description: "getter，返回 _isRunning"
+    gap_vs_spec:
+      - "缺少 gameEntry: GameEntry 属性"
+      - "缺少 htmlRenderer: HtmlRenderer 属性"
+      - "缺少 async bootstrap(): Promise<void> — 框架模块初始化 + Mock 策略注入"
+      - "缺少 abstract setupProcedures(): void"
+      - "缺少 abstract setupDataTables(): void"
+      - "缺少 startMainLoop(fps?: number): void — setInterval 模拟 update"
+      - "缺少 stopMainLoop(): void"
+      - "缺少 protected getModule<T extends ModuleBase>(name: string): T"
+      - "当前的 start()/stop() 与规范不对应（规范用 bootstrap + startMainLoop）"
+
+  # ─── 2. HtmlRenderer.ts ──────────────────────────────
+  - file: HtmlRenderer.ts
+    path: assets/scripts/game/shared/HtmlRenderer.ts
+    purpose: "HTML 日志 + 按钮 + 状态面板渲染器"
+    language: TypeScript
+    lines: 37
+    status: skeleton
+    key_elements:
+      - element: HtmlRenderer
+        type: class
+        location: "HtmlRenderer.ts:10"
+        description: "有 TAG 常量"
+      - element: render
+        type: method
+        location: "HtmlRenderer.ts:21"
+        description: "render(text: string): string — TODO，直接返回 text"
+      - element: renderWithStyle
+        type: method
+        location: "HtmlRenderer.ts:31"
+        description: "renderWithStyle(text, style): string — 包裹 span 标签"
+    gap_vs_spec:
+      - "当前 API 完全不匹配规范"
+      - "缺少 log(message: string, color?: string): void"
+      - "缺少 separator(title?: string): void"
+      - "缺少 createButtonGroup(groupName: string): HTMLElement"
+      - "缺少 addButton(group, label, onClick, disabled?): HTMLButtonElement"
+      - "缺少 clearLog(): void"
+      - "缺少 createStatusPanel(panelId, title): StatusPanel"
+      - "缺少 updateStatus(panelId, key, value): void"
+      - "缺少 createTable(headers, rows): HTMLElement"
+      - "当前 render/renderWithStyle 在规范中不存在，需要重写"
+
+  # ─── 3. MockResourceLoader.ts ────────────────────────
+  - file: MockResourceLoader.ts
+    path: assets/scripts/game/shared/MockResourceLoader.ts
+    purpose: "模拟资源加载器，实现 IResourceLoader"
+    language: TypeScript
+    lines: 91
+    status: complete
+    key_elements:
+      - element: MockResourceLoader
+        type: class
+        location: "MockResourceLoader.ts:7"
+        description: "implements IResourceLoader，完整实现"
+      - element: loadAsset
+        type: method
+        location: "MockResourceLoader.ts:18"
+        description: "异步加载，支持 autoSuccess 模式"
+      - element: releaseAsset
+        type: method
+        location: "MockResourceLoader.ts:30"
+        description: "释放资源，记录到 releaseRequests"
+      - element: registerAsset
+        type: method
+        location: "MockResourceLoader.ts:36"
+        description: "预注册 Mock 资源"
+      - element: resolve
+        type: method
+        location: "MockResourceLoader.ts:41"
+        description: "手动触发成功回调"
+      - element: reject
+        type: method
+        location: "MockResourceLoader.ts:53"
+        description: "手动触发失败回调"
+      - element: progress
+        type: method
+        location: "MockResourceLoader.ts:65"
+        description: "手动触发进度回调"
+      - element: setAutoSuccess
+        type: method
+        location: "MockResourceLoader.ts:73"
+        description: "启用/禁用自动成功模式"
+      - element: setLoadDelay
+        type: method
+        location: "MockResourceLoader.ts:78"
+        description: "设置模拟加载延迟"
+      - element: _scheduleCallback
+        type: method
+        location: "MockResourceLoader.ts:83"
+        description: "内部延迟调度"
+    gap_vs_spec: []
+    notes: |
+      完整实现了 IResourceLoader 接口（loadAsset + releaseAsset），
+      额外提供了测试辅助方法（registerAsset, resolve, reject, progress, setAutoSuccess, setLoadDelay）。
+      符合规范要求，可直接使用。
+
+  # ─── 4. MockAudioPlayer.ts ──────────────────────────
+  - file: MockAudioPlayer.ts
+    path: assets/scripts/game/shared/MockAudioPlayer.ts
+    purpose: "模拟音频播放器"
+    language: TypeScript
+    lines: 0
+    status: empty
+    key_elements: []
+    gap_vs_spec:
+      - "文件为空，需完整实现"
+      - "需实现 IAudioPlayer 接口：play(audioClip, config) → IAudioInstance, stopAll()"
+      - "规范要求 playHistory 数组记录所有播放操作"
+      - "需创建 MockAudioInstance 实现 IAudioInstance（play/stop/pause/resume/setVolume/onComplete）"
+
+  # ─── 5. MockSceneLoader.ts ─────────────────────────
+  - file: MockSceneLoader.ts
+    path: assets/scripts/game/shared/MockSceneLoader.ts
+    purpose: "模拟场景加载器"
+    language: TypeScript
+    lines: 0
+    status: empty
+    key_elements: []
+    gap_vs_spec:
+      - "文件为空，需完整实现"
+      - "需实现 ISceneLoader 接口：loadScene(sceneName, callbacks), unloadScene(sceneName)"
+      - "规范要求：记录场景切换历史、模拟加载延迟、回调 onProgress"
+
+  # ─── 6. MockNetworkSocket.ts ────────────────────────
+  - file: MockNetworkSocket.ts
+    path: assets/scripts/game/shared/MockNetworkSocket.ts
+    purpose: "模拟网络 Socket"
+    language: TypeScript
+    lines: 73
+    status: partial
+    key_elements:
+      - element: MockNetworkSocket
+        type: class
+        location: "MockNetworkSocket.ts:11"
+        description: "implements INetworkSocket"
+      - element: connect
+        type: method
+        location: "MockNetworkSocket.ts:37"
+        description: "设置 url、_connected=true，调用 onOpen"
+      - element: send
+        type: method
+        location: "MockNetworkSocket.ts:49"
+        description: "TODO 标记，仅在未连接时触发 onError"
+      - element: close
+        type: method
+        location: "MockNetworkSocket.ts:57"
+        description: "设 _connected=false，调用 onClose(1000, 'Normal closure')"
+      - element: simulateMessage
+        type: method
+        location: "MockNetworkSocket.ts:65"
+        description: "模拟接收消息"
+      - element: isConnected
+        type: property
+        location: "MockNetworkSocket.ts:72"
+        description: "getter"
+    gap_vs_spec:
+      - "缺少 _latencyRange: [number, number] — 延迟模拟"
+      - "缺少 _responseHandlers: Map — 自动回复映射"
+      - "缺少 registerAutoResponse(requestId, handler) — 注册自动回复"
+      - "缺少 setPacketLossRate(rate) — 模拟丢包"
+      - "缺少 simulateDisconnect() — 模拟断线"
+      - "缺少 simulateReconnect() — 模拟重连"
+      - "send() 内部是 TODO，未记录发送数据"
+      - "connect() 是同步的，规范可能要求模拟异步延迟"
+      - "未使用 Logger 代替 console（但当前也没有 console 调用，只是有 TODO）"
+
+  # ─── 7. MockUIFormFactory.ts ────────────────────────
+  - file: MockUIFormFactory.ts
+    path: assets/scripts/game/shared/MockUIFormFactory.ts
+    purpose: "模拟 UI 表单工厂"
+    language: TypeScript
+    lines: 0
+    status: empty
+    key_elements: []
+    gap_vs_spec:
+      - "文件为空，需完整实现"
+      - "需实现 IUIFormFactory 接口：createForm(formName, config, asset) → UIFormBase, destroyForm(form)"
+      - "规范要求：创建轻量 MockUIForm 实例，记录生命周期"
+      - "需创建 MockUIForm 继承 UIFormBase"
+
+  # ─── 8. MockEntityFactory.ts ────────────────────────
+  - file: MockEntityFactory.ts
+    path: assets/scripts/game/shared/MockEntityFactory.ts
+    purpose: "模拟实体工厂"
+    language: TypeScript
+    lines: 0
+    status: empty
+    key_elements: []
+    gap_vs_spec:
+      - "文件为空，需完整实现"
+      - "需实现 IEntityFactory 接口：createEntity(groupName) → EntityBase, destroyEntity(entity)"
+      - "规范要求：创建 MockEntity 继承 EntityBase，内存中管理"
+
+  # ─── 9. MockDataTableParser.ts ─────────────────────
+  - file: MockDataTableParser.ts
+    path: assets/scripts/game/shared/MockDataTableParser.ts
+    purpose: "模拟数据表解析器"
+    language: TypeScript
+    lines: 0
+    status: empty
+    key_elements: []
+    gap_vs_spec:
+      - "文件为空，需完整实现"
+      - "需实现 IDataTableParser 接口：parse<T extends IDataRow>(rawData: unknown) → T[]"
+      - "规范要求：直接接收 JSON 数组，无需文件解析"
+
+  # ─── 10. MockHotUpdateAdapter.ts ───────────────────
+  - file: MockHotUpdateAdapter.ts
+    path: assets/scripts/game/shared/MockHotUpdateAdapter.ts
+    purpose: "模拟热更新适配器"
+    language: TypeScript
+    lines: 0
+    status: empty
+    key_elements: []
+    gap_vs_spec:
+      - "文件为空，需完整实现"
+      - "需实现 IHotUpdateAdapter 接口（全部 7 个异步方法）："
+      - "  getLocalManifest() → Promise<ManifestInfo | null>"
+      - "  fetchRemoteVersion(url) → Promise<string>"
+      - "  fetchRemoteManifest(url) → Promise<ManifestInfo>"
+      - "  downloadAsset(url, savePath) → Promise<boolean>"
+      - "  verifyFile(filePath, expectedMd5) → Promise<boolean>"
+      - "  applyUpdate() → Promise<boolean>"
+      - "  rollback() → Promise<boolean>"
+      - "规范要求：模拟版本检查、清单对比、文件下载流程"
+
+  # ─── 11. MockLocalizationLoader.ts ─────────────────
+  - file: MockLocalizationLoader.ts
+    path: assets/scripts/game/shared/MockLocalizationLoader.ts
+    purpose: "模拟本地化数据加载器"
+    language: TypeScript
+    lines: 0
+    status: empty
+    key_elements: []
+    gap_vs_spec:
+      - "文件为空，需完整实现"
+      - "规范描述为自定义接口（非框架标准接口），内存中多语言数据，模拟资源加载"
+      - "LocalizationManager.loadTranslations() 接收 Record<string, Record<string, string>>"
+      - "此 Mock 应提供预设多语言数据并通过 loadTranslations 注入"
+
+  # ─── 12. MockVersionComparator.ts ──────────────────
+  - file: MockVersionComparator.ts
+    path: assets/scripts/game/shared/MockVersionComparator.ts
+    purpose: "可编程的版本比较器 Mock"
+    language: TypeScript
+    lines: 0
+    status: empty
+    key_elements: []
+    gap_vs_spec:
+      - "文件为空，需完整实现"
+      - "需实现 IVersionComparator 接口：compare(localVersion, remoteVersion) → VersionCompareResult"
+      - "规范要求：可编程的版本比较结果（用于测试各种场景）"
+      - "注意：框架已有 SemverComparator 实际实现，此 Mock 用于测试时注入自定义行为"
+
+# ═══════════════════════════════════════════════════════════
+# 测试文件分析
+# ═══════════════════════════════════════════════════════════
+
+test_files_analyzed:
+  - file: tests/game/MockResourceLoader.test.ts
+    lines: 0
+    status: empty
+
+  - file: tests/game/MockAudioPlayer.test.ts
+    lines: 0
+    status: empty
+
+  - file: tests/game/MockSceneLoader.test.ts
+    lines: 0
+    status: empty
+
+  - file: tests/game/MockNetworkSocket.test.ts
+    lines: 0
+    status: empty
+
+  - file: tests/game/shared/MockUIFormFactory.test.ts
+    lines: 0
+    status: empty
+
+  - file: tests/integration/demo0-infrastructure.test.ts
+    lines: 0
+    status: empty
+
+# ═══════════════════════════════════════════════════════════
+# 框架接口契约摘要（Mock 必须满足的接口）
+# ═══════════════════════════════════════════════════════════
+
+interface_contracts:
+  IResourceLoader:
+    file: framework/resource/ResourceDefs.ts
+    methods:
+      - "loadAsset(path: string, callbacks: LoadAssetCallbacks): void"
+      - "releaseAsset(path: string): void"
+    notes: "MockResourceLoader 已完整实现"
+
+  IAudioPlayer:
+    file: framework/audio/AudioDefs.ts
+    methods:
+      - "play(audioClip: unknown, config: AudioPlayConfig): IAudioInstance"
+      - "stopAll(): void"
+    dependencies:
+      - "IAudioInstance 接口需实现：id, isPlaying, isPaused, volume, play(), stop(), pause(), resume(), setVolume(), onComplete()"
+      - "AudioPlayConfig: loop?, volume?, fadeIn?"
+
+  ISceneLoader:
+    file: framework/scene/SceneDefs.ts
+    methods:
+      - "loadScene(sceneName: string, callbacks: LoadSceneCallbacks): void"
+      - "unloadScene(sceneName: string): void"
+    dependencies:
+      - "LoadSceneCallbacks: onProgress?, onSuccess?, onFailure?"
+
+  INetworkSocket:
+    file: framework/network/NetworkDefs.ts
+    methods:
+      - "connect(url: string): void"
+      - "send(data: ArrayBuffer | Uint8Array): void"
+      - "close(): void"
+    properties:
+      - "onOpen: (() => void) | null"
+      - "onClose: ((code: number, reason: string) => void) | null"
+      - "onMessage: ((data: ArrayBuffer) => void) | null"
+      - "onError: ((error: Error) => void) | null"
+    notes: "MockNetworkSocket 部分实现，缺少延迟/丢包/断线模拟"
+
+  IUIFormFactory:
+    file: framework/ui/UIDefs.ts
+    methods:
+      - "createForm(formName: string, config: UIFormConfig, asset: unknown): UIFormBase"
+      - "destroyForm(form: UIFormBase): void"
+    dependencies:
+      - "需创建 MockUIForm extends UIFormBase（实现 formName, layer getter）"
+
+  IEntityFactory:
+    file: framework/entity/EntityDefs.ts
+    methods:
+      - "createEntity(groupName: string): EntityBase"
+      - "destroyEntity(entity: EntityBase): void"
+    dependencies:
+      - "需创建 MockEntity extends EntityBase"
+
+  IDataTableParser:
+    file: framework/datatable/DataTableDefs.ts
+    methods:
+      - "parse<T extends IDataRow>(rawData: unknown): T[]"
+    notes: "最简单的 Mock——直接 JSON 数组返回"
+
+  IHotUpdateAdapter:
+    file: framework/hotupdate/HotUpdateDefs.ts
+    methods:
+      - "getLocalManifest(): Promise<ManifestInfo | null>"
+      - "fetchRemoteVersion(url: string): Promise<string>"
+      - "fetchRemoteManifest(url: string): Promise<ManifestInfo>"
+      - "downloadAsset(url: string, savePath: string): Promise<boolean>"
+      - "verifyFile(filePath: string, expectedMd5: string): Promise<boolean>"
+      - "applyUpdate(): Promise<boolean>"
+      - "rollback(): Promise<boolean>"
+
+  IVersionComparator:
+    file: framework/hotupdate/HotUpdateDefs.ts
+    methods:
+      - "compare(localVersion: string, remoteVersion: string): VersionCompareResult"
+
+  MockLocalizationLoader:
+    file: "(自定义接口，非框架标准)"
+    notes: "为 LocalizationManager.loadTranslations(data) 提供内存中的多语言数据"
+
+# ═══════════════════════════════════════════════════════════
+# 综合统计
+# ═══════════════════════════════════════════════════════════
+
+summary_matrix:
+  total_shared_files: 12
+  complete: 1    # MockResourceLoader
+  partial: 2     # DemoBase (skeleton with wrong API), MockNetworkSocket (basic impl, missing features)
+  skeleton: 1    # HtmlRenderer (has class/methods but wrong API per spec)
+  empty: 8       # MockAudioPlayer, MockSceneLoader, MockUIFormFactory, MockEntityFactory, MockDataTableParser, MockHotUpdateAdapter, MockLocalizationLoader, MockVersionComparator
+
+  total_test_files: 6
+  tests_with_content: 0
+  tests_empty: 6
+
+  integration_test_files: 1
+  integration_tests_with_content: 0
+  integration_tests_empty: 1
+
+  implementation_readiness: "~8% — 仅 MockResourceLoader 可直接使用"
+
+# ═══════════════════════════════════════════════════════════
+# 实施优先级建议（纯事实排列，按依赖关系）
+# ═══════════════════════════════════════════════════════════
+
+dependency_order:
+  - tier: 1
+    reason: "其他所有 Demo 和 Mock 都依赖这两个"
+    files:
+      - "DemoBase.ts — 需要完全重写以匹配规范（bootstrap, mainLoop, getModule）"
+      - "HtmlRenderer.ts — 需要完全重写以匹配规范（log, buttons, statusPanel）"
+
+  - tier: 2
+    reason: "所有 Demo 都会用到的核心 Mock"
+    files:
+      - "MockAudioPlayer.ts — 空文件，需新建 MockAudioInstance + MockAudioPlayer"
+      - "MockSceneLoader.ts — 空文件"
+      - "MockUIFormFactory.ts — 空文件，需新建 MockUIForm"
+      - "MockEntityFactory.ts — 空文件，需新建 MockEntity"
+      - "MockDataTableParser.ts — 空文件，最简单的 Mock"
+
+  - tier: 3
+    reason: "MockNetworkSocket 已有基础实现 + 特定 Demo 才需要的 Mock"
+    files:
+      - "MockNetworkSocket.ts — 补充延迟/丢包/断线/自动回复功能"
+      - "MockHotUpdateAdapter.ts — 空文件，仅 Demo6 深度使用"
+      - "MockLocalizationLoader.ts — 空文件"
+      - "MockVersionComparator.ts — 空文件，最简单的 Mock"
+
+open_questions: []
+
+gaps: []

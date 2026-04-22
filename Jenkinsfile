@@ -1,5 +1,5 @@
 // ============================================================
-// GameFramework-Cocos — 声明式 Jenkins Pipeline
+// GameForge Cinder — 声明式 Jenkins Pipeline
 //
 // 流水线阶段：
 //   1. Checkout   — 拉取代码

@@ -1,7 +1,7 @@
 {
     "name": "@gfc/ecs",
     "version": "0.1.0",
-    "description": "GameFramework-Cocos ECS 插件：SparseSet + Archetype 架构，DI 驱动的 System 管理",
+    "description": "GameForge Cinder ECS 插件：SparseSet + Archetype 架构，DI 驱动的 System 管理",
     "main": "src/index.ts",
     "peerDependencies": {
         "@gfc/core": ">=0.1.0"

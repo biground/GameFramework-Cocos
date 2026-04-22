@@ -1,6 +1,6 @@
-# GameFramework-Cocos
+# GameForge Cinder
 
-CocosCreator 3.x 模块化游戏框架（参照 Unity GameFramework），TypeScript 实现。
+引擎无关的模块化 TypeScript 游戏框架，灵感源自 Unity GameFramework，通过 IoC/DI 实现引擎解耦。
 兼作 8 周主程培训项目（详见 `training/progress.md`）。
 
 ## Build & Test

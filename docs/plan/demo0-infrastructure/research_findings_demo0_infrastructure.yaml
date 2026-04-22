@@ -1,0 +1,733 @@
+plan_id: demo0-infrastructure
+objective: "研究 Demo 0 — Demo Infrastructure 实现所需的所有框架接口、基类、现有文件状态和风险区域"
+focus_area: "game/shared Mock 策略层 + DemoBase + HtmlRenderer + 集成测试基础设施"
+created_at: "2026-04-21"
+created_by: gem-researcher
+status: completed
+
+tldr: |
+  - 所有 12 个 Mock 文件已在 game/shared/ 目录创建，但仅 MockResourceLoader 和 MockNetworkSocket 有实质实现，其余 10 个为空文件
+  - 全部 10 个策略接口（IResourceLoader、IAudioPlayer、ISceneLoader、INetworkSocket、IUIFormFactory、IEntityFactory、IDataTableParser、IHotUpdateAdapter、IVersionComparator + ILocalizationManager.loadTranslations）均已定义完毕，方法签名明确
+  - Entity 模块标记为"待开发"但实际已有完整实现（EntityManager/EntityGroup/EntityBase/EntityDefs），含测试文件，可直接使用
+  - DemoBase 和 HtmlRenderer 仅有骨架代码，需按 demo-design.md 规格重新实现（bootstrap 流程、主循环、HTML 布局）
+  - LocalizationManager 没有独立的 ILocalizationLoader 接口，翻译数据通过 loadTranslations() 直接注入，MockLocalizationLoader 可设计为数据提供者而非策略注入
+
+research_metadata:
+  methodology: "hybrid retrieval: file_search 定位文件 → read_file 详细审查接口签名和实现状态 → grep_search 交叉验证依赖关系"
+  scope: "framework/interfaces/、framework/*/Defs.ts（全部策略接口）、framework/core/（基类）、game/shared/（Mock 文件）、tests/integration/"
+  confidence: high
+  coverage: 95
+  decision_blockers: 0
+  research_blockers: 0
+
+# ═══════════════════════════════════════════════════════
+# 1. 策略接口详细清单（Mock 需要实现的接口）
+# ═══════════════════════════════════════════════════════
+
+files_analyzed:
+
+  # ─── IResourceLoader ───────────────────────────────
+  - file: ResourceDefs.ts
+    path: assets/scripts/framework/resource/ResourceDefs.ts
+    purpose: "定义资源加载器策略接口 IResourceLoader 和相关类型"
+    key_elements:
+      - element: IResourceLoader
+        type: interface
+        location: "ResourceDefs.ts:L93-L103"
+        description: |
+          资源加载器策略接口。方法：
+          - loadAsset(path: string, callbacks: LoadAssetCallbacks): void
+          - releaseAsset(path: string): void
+      - element: LoadAssetCallbacks
+        type: interface
+        location: "ResourceDefs.ts:L52-L59"
+        description: "加载回调：onSuccess?(path, asset) / onFailure?(path, error) / onProgress?(path, progress)"
+      - element: PreloadCallbacks
+        type: interface
+        location: "ResourceDefs.ts:L64-L75"
+        description: "预加载回调：onAssetLoaded / onAssetFailed / onProgress / onComplete"
+    language: TypeScript
+    lines: 117
+
+  # ─── IAudioPlayer ──────────────────────────────────
+  - file: AudioDefs.ts
+    path: assets/scripts/framework/audio/AudioDefs.ts
+    purpose: "定义音频播放器策略接口 IAudioPlayer 和音频数据类型"
+    key_elements:
+      - element: IAudioPlayer
+        type: interface
+        location: "AudioDefs.ts:L100-L113"
+        description: |
+          音频播放器策略接口。方法：
+          - play(audioClip: unknown, config: AudioPlayConfig): IAudioInstance
+          - stopAll(): void
+      - element: IAudioInstance
+        type: interface
+        location: "AudioDefs.ts:L39-L63"
+        description: |
+          音频实例接口。属性/方法：
+          - readonly id: string
+          - readonly isPlaying: boolean / isPaused: boolean
+          - volume: number
+          - play() / stop() / pause() / resume() / setVolume(v) / onComplete(cb)
+      - element: AudioPlayConfig
+        type: interface
+        location: "AudioDefs.ts:L68-L74"
+        description: "播放配置：loop?: boolean / volume?: number / fadeIn?: number"
+      - element: AudioType
+        type: enum
+        location: "AudioDefs.ts:L6-L11"
+        description: "Music = 0, Sound = 1"
+    language: TypeScript
+    lines: 140
+
+  # ─── ISceneLoader ──────────────────────────────────
+  - file: SceneDefs.ts
+    path: assets/scripts/framework/scene/SceneDefs.ts
+    purpose: "定义场景加载器策略接口 ISceneLoader"
+    key_elements:
+      - element: ISceneLoader
+        type: interface
+        location: "SceneDefs.ts:L38-L51"
+        description: |
+          场景加载器策略接口。方法：
+          - loadScene(sceneName: string, callbacks: LoadSceneCallbacks): void
+          - unloadScene(sceneName: string): void
+      - element: LoadSceneCallbacks
+        type: interface
+        location: "SceneDefs.ts:L7-L14"
+        description: "回调集合：onProgress?(progress) / onSuccess?(sceneName) / onFailure?(sceneName, error)"
+      - element: LoadSceneOptions
+        type: interface
+        location: "SceneDefs.ts:L20-L26"
+        description: "业务层选项：onProgress?(progress) / userData?: unknown"
+    language: TypeScript
+    lines: 73
+
+  # ─── INetworkSocket / IPacketHandler / IHeartbeatHandler ─
+  - file: NetworkDefs.ts
+    path: assets/scripts/framework/network/NetworkDefs.ts
+    purpose: "定义网络传输层、协议层、心跳处理器策略接口"
+    key_elements:
+      - element: INetworkSocket
+        type: interface
+        location: "NetworkDefs.ts:L75-L93"
+        description: |
+          网络 Socket 策略接口。方法/属性：
+          - connect(url: string): void
+          - send(data: ArrayBuffer | Uint8Array): void
+          - close(): void
+          - onOpen / onClose / onMessage / onError 回调属性
+      - element: IPacketHandler
+        type: interface
+        location: "NetworkDefs.ts:L115-L120"
+        description: |
+          消息包编解码策略：
+          - encode(packet: NetworkPacket): ArrayBuffer
+          - decode(data: ArrayBuffer): NetworkPacket
+      - element: IHeartbeatHandler
+        type: interface
+        location: "NetworkDefs.ts:L126-L131"
+        description: |
+          心跳处理器（可选策略）：
+          - createHeartbeatPacket(): NetworkPacket
+          - isHeartbeatResponse(packet: NetworkPacket): boolean
+      - element: NetworkPacket
+        type: interface
+        location: "NetworkDefs.ts:L28-L33"
+        description: "网络数据包：id: number / data: Uint8Array"
+    language: TypeScript
+    lines: 200+
+
+  # ─── IUIFormFactory ────────────────────────────────
+  - file: UIDefs.ts
+    path: assets/scripts/framework/ui/UIDefs.ts
+    purpose: "定义 UI 表单工厂策略接口 IUIFormFactory 和 UI 类型"
+    key_elements:
+      - element: IUIFormFactory
+        type: interface
+        location: "UIDefs.ts:L73-L86"
+        description: |
+          UI 表单工厂策略接口。方法：
+          - createForm(formName: string, config: UIFormConfig, asset: unknown): UIFormBase
+          - destroyForm(form: UIFormBase): void
+      - element: UIFormConfig
+        type: interface
+        location: "UIDefs.ts:L26-L42"
+        description: "表单配置：path / layer / allowMultiple? / pauseCoveredForm?"
+      - element: UILayer
+        type: enum
+        location: "UIDefs.ts:L6-L17"
+        description: "层级枚举：Background(0) / Normal(100) / Fixed(200) / Popup(300) / Toast(400)"
+      - element: OpenFormCallbacks
+        type: interface
+        location: "UIDefs.ts:L91-L96"
+        description: "打开回调：onSuccess?(formName, form) / onFailure?(formName, error)"
+    language: TypeScript
+    lines: 96
+
+  # ─── IEntityFactory ────────────────────────────────
+  - file: EntityDefs.ts
+    path: assets/scripts/framework/entity/EntityDefs.ts
+    purpose: "定义实体工厂策略接口 IEntityFactory 和实体类型"
+    key_elements:
+      - element: IEntityFactory
+        type: interface
+        location: "EntityDefs.ts:L22-L33"
+        description: |
+          实体工厂策略接口。方法：
+          - createEntity(groupName: string): EntityBase
+          - destroyEntity(entity: EntityBase): void
+      - element: EntityId
+        type: type
+        location: "EntityDefs.ts:L6"
+        description: "type EntityId = number"
+      - element: ShowEntityCallbacks
+        type: interface
+        location: "EntityDefs.ts:L39-L44"
+        description: "回调：onSuccess?(entityId, entity) / onFailure?(entityId, error)"
+    language: TypeScript
+    lines: 44
+
+  # ─── IDataTableParser ──────────────────────────────
+  - file: DataTableDefs.ts
+    path: assets/scripts/framework/datatable/DataTableDefs.ts
+    purpose: "定义数据表解析器策略接口 IDataTableParser"
+    key_elements:
+      - element: IDataTableParser
+        type: interface
+        location: "DataTableDefs.ts:L42-L49"
+        description: |
+          数据表解析器策略接口。方法：
+          - parse<T extends IDataRow>(rawData: unknown): T[]
+      - element: IDataRow
+        type: interface
+        location: "DataTableDefs.ts:L27-L30"
+        description: "数据行基础接口：readonly id: number"
+      - element: DataTableStorageMode
+        type: enum
+        location: "DataTableDefs.ts:L10-L15"
+        description: "Map（O(1) 查找）/ Array（顺序遍历）"
+    language: TypeScript
+    lines: 74
+
+  # ─── IHotUpdateAdapter / IVersionComparator ────────
+  - file: HotUpdateDefs.ts
+    path: assets/scripts/framework/hotupdate/HotUpdateDefs.ts
+    purpose: "定义热更新适配器和版本比较器策略接口"
+    key_elements:
+      - element: IHotUpdateAdapter
+        type: interface
+        location: "HotUpdateDefs.ts:L107-L120"
+        description: |
+          热更新适配器接口。方法（全 async）：
+          - getLocalManifest(): Promise<ManifestInfo | null>
+          - fetchRemoteVersion(url: string): Promise<string>
+          - fetchRemoteManifest(url: string): Promise<ManifestInfo>
+          - downloadAsset(url: string, savePath: string): Promise<boolean>
+          - verifyFile(filePath: string, expectedMd5: string): Promise<boolean>
+          - applyUpdate(): Promise<boolean>
+          - rollback(): Promise<boolean>
+      - element: IVersionComparator
+        type: interface
+        location: "HotUpdateDefs.ts:L51-L58"
+        description: |
+          版本比较策略接口。方法：
+          - compare(localVersion: string, remoteVersion: string): VersionCompareResult
+      - element: VersionCompareResult
+        type: enum
+        location: "HotUpdateDefs.ts:L44-L49"
+        description: "Newer(1) / Same(0) / Older(-1)"
+      - element: ManifestInfo
+        type: interface
+        location: "HotUpdateDefs.ts:L68-L78"
+        description: "清单信息：version / packageUrl / remoteManifestUrl / remoteVersionUrl / assets"
+      - element: HotUpdateState
+        type: enum
+        location: "HotUpdateDefs.ts:L8-L30"
+        description: "None → CheckingVersion → VersionAvailable → Downloading → Verifying → ReadyToApply → Applying → Completed / Failed"
+    language: TypeScript
+    lines: 200+
+
+  # ─── ILocalizationManager（无独立 Loader 接口）────
+  - file: ILocalizationManager.ts
+    path: assets/scripts/framework/interfaces/ILocalizationManager.ts
+    purpose: "本地化管理器接口定义"
+    key_elements:
+      - element: ILocalizationManager
+        type: interface
+        location: "ILocalizationManager.ts:L13-L62"
+        description: |
+          本地化管理器接口。注意：没有独立的 ILocalizationLoader 策略接口。
+          翻译数据通过 loadTranslations() 直接注入内存。方法：
+          - getCurrentLanguage(): Language
+          - setLanguage(lang: Language): void
+          - getAllLanguages(): Language[]
+          - t(key: string, params?: Record<string, string>): string
+          - hasKey(key: string): boolean
+          - loadTranslations(data: Record<string, Record<string, string>>): void
+    language: TypeScript
+    lines: 62
+
+  - file: LocalizationDefs.ts
+    path: assets/scripts/framework/i18n/LocalizationDefs.ts
+    purpose: "本地化类型定义"
+    key_elements:
+      - element: Language
+        type: enum
+        location: "LocalizationDefs.ts:L8-L17"
+        description: "ZH_CN / EN_US / JA_JP / KO_KR"
+    language: TypeScript
+    lines: 55
+
+  # ─── 核心基类 ──────────────────────────────────────
+  - file: ModuleBase.ts
+    path: assets/scripts/framework/core/ModuleBase.ts
+    purpose: "所有框架模块的抽象基类"
+    key_elements:
+      - element: ModuleBase
+        type: class
+        location: "ModuleBase.ts:L15-L38"
+        description: |
+          抽象基类。抽象属性/方法：
+          - abstract get moduleName(): string
+          - abstract get priority(): number
+          - abstract onInit(): void
+          - abstract onShutdown(): void
+          - onUpdate(_deltaTime: number): void （默认空实现）
+    language: TypeScript
+    lines: 38
+
+  - file: GameEntry.ts
+    path: assets/scripts/framework/core/GameEntry.ts
+    purpose: "游戏框架入口门面"
+    key_elements:
+      - element: GameEntry
+        type: class
+        location: "GameEntry.ts:L30-L45"
+        description: |
+          静态门面类。方法：
+          - static registerModule(mod: ModuleBase): void
+          - static getModule<T extends ModuleBase>(name: string): T
+          - static update(deltaTime: number): void
+          - static shutdown(): void
+    language: TypeScript
+    lines: 45
+
+  - file: GameModule.ts
+    path: assets/scripts/framework/core/GameModule.ts
+    purpose: "模块注册与生命周期管理器"
+    key_elements:
+      - element: GameModule
+        type: class
+        location: "GameModule.ts:L10-L100"
+        description: |
+          静态管理器。核心方法：
+          - static register(module: ModuleBase, allowReplace?: boolean): void
+          - static getModule<T>(name: string): T
+          - static hasModule(name: string): boolean
+          - static update(deltaTime: number): void （脏标记排序优化）
+          - static shutdownAll(): void （priority 降序关闭）
+    language: TypeScript
+    lines: 100
+
+  - file: Container.ts
+    path: assets/scripts/framework/di/Container.ts
+    purpose: "IoC 容器：服务绑定、解析、生命周期管理"
+    key_elements:
+      - element: Container
+        type: class
+        location: "Container.ts:L33-L150+"
+        description: |
+          DI 容器。核心方法：
+          - bind<T>(key: ServiceKey<T>): BindingBuilder<T>
+          - resolve<T>(key: ServiceKey<T>): T
+          - has<T>(key: ServiceKey<T>): boolean
+          - unbind<T>(key: ServiceKey<T>): void
+          支持 Singleton / Transient 生命周期，循环依赖检测，父子容器层级查找
+    language: TypeScript
+    lines: 150+
+
+  # ─── 实体模块（完整实现，虽然 registry 标记 ⬜）──
+  - file: EntityManager.ts
+    path: assets/scripts/framework/entity/EntityManager.ts
+    purpose: "实体管理器完整实现"
+    key_elements:
+      - element: EntityManager
+        type: class
+        location: "EntityManager.ts:L21-L100+"
+        description: |
+          完整实现 IEntityManager。Priority = 180。
+          通过 IEntityFactory 策略注入，内部使用 EntityGroup 管理对象池。
+          方法已全部实现：setEntityFactory / registerGroup / showEntity / hideEntity / hideAllEntities / getEntitiesByGroup / hasEntity
+    language: TypeScript
+    lines: 100+
+
+  - file: EntityBase.ts
+    path: assets/scripts/framework/entity/EntityBase.ts
+    purpose: "实体抽象基类"
+    key_elements:
+      - element: EntityBase
+        type: class
+        location: "EntityBase.ts:L17-L95"
+        description: |
+          抽象基类。属性：entityId / groupName / isActive
+          生命周期钩子：onShow(data?) / onHide() / onUpdate(deltaTime)
+          内部方法（EntityGroup 调用）：_init(id, groupName) / _setActive(active)
+    language: TypeScript
+    lines: 95
+
+  - file: EntityGroup.ts
+    path: assets/scripts/framework/entity/EntityGroup.ts
+    purpose: "实体分组，内部对象池复用"
+    key_elements:
+      - element: EntityGroup
+        type: class
+        location: "EntityGroup.ts:L14-L80+"
+        description: |
+          管理同类型实体的活跃列表和等待池。
+          showEntity 优先复用等待池，无则通过 factory 创建。
+          内含 activeCount / waitingCount getter。
+    language: TypeScript
+    lines: 80+
+
+  # ─── 现有 Mock 文件状态 ────────────────────────────
+  - file: DemoBase.ts
+    path: assets/scripts/game/shared/DemoBase.ts
+    purpose: "Demo 基类骨架（仅有 start/stop 抽象方法，缺少 bootstrap/mainLoop）"
+    key_elements:
+      - element: DemoBase
+        type: class
+        location: "DemoBase.ts:L10-L36"
+        description: |
+          当前状态：仅有骨架。包含 _isRunning / isRunning getter。
+          抽象方法：start() / stop()。
+          缺少 demo-design.md 要求的：bootstrap() / setupProcedures() / setupDataTables() / startMainLoop() / stopMainLoop() / getModule<T>()
+    language: TypeScript
+    lines: 36
+
+  - file: HtmlRenderer.ts
+    path: assets/scripts/game/shared/HtmlRenderer.ts
+    purpose: "HTML 渲染器骨架（仅 render/renderWithStyle 方法）"
+    key_elements:
+      - element: HtmlRenderer
+        type: class
+        location: "HtmlRenderer.ts:L10-L36"
+        description: |
+          当前状态：仅有骨架。
+          缺少 demo-design.md 要求的：log() / separator() / createButtonGroup() / addButton() / clearLog() / createStatusPanel() / updateStatus() / createTable()
+    language: TypeScript
+    lines: 36
+
+  - file: MockResourceLoader.ts
+    path: assets/scripts/game/shared/MockResourceLoader.ts
+    purpose: "资源加载器 Mock — 已有完整实现"
+    key_elements:
+      - element: MockResourceLoader
+        type: class
+        location: "MockResourceLoader.ts:L7-L96"
+        description: |
+          已完整实现 IResourceLoader。功能：
+          - registerAsset / loadAsset / releaseAsset
+          - resolve / reject / progress（测试控制方法）
+          - setAutoSuccess / setLoadDelay（模拟配置）
+          状态：✅ 可用
+    language: TypeScript
+    lines: 96
+
+  - file: MockNetworkSocket.ts
+    path: assets/scripts/game/shared/MockNetworkSocket.ts
+    purpose: "网络 Socket Mock — 基础实现已有，缺少高级模拟"
+    key_elements:
+      - element: MockNetworkSocket
+        type: class
+        location: "MockNetworkSocket.ts:L12-L75"
+        description: |
+          已实现 INetworkSocket 基本方法：connect / send / close + simulateMessage。
+          缺少 demo-design.md 要求的高级功能：
+          - registerAutoResponse（自动回复）
+          - setPacketLossRate（丢包模拟）
+          - simulateDisconnect / simulateReconnect（断线/重连模拟）
+          - 延迟模拟（latencyRange）
+          状态：⚠️ 部分实现
+    language: TypeScript
+    lines: 75
+
+# ═══════════════════════════════════════════════════════
+# 2. 空文件清单（需要实现）
+# ═══════════════════════════════════════════════════════
+
+patterns_found:
+  - category: architecture
+    pattern: "策略模式统一注入点"
+    description: |
+      所有 Manager 都遵循 setXxxStrategy(strategy) 模式：
+      ResourceManager.setResourceLoader(loader)、AudioManager.setAudioPlayer(player)、
+      SceneManager.setSceneLoader(loader)、UIManager.setUIFormFactory(factory)、
+      EntityManager.setEntityFactory(factory)、DataTableManager.setParser(parser)、
+      HotUpdateManager.setAdapter(adapter) + setComparator(comparator)。
+      LocalizationManager 是唯一不使用策略注入的——直接通过 loadTranslations() 注入数据。
+    examples:
+      - file: ResourceManager.ts
+        location: "IResourceManager.setResourceLoader()"
+        snippet: "setResourceLoader(loader: IResourceLoader): void"
+      - file: AudioManager.ts
+        location: "IAudioManager.setAudioPlayer()"
+        snippet: "setAudioPlayer(player: IAudioPlayer): void"
+      - file: HotUpdateManager.ts
+        location: "IHotUpdateManager.setAdapter() + setComparator()"
+        snippet: "setAdapter(adapter: IHotUpdateAdapter): void / setComparator(comparator: IVersionComparator): void"
+    prevalence: common
+
+  - category: architecture
+    pattern: "Mock 文件骨架已创建但多数为空"
+    description: |
+      game/shared/ 目录下 12 个文件已创建。实现状态：
+      ✅ 已实现：MockResourceLoader（完整）、MockNetworkSocket（基础）、DemoBase（骨架）、HtmlRenderer（骨架）
+      ❌ 空文件：MockAudioPlayer、MockSceneLoader、MockUIFormFactory、MockEntityFactory、
+                MockDataTableParser、MockHotUpdateAdapter、MockLocalizationLoader、MockVersionComparator
+    examples:
+      - file: MockAudioPlayer.ts
+        location: "game/shared/MockAudioPlayer.ts"
+        snippet: "(empty file)"
+      - file: MockSceneLoader.ts
+        location: "game/shared/MockSceneLoader.ts"
+        snippet: "(empty file)"
+    prevalence: common
+
+  - category: naming
+    pattern: "接口命名双轨制"
+    description: |
+      策略接口分布在两处：
+      1. framework/interfaces/ — Manager 接口（IResourceManager、IAudioManager 等），位于独立目录
+      2. framework/{module}/Defs.ts — 策略接口（IResourceLoader、IAudioPlayer 等），内嵌在 Defs 文件中
+      Mock 需要实现的是第 2 类（策略接口），不是第 1 类（Manager 接口）。
+      例外：IAudioManager 同时存在于 framework/audio/IAudioManager.ts（独立文件）和 framework/interfaces/ 没有它。
+    examples:
+      - file: ResourceDefs.ts
+        location: "framework/resource/ResourceDefs.ts"
+        snippet: "export interface IResourceLoader { ... }"
+      - file: IResourceManager.ts
+        location: "framework/interfaces/IResourceManager.ts"
+        snippet: "export interface IResourceManager { ... }"
+    prevalence: common
+
+  - category: testing
+    pattern: "集成测试文件已创建但为空"
+    description: |
+      tests/integration/demo0-infrastructure.test.ts 已存在但内容为空。
+      tests/__mocks__/ 仅包含 cc.ts（Cocos Creator 引擎 mock）。
+    examples:
+      - file: demo0-infrastructure.test.ts
+        location: "tests/integration/demo0-infrastructure.test.ts"
+        snippet: "(empty file)"
+    prevalence: rare
+
+related_architecture:
+  components_relevant_to_domain:
+    - component: GameModule (静态管理器)
+      responsibility: "模块注册、脏标记排序、生命周期驱动"
+      location: "framework/core/GameModule.ts"
+      relationship_to_domain: "DemoBase.bootstrap() 通过 GameModule.register() 注册所有模块"
+    - component: GameEntry (门面)
+      responsibility: "对外统一 API"
+      location: "framework/core/GameEntry.ts"
+      relationship_to_domain: "DemoBase 暴露 getModule<T>() 快捷方法，内部委托 GameEntry"
+    - component: Container (DI)
+      responsibility: "IoC 容器，服务注册/解析"
+      location: "framework/di/Container.ts"
+      relationship_to_domain: "demo-design.md 要求 DemoBase 使用 Container 统一注册 Mock 策略"
+    - component: UIFormBase (抽象基类)
+      responsibility: "UI 表单生命周期钩子"
+      location: "framework/ui/UIFormBase.ts"
+      relationship_to_domain: "MockUIFormFactory.createForm() 需返回 UIFormBase 子类实例"
+    - component: EntityBase (抽象基类)
+      responsibility: "实体生命周期钩子"
+      location: "framework/entity/EntityBase.ts"
+      relationship_to_domain: "MockEntityFactory.createEntity() 需返回 EntityBase 子类实例"
+
+  interfaces_used_by_domain:
+    - interface: IResourceLoader
+      location: "framework/resource/ResourceDefs.ts"
+      usage_pattern: "MockResourceLoader implements IResourceLoader"
+    - interface: IAudioPlayer
+      location: "framework/audio/AudioDefs.ts"
+      usage_pattern: "MockAudioPlayer implements IAudioPlayer"
+    - interface: ISceneLoader
+      location: "framework/scene/SceneDefs.ts"
+      usage_pattern: "MockSceneLoader implements ISceneLoader"
+    - interface: INetworkSocket
+      location: "framework/network/NetworkDefs.ts"
+      usage_pattern: "MockNetworkSocket implements INetworkSocket"
+    - interface: IUIFormFactory
+      location: "framework/ui/UIDefs.ts"
+      usage_pattern: "MockUIFormFactory implements IUIFormFactory"
+    - interface: IEntityFactory
+      location: "framework/entity/EntityDefs.ts"
+      usage_pattern: "MockEntityFactory implements IEntityFactory"
+    - interface: IDataTableParser
+      location: "framework/datatable/DataTableDefs.ts"
+      usage_pattern: "MockDataTableParser implements IDataTableParser"
+    - interface: IHotUpdateAdapter
+      location: "framework/hotupdate/HotUpdateDefs.ts"
+      usage_pattern: "MockHotUpdateAdapter implements IHotUpdateAdapter"
+    - interface: IVersionComparator
+      location: "framework/hotupdate/HotUpdateDefs.ts"
+      usage_pattern: "MockVersionComparator implements IVersionComparator"
+
+  data_flow_involving_domain: |
+    DemoBase.bootstrap() 创建所有 Manager 模块实例 → 创建所有 Mock 策略实例 →
+    通过 Manager.setXxxStrategy(mock) 注入 Mock → GameEntry.registerModule(manager) 注册全部模块 →
+    startMainLoop() 启动 setInterval 模拟帧循环 → 每帧调用 GameEntry.update(dt)
+
+  key_relationships_to_domain:
+    - from: DemoBase
+      to: GameEntry
+      relationship: "calls（registerModule、update、shutdown）"
+    - from: DemoBase
+      to: "All Mock strategies"
+      relationship: "creates and injects"
+    - from: MockUIFormFactory
+      to: UIFormBase
+      relationship: "creates subclass instances"
+    - from: MockEntityFactory
+      to: EntityBase
+      relationship: "creates subclass instances"
+    - from: MockResourceLoader
+      to: IResourceLoader
+      relationship: implements
+    - from: HtmlRenderer
+      to: Logger
+      relationship: "可选集成 — 将 Logger 输出重定向到 HTML 面板"
+
+related_conventions:
+  naming_patterns_in_domain: "Mock 类统一前缀 Mock + 接口名去掉 I 前缀（如 IResourceLoader → MockResourceLoader）"
+  structure_of_domain: "所有 Mock 文件位于 assets/scripts/game/shared/，测试位于 tests/integration/"
+  error_handling_in_domain: "框架统一 [模块名] 描述性消息 格式，Mock 中应保持一致"
+  testing_in_domain: "Jest 单元测试，路径别名 @framework/* @game/* 已在 jest.config.js 配置"
+  documentation_in_domain: "所有 public API 必须有中文 JSDoc"
+
+related_dependencies:
+  internal:
+    - component: EventManager
+      relationship_to_domain: outbound
+      direction: outbound
+    - component: ObjectPool
+      relationship_to_domain: outbound
+      direction: outbound
+    - component: TimerManager
+      relationship_to_domain: outbound
+      direction: outbound
+    - component: FsmManager
+      relationship_to_domain: outbound
+      direction: outbound
+    - component: ProcedureManager
+      relationship_to_domain: outbound
+      direction: outbound
+    - component: ResourceManager
+      relationship_to_domain: outbound
+      direction: outbound
+    - component: AudioManager
+      relationship_to_domain: outbound
+      direction: outbound
+    - component: SceneManager
+      relationship_to_domain: outbound
+      direction: outbound
+    - component: UIManager
+      relationship_to_domain: outbound
+      direction: outbound
+    - component: EntityManager
+      relationship_to_domain: outbound
+      direction: outbound
+    - component: NetworkManager
+      relationship_to_domain: outbound
+      direction: outbound
+    - component: DataTableManager
+      relationship_to_domain: outbound
+      direction: outbound
+    - component: LocalizationManager
+      relationship_to_domain: outbound
+      direction: outbound
+    - component: DebugManager
+      relationship_to_domain: outbound
+      direction: outbound
+    - component: HotUpdateManager
+      relationship_to_domain: outbound
+      direction: outbound
+  external: []
+
+# ═══════════════════════════════════════════════════════
+# 3. 实现任务清单（按优先级）
+# ═══════════════════════════════════════════════════════
+
+open_questions:
+  - question: "MockLocalizationLoader 的职责边界是什么？LocalizationManager 没有 ILocalizationLoader 接口"
+    context: |
+      LocalizationManager 不使用策略注入模式。翻译数据通过 loadTranslations(data) 直接注入。
+      MockLocalizationLoader 应该是一个数据提供者（生成测试用翻译数据），
+      而不是像其他 Mock 一样实现某个策略接口。
+    type: nice_to_know
+    affects: ["MockLocalizationLoader"]
+
+  - question: "DemoBase 应继承 ModuleBase 还是独立存在？"
+    context: |
+      demo-design.md 中 DemoBase 不是模块（不通过 GameModule.register 注册），
+      而是模块的组装者和主循环驱动者。当前骨架也没有继承 ModuleBase。
+      这是正确的设计——DemoBase 是框架使用者，不是框架的一部分。
+    type: nice_to_know
+    affects: ["DemoBase"]
+
+gaps:
+  - area: "空 Mock 文件（8 个）"
+    description: |
+      以下文件已创建但为空，需要完整实现：
+      1. MockAudioPlayer.ts — implements IAudioPlayer（需创建 MockAudioInstance）
+      2. MockSceneLoader.ts — implements ISceneLoader
+      3. MockUIFormFactory.ts — implements IUIFormFactory（需创建 MockUIForm extends UIFormBase）
+      4. MockEntityFactory.ts — implements IEntityFactory（需创建 MockEntity extends EntityBase）
+      5. MockDataTableParser.ts — implements IDataTableParser
+      6. MockHotUpdateAdapter.ts — implements IHotUpdateAdapter（所有方法返回 Promise）
+      7. MockLocalizationLoader.ts — 数据提供者（非策略接口），提供测试翻译数据
+      8. MockVersionComparator.ts — implements IVersionComparator
+    impact: research_blocker
+    affects: ["all-demo-tasks"]
+
+  - area: "DemoBase 需重写"
+    description: |
+      当前骨架仅有 start/stop，需按 demo-design.md 扩展：
+      - bootstrap(): 创建并注册所有 17 个模块 + 注入 Mock 策略
+      - setupProcedures(): 抽象方法，子类注册 Procedure
+      - setupDataTables(): 抽象方法，子类注册 DataTable
+      - startMainLoop(fps?): setInterval 模拟帧循环
+      - stopMainLoop(): clearInterval
+      - getModule<T>(): GameEntry.getModule 快捷方法
+    impact: research_blocker
+    affects: ["DemoBase"]
+
+  - area: "HtmlRenderer 需重写"
+    description: |
+      当前骨架仅有 render/renderWithStyle，需按 demo-design.md 实现完整 API：
+      log / separator / createButtonGroup / addButton / clearLog /
+      createStatusPanel / updateStatus / createTable + HTML 布局
+    impact: research_blocker
+    affects: ["HtmlRenderer"]
+
+  - area: "MockNetworkSocket 需增强"
+    description: |
+      基础 connect/send/close 已实现，缺少高级模拟功能：
+      registerAutoResponse / setPacketLossRate / simulateDisconnect / simulateReconnect / latencyRange
+    impact: nice_to_know
+    affects: ["MockNetworkSocket"]
+
+  - area: "集成测试文件为空"
+    description: "tests/integration/demo0-infrastructure.test.ts 已创建但无内容"
+    impact: nice_to_know
+    affects: ["integration-tests"]
+
+  - area: "Entity 模块 registry 标记不准确"
+    description: |
+      docs/module-registry.md 将 Entity 标记为 ⬜ 待开发，但实际代码已完整实现：
+      EntityManager / EntityGroup / EntityBase / EntityDefs + tests/entity/ 有测试文件。
+      建议更新 registry 状态为 ✅ 已完成。
+    impact: nice_to_know
+    affects: ["module-registry"]

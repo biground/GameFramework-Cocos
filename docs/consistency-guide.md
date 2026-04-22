@@ -66,7 +66,7 @@ throw new Error('not found');
 
 ### 第一步：告知 Agent 读取上下文
 ```
-我是用户，继续 GameFramework-Cocos 的开发。
+我是用户，继续 GameForge Cinder 的开发。
 请先读取以下文件：
 1. .github/copilot-instructions.md
 2. docs/module-registry.md

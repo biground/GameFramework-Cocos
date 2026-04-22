@@ -1,0 +1,1573 @@
+plan_id: demo1-idle-clicker
+objective: |
+  实现完整的 Idle Clicker 挂机放置 Demo，验证 Timer、DataTable、FSM、Procedure、Event 等核心模块在真实游戏场景下的协作能力。
+  核心循环：点击获取金币 → 购买/升级建筑 → 建筑自动产金 → 解锁新建筑 → 离线收益结算。
+created_at: "2026-04-21"
+created_by: gem-planner
+status: pending_approval
+research_confidence: high
+
+plan_metrics:
+  wave_1_task_count: 3
+  total_dependencies: 27
+  risk_score: medium
+
+tldr: |
+  7 波次、22 个任务的 DAG 执行计划：
+  - W1: 数据类型层（EventKey 定义、DataTable 行类型、游戏状态数据结构）
+  - W2: 核心系统层（BuildingSystem、AchievementSystem、OfflineRewardSystem、SaveSystem）
+  - W3: FSM 状态 + Procedure 流程
+  - W4: UI 面板 + 主 Demo 类
+  - W5: 系统单元测试（BuildingSystem、AchievementSystem、OfflineReward、SaveSystem）
+  - W6: FSM + Procedure 单元测试
+  - W7: 集成测试
+  所有实现在 worktree `/Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos/.worktrees/demo1` 中进行。
+
+open_questions: []
+
+pre_mortem:
+  overall_risk_level: medium
+  critical_failure_modes:
+    - scenario: Timer 多间隔精度累积误差导致产出数值偏差
+      likelihood: medium
+      impact: medium
+      mitigation: 测试中使用手动 update(dt) 而非真实计时，精确控制 deltaTime；产出计算使用 Math.floor 截断
+    - scenario: FSM 状态切换与 Timer 生命周期不同步（如升级中取消 Timer 泄漏）
+      likelihood: medium
+      impact: high
+      mitigation: 每个 FSM 状态的 onLeave 必须清理该状态创建的 Timer；测试验证状态切换后 Timer 数量
+    - scenario: 离线收益计算精度——长时间离线后浮点累积误差
+      likelihood: low
+      impact: medium
+      mitigation: 离线收益使用整数数学（totalOutput = outputPerSecond * seconds），不做帧级模拟
+    - scenario: SaveSystem 序列化/反序列化丢失字段或类型错误
+      likelihood: medium
+      impact: high
+      mitigation: SaveSystem 测试覆盖完整存档→读档往返验证；使用明确的 ISaveData 接口约束
+    - scenario: 循环依赖——BuildingSystem 与 AchievementSystem 互相触发事件导致无限循环
+      likelihood: low
+      impact: high
+      mitigation: 系统间仅通过 EventManager 单向通信；AchievementSystem 只监听事件不 emit 触发事件
+  assumptions:
+    - DemoBase、HtmlRenderer 及所有 Mock 策略已在 demo1 worktree 中可用且测试通过
+    - 框架 15 个模块 API 稳定，不需要修改框架层代码
+    - Jest + 路径别名配置在 worktree 中已正确设置
+    - DOM API 在测试环境中通过 jsdom 可用（HtmlRenderer 相关测试需要）
+
+implementation_specification:
+  code_structure: |
+    所有源码在 assets/scripts/game/demo1-idle/ 下，按职责分为 6 个子目录：
+    - data/: 数据类型定义（DataTable 行类型、游戏状态接口）
+    - events/: EventKey 定义
+    - systems/: 核心游戏系统（BuildingSystem、AchievementSystem、OfflineRewardSystem、SaveSystem）
+    - fsm/: 建筑 FSM 状态定义
+    - procedures/: 5 个 Procedure（Launch、Preload、OfflineSettle、Main、Settings）
+    - ui/: UI 面板（MainPanel、SettingsPanel）
+    测试文件在 tests/game/demo1-idle/ 下，与源码结构对应。
+  affected_areas:
+    - assets/scripts/game/demo1-idle/ (新建整个目录树)
+    - tests/game/demo1-idle/ (新建整个测试目录树)
+  component_details:
+    - component: IdleEvents
+      responsibility: 定义所有游戏事件的 EventKey（金币变化、建筑升级、成就解锁、离线收益等）
+      interfaces:
+        - "GOLD_CHANGED: EventKey<{ current: number; delta: number }>"
+        - "BUILDING_PURCHASED: EventKey<{ buildingId: number }>"
+        - "BUILDING_UPGRADED: EventKey<{ buildingId: number; newLevel: number }>"
+        - "BUILDING_PRODUCED: EventKey<{ buildingId: number; amount: number }>"
+        - "ACHIEVEMENT_UNLOCKED: EventKey<{ achievementId: number; reward: number }>"
+        - "OFFLINE_REWARD: EventKey<{ seconds: number; gold: number }>"
+        - "GAME_SAVED: EventKey<void>"
+        - "GAME_LOADED: EventKey<void>"
+    - component: BuildingConfigRow / UpgradeCurveRow / AchievementConfigRow
+      responsibility: DataTable 行类型定义，实现 IDataRow 接口
+      interfaces:
+        - "BuildingConfigRow extends IDataRow: id, name, baseCost, baseOutput, outputInterval, costMultiplier, outputPerLevel, maxLevel, unlockCondition"
+        - "UpgradeCurveRow extends IDataRow: id, buildingId, level, cost, output, upgradeTime"
+        - "AchievementConfigRow extends IDataRow: id, name, desc, type, target, reward"
+    - component: IdleGameData
+      responsibility: 游戏运行时状态数据结构（金币、建筑状态、成就、存档时间戳）
+      interfaces:
+        - "IBuildingState: { buildingId, level, owned, producing }"
+        - "IIdleGameData: { gold, totalGoldEarned, buildings, unlockedAchievements, lastSaveTime, clickPower }"
+        - "ISaveData: 序列化友好的存档格式"
+    - component: BuildingSystem
+      responsibility: 建筑管理——购买、升级、产出计算、解锁判定
+      interfaces:
+        - "init(eventManager, timerManager, dataTableManager): void"
+        - "purchaseBuilding(buildingId, gameData): boolean"
+        - "upgradeBuilding(buildingId, gameData): boolean"
+        - "startProduction(buildingId, gameData): void"
+        - "stopAllProduction(): void"
+        - "getTotalOutputPerSecond(gameData): number"
+        - "getUpgradeCost(buildingId, currentLevel): number"
+        - "canUnlockBuilding(buildingId, totalGold): boolean"
+    - component: AchievementSystem
+      responsibility: 成就条件检测、解锁和奖励发放
+      interfaces:
+        - "init(eventManager, dataTableManager): void"
+        - "checkAchievements(gameData): void"
+        - "getUnlockedAchievements(): number[]"
+        - "getAllAchievements(): AchievementConfigRow[]"
+    - component: OfflineRewardSystem
+      responsibility: 离线收益计算——基于时间差和当前产出速率
+      interfaces:
+        - "calculateReward(gameData, offlineSeconds): number"
+        - "getOfflineSeconds(lastSaveTime): number"
+    - component: SaveSystem
+      responsibility: 自动存档和读档（localStorage 序列化）
+      interfaces:
+        - "save(gameData): void"
+        - "load(): IIdleGameData | null"
+        - "hasSaveData(): boolean"
+        - "clearSaveData(): void"
+    - component: BuildingFsmStates
+      responsibility: 建筑 FSM 四个状态（Idle、Producing、Upgrading、MaxLevel）
+      interfaces:
+        - "BuildingIdleState extends FsmState"
+        - "BuildingProducingState extends FsmState"
+        - "BuildingUpgradingState extends FsmState"
+        - "BuildingMaxLevelState extends FsmState"
+    - component: Procedures (5个)
+      responsibility: 游戏流程驱动
+      interfaces:
+        - "LaunchProcedure: 初始化框架 → 切换到 Preload"
+        - "PreloadProcedure: 加载 DataTable → 切换到 OfflineSettle"
+        - "OfflineSettleProcedure: 计算离线收益 → 切换到 Main"
+        - "MainProcedure: 游戏主循环（UI 交互、Timer 驱动）"
+        - "SettingsProcedure: 设置面板（音量、存档管理）"
+    - component: IdleClickerDemo
+      responsibility: Demo 主入口类，继承 DemoBase，串联所有系统
+      interfaces:
+        - "setupProcedures(): 注册 5 个 Procedure 并启动 LaunchProcedure"
+        - "setupDataTables(): 注册 3 张配置表数据"
+    - component: IdleMainPanel / IdleSettingsPanel
+      responsibility: HTML UI 面板（通过 HtmlRenderer 渲染按钮和状态面板）
+      interfaces:
+        - "IdleMainPanel: 建筑列表、金币显示、点击按钮、升级按钮"
+        - "IdleSettingsPanel: 音量设置、存档管理"
+  dependencies:
+    - component: BuildingSystem
+      relationship: 依赖 EventManager(emit/on)、TimerManager(addTimer)、DataTableManager(getRow) 通过构造注入
+    - component: AchievementSystem
+      relationship: 监听 EventManager 事件（GOLD_CHANGED、BUILDING_UPGRADED），读取 DataTableManager 成就配置
+    - component: OfflineRewardSystem
+      relationship: 读取 BuildingSystem 的 getTotalOutputPerSecond 计算收益
+    - component: SaveSystem
+      relationship: 序列化 IIdleGameData，通过 EventManager emit GAME_SAVED/GAME_LOADED
+    - component: BuildingFsmStates
+      relationship: 状态内通过 blackboard 获取 BuildingSystem 和 TimerManager 引用
+    - component: Procedures
+      relationship: MainProcedure 持有 BuildingSystem、AchievementSystem、SaveSystem 引用，驱动 UI 更新
+    - component: IdleClickerDemo
+      relationship: 组合所有系统，继承 DemoBase 获取框架模块访问
+  integration_points:
+    - DemoBase.bootstrap() 初始化全部框架模块并注入 Mock 策略
+    - DataTableManager.createTable() 注册 building_config、upgrade_curve、achievement_config
+    - ProcedureManager.initialize() + startProcedure() 启动流程链
+    - FsmManager.createFsm() 为每个已购建筑创建独立 FSM
+    - TimerManager.addTimer() 为每个建筑创建独立产出 Timer（tag 分组）
+    - EventManager 连接所有系统的事件通信
+
+contracts:
+  - from_task: T01
+    to_task: T04
+    interface: IdleEvents 模块导出所有 EventKey 常量
+    format: "import { GOLD_CHANGED, BUILDING_UPGRADED, ... } from '../events/IdleEvents'"
+  - from_task: T02
+    to_task: T04
+    interface: BuildingConfigRow、UpgradeCurveRow、AchievementConfigRow 类型定义
+    format: "import { BuildingConfigRow } from '../data/BuildingConfigRow'"
+  - from_task: T03
+    to_task: T04
+    interface: IIdleGameData、IBuildingState、ISaveData 接口定义
+    format: "import { IIdleGameData, IBuildingState } from '../data/IdleGameData'"
+  - from_task: T03
+    to_task: T05
+    interface: IIdleGameData 和 ISaveData 序列化格式
+    format: ISaveData 接口用于 SaveSystem 的 JSON.stringify/parse
+  - from_task: T03
+    to_task: T06
+    interface: IIdleGameData 供 OfflineRewardSystem 读取建筑产出
+    format: "import { IIdleGameData } from '../data/IdleGameData'"
+  - from_task: T04
+    to_task: T08
+    interface: BuildingSystem 的 startProduction/stopAllProduction 供 FSM 状态调用
+    format: BuildingSystem 实例通过 FSM blackboard 传递
+  - from_task: T04
+    to_task: T09
+    interface: BuildingSystem 的 purchaseBuilding/upgradeBuilding 供 MainProcedure 调用
+    format: BuildingSystem 实例作为 MainProcedure 的依赖
+  - from_task: T05
+    to_task: T09
+    interface: SaveSystem 的 save/load 供 Procedure 调用
+    format: SaveSystem 实例传递给 Procedures
+  - from_task: T06
+    to_task: T10
+    interface: OfflineRewardSystem.calculateReward 供 OfflineSettleProcedure 调用
+    format: OfflineRewardSystem 实例传递给 OfflineSettleProcedure
+  - from_task: T07
+    to_task: T09
+    interface: AchievementSystem.checkAchievements 供 MainProcedure 驱动检查
+    format: AchievementSystem 实例传递给 MainProcedure
+  - from_task: T08
+    to_task: T09
+    interface: BuildingFsmDefs + 四个 FSM 状态类用于 FsmManager.createFsm
+    format: "import { BuildingIdleState, ... } from '../fsm/BuildingFsmStates'"
+  - from_task: T09
+    to_task: T12
+    interface: 5 个 Procedure 类导出供 IdleClickerDemo.setupProcedures 注册
+    format: "import { LaunchProcedure, ... } from './procedures/...'"
+  - from_task: T11
+    to_task: T12
+    interface: IdleMainPanel/IdleSettingsPanel UI 面板供 Procedures 打开
+    format: UIManager.registerForm + openForm
+
+tasks:
+  # ═══════════════════════════════════════════════
+  # Wave 1: 数据类型层（无依赖，可并行）
+  # ═══════════════════════════════════════════════
+  - id: T01
+    title: "定义游戏事件键（IdleEvents）"
+    description: |
+      创建 `assets/scripts/game/demo1-idle/events/IdleEvents.ts`，定义所有 Idle Clicker 的 EventKey 常量。
+
+      需要定义的事件键：
+      - GOLD_CHANGED: EventKey<{ current: number; delta: number }> — 金币变化
+      - BUILDING_PURCHASED: EventKey<{ buildingId: number }> — 购买建筑
+      - BUILDING_UPGRADED: EventKey<{ buildingId: number; newLevel: number }> — 建筑升级
+      - BUILDING_PRODUCED: EventKey<{ buildingId: number; amount: number }> — 建筑产出
+      - ACHIEVEMENT_UNLOCKED: EventKey<{ achievementId: number; reward: number }> — 成就解锁
+      - OFFLINE_REWARD: EventKey<{ seconds: number; gold: number }> — 离线收益
+      - GAME_SAVED: EventKey<void> — 游戏保存
+      - GAME_LOADED: EventKey<void> — 游戏加载
+      - CLICK_GOLD: EventKey<{ amount: number }> — 手动点击获取金币
+
+      使用框架的 EventKey<T> 类型安全机制（phantom type）。
+      每个事件都需要中文 JSDoc 注释。
+    wave: 1
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: high
+    status: pending
+    dependencies: []
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/framework/event/EventDefs.ts
+        description: EventKey<T> 定义，phantom type 用法
+      - path: docs/demo-design.md
+        description: Demo 1 事件设计（4.3节 EventManager 职责）
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: small
+        estimated_files: 1
+        estimated_lines: 60
+        focus_area: events/IdleEvents.ts
+        verification:
+          - "npx tsc --noEmit — 无编译错误"
+        acceptance_criteria:
+          - "9 个 EventKey 常量导出，每个都有正确的泛型参数"
+          - "所有 EventKey 有中文 JSDoc"
+          - "TypeScript 编译通过"
+        failure_modes: []
+        tech_stack:
+          - TypeScript
+          - "@framework/event/EventDefs"
+        test_coverage: null
+
+  - id: T02
+    title: "定义 DataTable 行类型（3 张配置表）"
+    description: |
+      创建 3 个 DataTable 行类型文件，所有类型实现 IDataRow 接口。
+
+      **文件 1**: `assets/scripts/game/demo1-idle/data/BuildingConfigRow.ts`
+      ```typescript
+      export interface BuildingConfigRow extends IDataRow {
+          readonly id: number;
+          readonly name: string;        // 建筑名称
+          readonly baseCost: number;     // 基础购买价格
+          readonly baseOutput: number;   // 基础每秒产出
+          readonly outputInterval: number; // 产出间隔（秒）
+          readonly costMultiplier: number; // 升级费用倍率
+          readonly outputPerLevel: number; // 每级增加产出
+          readonly maxLevel: number;     // 最大等级
+          readonly unlockCondition: number; // 解锁所需总金币数
+      }
+      ```
+
+      **文件 2**: `assets/scripts/game/demo1-idle/data/UpgradeCurveRow.ts`
+      ```typescript
+      export interface UpgradeCurveRow extends IDataRow {
+          readonly id: number;
+          readonly buildingId: number;
+          readonly level: number;
+          readonly cost: number;
+          readonly output: number;
+          readonly upgradeTime: number;
+      }
+      ```
+
+      **文件 3**: `assets/scripts/game/demo1-idle/data/AchievementConfigRow.ts`
+      ```typescript
+      export interface AchievementConfigRow extends IDataRow {
+          readonly id: number;
+          readonly name: string;
+          readonly desc: string;
+          readonly type: string;   // 'totalGold' | 'buildingLevel' | 'buildingCount'
+          readonly target: number;
+          readonly reward: number;
+      }
+      ```
+
+      同时创建内联的测试用配置数据常量（BUILDING_CONFIG_DATA、UPGRADE_CURVE_DATA、ACHIEVEMENT_CONFIG_DATA），
+      供后续测试和 Demo 运行时使用。放在各自文件的底部 export。
+    wave: 1
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: high
+    status: pending
+    dependencies: []
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/framework/datatable/DataTableDefs.ts
+        description: IDataRow 接口定义
+      - path: docs/demo-design.md
+        description: Demo 1 DataTable 结构设计（4.6节）
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: small
+        estimated_files: 3
+        estimated_lines: 180
+        focus_area: data/*.ts 三个行类型 + 测试数据
+        verification:
+          - "npx tsc --noEmit — 无编译错误"
+        acceptance_criteria:
+          - "3 个 IDataRow 子接口导出，字段与设计文档完全匹配"
+          - "每个文件导出测试用配置数据数组（5 条建筑配置、50 条升级曲线、5 条成就配置）"
+          - "所有字段有中文 JSDoc"
+          - "TypeScript 编译通过"
+        failure_modes: []
+        tech_stack:
+          - TypeScript
+          - "@framework/datatable/DataTableDefs"
+        test_coverage: null
+
+  - id: T03
+    title: "定义游戏状态数据结构（IdleGameData）"
+    description: |
+      创建 `assets/scripts/game/demo1-idle/data/IdleGameData.ts`，定义运行时游戏状态接口。
+
+      ```typescript
+      /** 单个建筑的运行时状态 */
+      export interface IBuildingState {
+          /** 建筑配置 ID */
+          buildingId: number;
+          /** 当前等级（0 = 未购买） */
+          level: number;
+          /** 是否已拥有（已购买） */
+          owned: boolean;
+          /** 是否正在产出中 */
+          producing: boolean;
+          /** 产出 Timer 的 ID（-1 表示无 Timer） */
+          timerId: number;
+      }
+
+      /** 游戏运行时完整状态 */
+      export interface IIdleGameData {
+          /** 当前金币 */
+          gold: number;
+          /** 历史累计获得金币总量 */
+          totalGoldEarned: number;
+          /** 各建筑状态，key 为 buildingId */
+          buildings: Map<number, IBuildingState>;
+          /** 已解锁的成就 ID 集合 */
+          unlockedAchievements: Set<number>;
+          /** 上次存档时间戳（毫秒） */
+          lastSaveTime: number;
+          /** 手动点击单次金币收益 */
+          clickPower: number;
+      }
+
+      /** 序列化友好的存档格式（JSON 安全） */
+      export interface ISaveData {
+          gold: number;
+          totalGoldEarned: number;
+          buildings: Array<{ buildingId: number; level: number; owned: boolean }>;
+          unlockedAchievements: number[];
+          lastSaveTime: number;
+          clickPower: number;
+      }
+
+      /** 创建默认游戏状态 */
+      export function createDefaultGameData(): IIdleGameData;
+
+      /** IIdleGameData → ISaveData 序列化 */
+      export function serializeGameData(data: IIdleGameData): ISaveData;
+
+      /** ISaveData → IIdleGameData 反序列化 */
+      export function deserializeGameData(save: ISaveData): IIdleGameData;
+      ```
+
+      Map/Set 不能直接 JSON 序列化，因此需要 serialize/deserialize 辅助函数。
+    wave: 1
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: high
+    status: pending
+    dependencies: []
+    conflicts_with: []
+    context_files:
+      - path: docs/demo-design.md
+        description: Demo 1 存档和离线收益设计
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: small
+        estimated_files: 1
+        estimated_lines: 120
+        focus_area: data/IdleGameData.ts
+        verification:
+          - "npx tsc --noEmit — 无编译错误"
+        acceptance_criteria:
+          - "IBuildingState、IIdleGameData、ISaveData 三个接口导出"
+          - "createDefaultGameData 返回合理的初始状态（gold=0, clickPower=1）"
+          - "serialize → deserialize 往返一致"
+          - "所有接口和函数有中文 JSDoc"
+        failure_modes: []
+        tech_stack:
+          - TypeScript
+        test_coverage: null
+
+  # ═══════════════════════════════════════════════
+  # Wave 2: 核心系统层（依赖 W1 数据类型）
+  # ═══════════════════════════════════════════════
+  - id: T04
+    title: "实现 BuildingSystem（建筑管理系统）"
+    description: |
+      创建 `assets/scripts/game/demo1-idle/systems/BuildingSystem.ts`。
+
+      核心职责：
+      1. **purchaseBuilding(buildingId, gameData)**: 检查金币够不够 + 建筑是否解锁 → 扣费 → 设置 owned=true + level=1 → emit BUILDING_PURCHASED → 启动产出
+      2. **upgradeBuilding(buildingId, gameData)**: 检查金币和等级上限 → 扣费 → level++ → 更新产出 Timer 间隔 → emit BUILDING_UPGRADED
+      3. **startProduction(buildingId, gameData)**: 用 TimerManager.addTimer 创建重复 Timer（repeat=-1），tag='building_{id}'，间隔从 DataTable 读取，回调中增加金币并 emit BUILDING_PRODUCED
+      4. **stopAllProduction()**: 用 TimerManager.removeTimersByTag 批量清除
+      5. **getTotalOutputPerSecond(gameData)**: 遍历所有已拥有建筑，计算总每秒产出
+      6. **getUpgradeCost(buildingId, currentLevel)**: baseCost * costMultiplier^level（从 DataTable 或直接计算）
+      7. **canUnlockBuilding(buildingId, totalGold)**: 检查 totalGoldEarned >= unlockCondition
+      8. **manualClick(gameData)**: gold += clickPower, totalGoldEarned += clickPower, emit CLICK_GOLD + GOLD_CHANGED
+
+      构造函数接收 EventManager、TimerManager、DataTableManager 引用。
+      所有金币操作后必须 emit GOLD_CHANGED 事件。
+      产出计算用 baseOutput + outputPerLevel * (level - 1)。
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: high
+    status: pending
+    dependencies:
+      - T01
+      - T02
+      - T03
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/framework/timer/TimerManager.ts
+        description: addTimer/removeTimer/removeTimersByTag API
+      - path: assets/scripts/framework/timer/TimerDefs.ts
+        description: ITimerOptions（repeat、tag、initialDelay）
+      - path: assets/scripts/framework/event/EventManager.ts
+        description: on/emit API
+      - path: assets/scripts/framework/datatable/DataTableManager.ts
+        description: getRow/getAllRows API
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: medium
+        estimated_files: 1
+        estimated_lines: 250
+        focus_area: systems/BuildingSystem.ts
+        verification:
+          - "npx tsc --noEmit — 无编译错误"
+        acceptance_criteria:
+          - "purchaseBuilding 正确扣费、设置建筑状态、emit 事件、启动产出 Timer"
+          - "upgradeBuilding 检查等级上限和金币、正确升级"
+          - "startProduction 创建带 tag 的重复 Timer"
+          - "getTotalOutputPerSecond 正确汇总所有建筑产出"
+          - "manualClick 增加金币并 emit 两个事件"
+          - "所有 public 方法有中文 JSDoc"
+          - "使用 Logger 而非 console.log"
+        failure_modes:
+          - scenario: Timer 回调中修改 gameData 的金币时未 emit GOLD_CHANGED
+            likelihood: medium
+            impact: high
+            mitigation: 每个修改金币的路径末尾必须 emit，code review 检查
+        tech_stack:
+          - TypeScript
+          - "@framework/timer/TimerManager"
+          - "@framework/event/EventManager"
+          - "@framework/datatable/DataTableManager"
+        test_coverage: null
+
+  - id: T05
+    title: "实现 SaveSystem（自动存档系统）"
+    description: |
+      创建 `assets/scripts/game/demo1-idle/systems/SaveSystem.ts`。
+
+      核心职责：
+      1. **save(gameData)**: 调用 serializeGameData → JSON.stringify → localStorage.setItem('idle_clicker_save', json) → emit GAME_SAVED
+      2. **load()**: localStorage.getItem → JSON.parse → deserializeGameData → 返回 IIdleGameData（不存在返回 null）
+      3. **hasSaveData()**: 检查 localStorage 中是否有存档
+      4. **clearSaveData()**: 移除 localStorage 条目
+
+      构造函数接收 EventManager 引用。
+      存档 key 常量化：SAVE_KEY = 'idle_clicker_save'。
+      load 时需要 try-catch 处理损坏的存档数据（解析失败返回 null 并 Logger.warn）。
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: medium
+    status: pending
+    dependencies:
+      - T01
+      - T03
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/game/demo1-idle/data/IdleGameData.ts
+        description: serializeGameData/deserializeGameData 函数
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: small
+        estimated_files: 1
+        estimated_lines: 80
+        focus_area: systems/SaveSystem.ts
+        verification:
+          - "npx tsc --noEmit — 无编译错误"
+        acceptance_criteria:
+          - "save 正确序列化并写入 localStorage"
+          - "load 正确反序列化并返回 IIdleGameData"
+          - "损坏数据 load 返回 null 不抛异常"
+          - "hasSaveData 和 clearSaveData 工作正确"
+          - "使用 Logger 输出存档操作日志"
+        failure_modes:
+          - scenario: localStorage 不可用（某些测试环境）
+            likelihood: low
+            impact: medium
+            mitigation: Jest jsdom 环境默认提供 localStorage mock
+        tech_stack:
+          - TypeScript
+          - localStorage API
+        test_coverage: null
+
+  - id: T06
+    title: "实现 OfflineRewardSystem（离线收益系统）"
+    description: |
+      创建 `assets/scripts/game/demo1-idle/systems/OfflineRewardSystem.ts`。
+
+      核心职责：
+      1. **getOfflineSeconds(lastSaveTime)**: (Date.now() - lastSaveTime) / 1000，最小 0
+      2. **calculateReward(gameData, offlineSeconds)**: totalOutputPerSecond * offlineSeconds，使用 Math.floor 截断为整数
+         - totalOutputPerSecond 从 BuildingSystem.getTotalOutputPerSecond() 获取
+         - 可选上限：MAX_OFFLINE_SECONDS = 7200（2小时），超过的部分不计
+      3. **applyReward(gameData, reward)**: gameData.gold += reward, totalGoldEarned += reward
+
+      构造函数接收 BuildingSystem 引用（用于读取总产出速率）。
+      纯计算系统，不依赖 Timer 或 Event（由 OfflineSettleProcedure 调用并 emit）。
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: medium
+    status: pending
+    dependencies:
+      - T03
+      - T04
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/game/demo1-idle/systems/BuildingSystem.ts
+        description: getTotalOutputPerSecond 方法
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: small
+        estimated_files: 1
+        estimated_lines: 60
+        focus_area: systems/OfflineRewardSystem.ts
+        verification:
+          - "npx tsc --noEmit — 无编译错误"
+        acceptance_criteria:
+          - "calculateReward 返回整数金币值"
+          - "离线时间超过上限时截断"
+          - "无建筑时返回 0"
+          - "中文 JSDoc 完整"
+        failure_modes: []
+        tech_stack:
+          - TypeScript
+        test_coverage: null
+
+  - id: T07
+    title: "实现 AchievementSystem（成就系统）"
+    description: |
+      创建 `assets/scripts/game/demo1-idle/systems/AchievementSystem.ts`。
+
+      核心职责：
+      1. **init(eventManager, dataTableManager)**: 从 DataTable 读取成就配置，监听 GOLD_CHANGED 和 BUILDING_UPGRADED 事件
+      2. **checkAchievements(gameData)**: 遍历所有未解锁成就，检查条件：
+         - type='totalGold': totalGoldEarned >= target
+         - type='buildingLevel': 任意建筑 level >= target
+         - type='buildingCount': 已拥有建筑数 >= target
+         达成时：加入 unlockedAchievements + emit ACHIEVEMENT_UNLOCKED（含 reward）
+      3. **getUnlockedAchievements()**: 返回已解锁成就 ID 列表
+      4. **getAllAchievements()**: 返回所有成就配置
+
+      设计约束：
+      - AchievementSystem 只 emit ACHIEVEMENT_UNLOCKED，不修改金币（金币奖励由监听方处理，避免循环）
+      - 每帧不检查，仅在收到相关事件时检查（事件驱动）
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: medium
+    status: pending
+    dependencies:
+      - T01
+      - T02
+      - T03
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/framework/event/EventManager.ts
+        description: on/emit API
+      - path: assets/scripts/framework/datatable/DataTableManager.ts
+        description: getAllRows API
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: small
+        estimated_files: 1
+        estimated_lines: 120
+        focus_area: systems/AchievementSystem.ts
+        verification:
+          - "npx tsc --noEmit — 无编译错误"
+        acceptance_criteria:
+          - "3 种成就类型条件检测正确"
+          - "已解锁成就不重复检测"
+          - "达成时 emit ACHIEVEMENT_UNLOCKED 事件"
+          - "事件驱动检查，不每帧轮询"
+          - "中文 JSDoc 完整"
+        failure_modes:
+          - scenario: 成就检查在同一帧内被多次触发导致重复解锁
+            likelihood: medium
+            impact: medium
+            mitigation: checkAchievements 内部先检查 unlockedAchievements.has(id)
+        tech_stack:
+          - TypeScript
+          - "@framework/event/EventManager"
+          - "@framework/datatable/DataTableManager"
+        test_coverage: null
+
+  # ═══════════════════════════════════════════════
+  # Wave 3: FSM 状态 + Procedure 流程（依赖 W2 系统）
+  # ═══════════════════════════════════════════════
+  - id: T08
+    title: "实现建筑 FSM 状态定义和四个状态类"
+    description: |
+      创建 2 个文件：
+
+      **文件 1**: `assets/scripts/game/demo1-idle/fsm/BuildingFsmDefs.ts`
+      - 建筑 FSM 状态名常量
+      - Blackboard 数据类型：{ buildingSystem: BuildingSystem; buildingId: number; gameData: IIdleGameData; timerManager: TimerManager; eventManager: EventManager }
+
+      **文件 2**: `assets/scripts/game/demo1-idle/fsm/BuildingFsmStates.ts`
+      - **BuildingIdleState**: onEnter 无操作（等待购买）
+      - **BuildingProducingState**: onEnter 调用 BuildingSystem.startProduction → 创建产出 Timer；onLeave 停止该建筑的 Timer
+      - **BuildingUpgradingState**: onEnter 创建升级倒计时 Timer（一次性），完成后 changeState → ProducingState 或 MaxLevelState
+      - **BuildingMaxLevelState**: onEnter 启动最大产出 Timer（永久）；onLeave 停止 Timer
+
+      所有状态继承 FsmState<unknown>（与 ProcedureBase 一致的 owner 类型）。
+      通过 fsm.getData/setData 访问 blackboard。
+    wave: 3
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: high
+    status: pending
+    dependencies:
+      - T04
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/framework/fsm/FsmState.ts
+        description: FsmState 基类和 changeState 方法
+      - path: assets/scripts/framework/fsm/FsmDefs.ts
+        description: IFsm 接口、getData/setData
+      - path: docs/demo-design.md
+        description: 建筑 FSM 设计（4.5节）
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: medium
+        estimated_files: 2
+        estimated_lines: 200
+        focus_area: fsm/BuildingFsmDefs.ts + fsm/BuildingFsmStates.ts
+        verification:
+          - "npx tsc --noEmit — 无编译错误"
+        acceptance_criteria:
+          - "4 个 FSM 状态类导出，继承 FsmState"
+          - "ProducingState.onEnter 启动 Timer，onLeave 清除 Timer"
+          - "UpgradingState 完成后根据等级切换到 ProducingState 或 MaxLevelState"
+          - "通过 blackboard 获取系统引用，不直接 import 实现类"
+          - "中文 JSDoc 完整"
+        failure_modes:
+          - scenario: onLeave 未清除 Timer 导致泄漏
+            likelihood: medium
+            impact: high
+            mitigation: 每个状态的 onLeave 必须显式清除 timerId
+        tech_stack:
+          - TypeScript
+          - "@framework/fsm/FsmState"
+          - "@framework/fsm/FsmDefs"
+        test_coverage: null
+
+  - id: T09
+    title: "实现 5 个 Procedure（Launch、Preload、OfflineSettle、Main、Settings）"
+    description: |
+      创建 5 个 Procedure 文件，全部继承 ProcedureBase。
+
+      **LaunchProcedure** (`procedures/LaunchProcedure.ts`):
+      - onEnter: 日志输出"框架初始化完成" → changeProcedure(PreloadProcedure)
+
+      **PreloadProcedure** (`procedures/PreloadProcedure.ts`):
+      - onEnter: 从 blackboard 获取 DataTableManager → 验证 3 张表已加载 → 日志 → changeProcedure(OfflineSettleProcedure)
+
+      **OfflineSettleProcedure** (`procedures/OfflineSettleProcedure.ts`):
+      - onEnter: 从 blackboard 获取 SaveSystem → load 存档 → 如有存档：计算离线收益(OfflineRewardSystem) → emit OFFLINE_REWARD → 应用收益 → 日志 → changeProcedure(MainProcedure)
+      - 无存档：创建默认 gameData → changeProcedure(MainProcedure)
+
+      **MainProcedure** (`procedures/MainProcedure.ts`):
+      - onEnter: 从 blackboard 获取各系统 → 为已拥有建筑恢复 FSM 和产出 → 设置自动存档 Timer（30秒，tag='autosave'）→ 设置 UI 按钮事件 → 日志
+      - onUpdate: 刷新 UI 状态面板（金币、产出、建筑等级等）
+      - onLeave: 停止所有建筑产出 Timer → 停止自动存档 Timer → 保存一次
+
+      **SettingsProcedure** (`procedures/SettingsProcedure.ts`):
+      - onEnter: 显示设置 UI → 暂停所有建筑 Timer
+      - onLeave: 关闭设置 UI → 恢复 Timer
+
+      所有 Procedure 通过 fsm.getData<T>(key) 获取系统引用（blackboard 模式）。
+    wave: 3
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: high
+    status: pending
+    dependencies:
+      - T04
+      - T05
+      - T06
+      - T07
+      - T08
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/framework/procedure/ProcedureBase.ts
+        description: ProcedureBase 基类和 changeProcedure 方法
+      - path: assets/scripts/framework/procedure/ProcedureManager.ts
+        description: initialize + startProcedure API
+      - path: docs/demo-design.md
+        description: Procedure 流程设计（4.4节）
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: large
+        estimated_files: 5
+        estimated_lines: 300
+        focus_area: procedures/*.ts 五个 Procedure
+        verification:
+          - "npx tsc --noEmit — 无编译错误"
+        acceptance_criteria:
+          - "5 个 Procedure 类导出，全部继承 ProcedureBase"
+          - "Launch → Preload → OfflineSettle → Main 自动流转"
+          - "Main ↔ Settings 双向切换"
+          - "MainProcedure 包含自动存档 Timer 和 UI 刷新逻辑"
+          - "OfflineSettleProcedure 正确处理有/无存档两种情况"
+          - "所有 Procedure 有中文 JSDoc"
+        failure_modes:
+          - scenario: blackboard key 不一致导致获取系统引用失败
+            likelihood: medium
+            impact: high
+            mitigation: 在 BuildingFsmDefs 中统一定义所有 blackboard key 常量
+        tech_stack:
+          - TypeScript
+          - "@framework/procedure/ProcedureBase"
+          - "@framework/timer/TimerManager"
+        test_coverage: null
+
+  - id: T10
+    title: "实现 Blackboard Keys 常量和 Procedure 辅助设置"
+    description: |
+      创建 `assets/scripts/game/demo1-idle/IdleGameDefs.ts`，统一定义所有 blackboard 数据键：
+
+      ```typescript
+      /** Procedure FSM blackboard 键 */
+      export const BLACKBOARD_KEYS = {
+          GAME_DATA: 'gameData',
+          BUILDING_SYSTEM: 'buildingSystem',
+          ACHIEVEMENT_SYSTEM: 'achievementSystem',
+          OFFLINE_REWARD_SYSTEM: 'offlineRewardSystem',
+          SAVE_SYSTEM: 'saveSystem',
+          EVENT_MANAGER: 'eventManager',
+          TIMER_MANAGER: 'timerManager',
+          DATA_TABLE_MANAGER: 'dataTableManager',
+          FSM_MANAGER: 'fsmManager',
+          AUDIO_MANAGER: 'audioManager',
+          UI_MANAGER: 'uiManager',
+          HTML_RENDERER: 'htmlRenderer',
+      } as const;
+      ```
+
+      这个文件是 Procedure 和 FSM 共享的常量中心，避免字符串硬编码。
+    wave: 3
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: medium
+    status: pending
+    dependencies:
+      - T04
+    conflicts_with:
+      - T09
+    context_files: []
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: small
+        estimated_files: 1
+        estimated_lines: 40
+        focus_area: IdleGameDefs.ts
+        verification:
+          - "npx tsc --noEmit — 无编译错误"
+        acceptance_criteria:
+          - "所有 blackboard key 常量导出"
+          - "T09 的 Procedure 和 T08 的 FSM 使用这些常量而非硬编码字符串"
+        failure_modes: []
+        tech_stack:
+          - TypeScript
+        test_coverage: null
+
+  # ═══════════════════════════════════════════════
+  # Wave 4: UI 面板 + Demo 主类（依赖 W3 Procedures）
+  # ═══════════════════════════════════════════════
+  - id: T11
+    title: "实现 UI 面板（IdleMainPanel + IdleSettingsPanel）"
+    description: |
+      创建 2 个 UI 面板文件，使用 HtmlRenderer API 构建界面。
+
+      **IdleMainPanel** (`ui/IdleMainPanel.ts`):
+      - 创建状态面板：当前金币、每秒总产出、各建筑等级和产出、活跃 Timer 数量
+      - 创建按钮组：
+        - [点击挖矿] → 调用 BuildingSystem.manualClick
+        - [购买矿场] [购买伐木场] [购买农田] [购买炼金所] → 调用 purchaseBuilding
+        - [升级矿场] [升级伐木场] ... → 调用 upgradeBuilding
+        - [打开设置] → changeProcedure(SettingsProcedure)
+        - [模拟离线30分钟] → 模拟离线收益
+        - [查看成就] → 展示成就列表
+      - updateDisplay(gameData): 刷新状态面板所有值
+
+      **IdleSettingsPanel** (`ui/IdleSettingsPanel.ts`):
+      - 音量控制按钮
+      - [保存游戏] / [清除存档] 按钮
+      - [返回游戏] → changeProcedure(MainProcedure)
+
+      面板不直接持有系统引用，通过回调函数（onClick handlers）解耦。
+    wave: 4
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: medium
+    status: pending
+    dependencies:
+      - T09
+      - T10
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/game/shared/HtmlRenderer.ts
+        description: HtmlRenderer API（log、createButtonGroup、addButton、createStatusPanel、updateStatus）
+      - path: docs/demo-design.md
+        description: HTML 按钮和状态面板设计（4.7节）
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: medium
+        estimated_files: 2
+        estimated_lines: 250
+        focus_area: ui/IdleMainPanel.ts + ui/IdleSettingsPanel.ts
+        verification:
+          - "npx tsc --noEmit — 无编译错误"
+        acceptance_criteria:
+          - "IdleMainPanel 包含所有设计文档要求的按钮和状态显示"
+          - "IdleSettingsPanel 包含音量控制和存档管理"
+          - "面板通过回调解耦，不直接依赖具体系统实现"
+          - "使用 HtmlRenderer API 和 LOG_COLORS 常量"
+          - "中文 JSDoc 完整"
+        failure_modes: []
+        tech_stack:
+          - TypeScript
+          - HtmlRenderer API
+        test_coverage: null
+
+  - id: T12
+    title: "实现 IdleClickerDemo 主入口类"
+    description: |
+      创建 `assets/scripts/game/demo1-idle/IdleClickerDemo.ts`，继承 DemoBase。
+
+      核心职责：
+      1. **setupDataTables()**: 用 DataTableManager.createTable 注册 3 张配置表（使用 T02 中定义的测试数据）
+      2. **setupProcedures()**: 
+         - 创建所有系统实例（BuildingSystem、AchievementSystem、OfflineRewardSystem、SaveSystem）
+         - 初始化系统（传入框架模块引用）
+         - 用 ProcedureManager.initialize 注册 5 个 Procedure
+         - 设置 blackboard 数据（所有系统引用 + 框架模块引用 + htmlRenderer）
+         - ProcedureManager.startProcedure(LaunchProcedure)
+      3. **shutdown()**: 调用 super.shutdown() + 清理系统
+
+      这是整个 Demo 的组装点，将所有部件连接起来。
+    wave: 4
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: high
+    status: pending
+    dependencies:
+      - T09
+      - T10
+      - T11
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/game/shared/DemoBase.ts
+        description: DemoBase 基类（bootstrap、setupProcedures、setupDataTables 抽象方法）
+      - path: assets/scripts/framework/procedure/ProcedureManager.ts
+        description: initialize + startProcedure API
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: medium
+        estimated_files: 1
+        estimated_lines: 180
+        focus_area: IdleClickerDemo.ts
+        verification:
+          - "npx tsc --noEmit — 无编译错误"
+        acceptance_criteria:
+          - "继承 DemoBase 并正确实现 setupProcedures 和 setupDataTables"
+          - "3 张配置表正确注册到 DataTableManager"
+          - "5 个 Procedure 正确注册并设置 blackboard"
+          - "LaunchProcedure 作为入口启动"
+          - "shutdown 清理所有资源"
+          - "中文 JSDoc 完整"
+        failure_modes:
+          - scenario: 系统初始化顺序错误导致依赖缺失
+            likelihood: medium
+            impact: high
+            mitigation: 初始化顺序明确记录在 JSDoc 中；BuildingSystem 在 AchievementSystem 之前初始化
+        tech_stack:
+          - TypeScript
+          - DemoBase
+          - ProcedureManager
+          - DataTableManager
+        test_coverage: null
+
+  # ═══════════════════════════════════════════════
+  # Wave 5: 系统单元测试（依赖 W2 系统实现）
+  # ═══════════════════════════════════════════════
+  - id: T13
+    title: "BuildingSystem 单元测试"
+    description: |
+      创建 `tests/game/demo1-idle/BuildingSystem.test.ts`。
+
+      TDD 验证 BuildingSystem 核心逻辑：
+
+      **测试用例**（每个 describe 一个功能点）：
+      1. `purchaseBuilding`:
+         - 金币足够时正确扣费、设置状态、emit 事件
+         - 金币不足时返回 false 不修改状态
+         - 重复购买已拥有建筑时返回 false
+         - 建筑未解锁时返回 false
+      2. `upgradeBuilding`:
+         - 正常升级：扣费、level++、emit 事件
+         - 已达 maxLevel 时返回 false
+         - 金币不足时返回 false
+      3. `startProduction`:
+         - 创建重复 Timer 并验证间隔和 tag
+         - Timer 回调正确增加金币并 emit BUILDING_PRODUCED
+      4. `getTotalOutputPerSecond`:
+         - 多个建筑汇总产出正确
+         - 无建筑时返回 0
+      5. `manualClick`:
+         - 增加 clickPower 数量的金币
+         - emit CLICK_GOLD 和 GOLD_CHANGED
+
+      测试前置：创建真实 EventManager + TimerManager + DataTableManager，注册测试配置数据。
+    wave: 5
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: high
+    status: pending
+    dependencies:
+      - T04
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/game/demo1-idle/systems/BuildingSystem.ts
+        description: 被测对象
+      - path: assets/scripts/game/demo1-idle/data/BuildingConfigRow.ts
+        description: 测试用配置数据
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: medium
+        estimated_files: 1
+        estimated_lines: 280
+        focus_area: tests/game/demo1-idle/BuildingSystem.test.ts
+        verification:
+          - "npm test -- --testPathPattern=demo1-idle/BuildingSystem — 全部通过"
+        acceptance_criteria:
+          - "≥15 个测试用例覆盖所有 public 方法"
+          - "测试验证事件 emit 参数正确性"
+          - "测试验证 Timer 创建和回调行为"
+          - "无跳过的测试"
+        failure_modes: []
+        tech_stack:
+          - Jest
+          - TypeScript
+        test_coverage: "BuildingSystem 80%+"
+        requires_review: false
+        review_depth: null
+        review_security_sensitive: false
+
+  - id: T14
+    title: "AchievementSystem 单元测试"
+    description: |
+      创建 `tests/game/demo1-idle/AchievementSystem.test.ts`。
+
+      **测试用例**：
+      1. `totalGold 类型成就`: totalGoldEarned >= target 时解锁
+      2. `buildingLevel 类型成就`: 任意建筑 level >= target 时解锁
+      3. `buildingCount 类型成就`: 拥有建筑数 >= target 时解锁
+      4. `已解锁成就不重复触发`: 调用多次 checkAchievements，只 emit 一次
+      5. `多成就同时达成`: 一次检查解锁多个成就
+      6. `emit 事件数据正确`: achievementId 和 reward 值匹配配置
+
+      测试前置：创建真实 EventManager + DataTableManager，注册成就测试数据。
+    wave: 5
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: medium
+    status: pending
+    dependencies:
+      - T07
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/game/demo1-idle/systems/AchievementSystem.ts
+        description: 被测对象
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: small
+        estimated_files: 1
+        estimated_lines: 180
+        focus_area: tests/game/demo1-idle/AchievementSystem.test.ts
+        verification:
+          - "npm test -- --testPathPattern=demo1-idle/AchievementSystem — 全部通过"
+        acceptance_criteria:
+          - "≥8 个测试用例覆盖 3 种成就类型 + 边界条件"
+          - "验证事件数据正确性"
+          - "验证去重逻辑"
+        failure_modes: []
+        tech_stack:
+          - Jest
+          - TypeScript
+        test_coverage: "AchievementSystem 85%+"
+        requires_review: false
+        review_depth: null
+        review_security_sensitive: false
+
+  - id: T15
+    title: "OfflineRewardSystem 单元测试"
+    description: |
+      创建 `tests/game/demo1-idle/OfflineRewardSystem.test.ts`。
+
+      **测试用例**：
+      1. `正常离线收益`: 产出 10/秒 × 离线 3600 秒 = 36000 金币
+      2. `无建筑时返回 0`: getTotalOutputPerSecond = 0 → reward = 0
+      3. `超出上限截断`: 离线 10000 秒 → 截断为 MAX_OFFLINE_SECONDS
+      4. `结果为整数`: Math.floor 截断验证
+      5. `getOfflineSeconds`: 时间差计算正确，负值返回 0
+      6. `applyReward`: gold 和 totalGoldEarned 都正确增加
+    wave: 5
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: medium
+    status: pending
+    dependencies:
+      - T06
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/game/demo1-idle/systems/OfflineRewardSystem.ts
+        description: 被测对象
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: small
+        estimated_files: 1
+        estimated_lines: 120
+        focus_area: tests/game/demo1-idle/OfflineRewardSystem.test.ts
+        verification:
+          - "npm test -- --testPathPattern=demo1-idle/OfflineRewardSystem — 全部通过"
+        acceptance_criteria:
+          - "≥6 个测试用例覆盖正常、边界、截断场景"
+          - "数值计算准确"
+        failure_modes: []
+        tech_stack:
+          - Jest
+          - TypeScript
+        test_coverage: "OfflineRewardSystem 90%+"
+        requires_review: false
+        review_depth: null
+        review_security_sensitive: false
+
+  - id: T16
+    title: "SaveSystem 单元测试"
+    description: |
+      创建 `tests/game/demo1-idle/SaveSystem.test.ts`。
+
+      **测试用例**：
+      1. `save + load 往返一致`: 存档 → 读档 → 比较所有字段
+      2. `Map/Set 序列化正确`: buildings Map 和 achievements Set 往返后类型和值正确
+      3. `无存档时 load 返回 null`
+      4. `hasSaveData 正确反映状态`
+      5. `clearSaveData 清除后 hasSaveData 返回 false`
+      6. `损坏数据 load 返回 null 不抛异常`: 写入无效 JSON → load → null
+
+      测试需要 mock localStorage（Jest jsdom 环境默认提供）。
+    wave: 5
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: medium
+    status: pending
+    dependencies:
+      - T05
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/game/demo1-idle/systems/SaveSystem.ts
+        description: 被测对象
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: small
+        estimated_files: 1
+        estimated_lines: 140
+        focus_area: tests/game/demo1-idle/SaveSystem.test.ts
+        verification:
+          - "npm test -- --testPathPattern=demo1-idle/SaveSystem — 全部通过"
+        acceptance_criteria:
+          - "≥6 个测试用例覆盖存档/读档/清除/损坏"
+          - "Map/Set 序列化往返一致性验证"
+          - "localStorage mock 正确使用"
+        failure_modes: []
+        tech_stack:
+          - Jest
+          - TypeScript
+          - localStorage (jsdom)
+        test_coverage: "SaveSystem 90%+"
+        requires_review: false
+        review_depth: null
+        review_security_sensitive: false
+
+  # ═══════════════════════════════════════════════
+  # Wave 6: FSM + Procedure 单元测试（依赖 W3 + W5）
+  # ═══════════════════════════════════════════════
+  - id: T17
+    title: "BuildingFsm 单元测试"
+    description: |
+      创建 `tests/game/demo1-idle/BuildingFsm.test.ts`。
+
+      **测试用例**：
+      1. `初始状态为 IdleState`
+      2. `IdleState → ProducingState`: 购买后切换，验证 Timer 启动
+      3. `ProducingState → UpgradingState`: 点击升级后切换
+      4. `UpgradingState → ProducingState`: 升级完成后切换回生产
+      5. `ProducingState → MaxLevelState`: 达到 maxLevel 后切换
+      6. `状态切换时 Timer 生命周期`: 验证 onLeave 清除 Timer、onEnter 创建新 Timer
+      7. `MaxLevelState 的 Timer 持续运行`: 不会因升级而中断
+
+      测试前置：创建真实 FsmManager + TimerManager + EventManager。
+    wave: 6
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: high
+    status: pending
+    dependencies:
+      - T08
+      - T13
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/game/demo1-idle/fsm/BuildingFsmStates.ts
+        description: 被测对象
+      - path: assets/scripts/framework/fsm/FsmManager.ts
+        description: createFsm API
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: medium
+        estimated_files: 1
+        estimated_lines: 220
+        focus_area: tests/game/demo1-idle/BuildingFsm.test.ts
+        verification:
+          - "npm test -- --testPathPattern=demo1-idle/BuildingFsm — 全部通过"
+        acceptance_criteria:
+          - "≥7 个测试用例覆盖所有状态转换路径"
+          - "验证 Timer 在状态切换时正确创建/清除"
+          - "验证 blackboard 数据传递正确"
+        failure_modes:
+          - scenario: FsmManager.createFsm 的 owner 和 states 参数不匹配
+            likelihood: low
+            impact: medium
+            mitigation: 参考现有 FSM 测试的 setup 模式
+        tech_stack:
+          - Jest
+          - TypeScript
+          - "@framework/fsm/FsmManager"
+        test_coverage: "BuildingFsmStates 80%+"
+        requires_review: false
+        review_depth: null
+        review_security_sensitive: false
+
+  - id: T18
+    title: "Procedure 流程单元测试"
+    description: |
+      创建 `tests/game/demo1-idle/procedures/IdleProcedures.test.ts`。
+
+      **测试用例**：
+      1. `Launch → Preload 自动切换`
+      2. `Preload → OfflineSettle 自动切换`（验证 DataTable 检查）
+      3. `OfflineSettle 有存档时`: load → 计算离线收益 → emit → Main
+      4. `OfflineSettle 无存档时`: 创建默认数据 → Main
+      5. `Main 进入后启动自动存档 Timer`
+      6. `Main → Settings 切换`: 验证 Timer 暂停
+      7. `Settings → Main 切换`: 验证 Timer 恢复
+
+      测试前置：完整 bootstrap 环境（DemoBase 或手动注册核心模块）。
+    wave: 6
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: high
+    status: pending
+    dependencies:
+      - T09
+      - T13
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/game/demo1-idle/procedures/
+        description: 5 个 Procedure 实现
+      - path: assets/scripts/framework/procedure/ProcedureManager.ts
+        description: initialize + startProcedure
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: medium
+        estimated_files: 1
+        estimated_lines: 260
+        focus_area: tests/game/demo1-idle/procedures/IdleProcedures.test.ts
+        verification:
+          - "npm test -- --testPathPattern=demo1-idle/procedures — 全部通过"
+        acceptance_criteria:
+          - "≥7 个测试用例覆盖完整流程链"
+          - "验证有/无存档两条路径"
+          - "验证 Timer 暂停/恢复行为"
+          - "验证 Procedure 切换时 blackboard 数据传递"
+        failure_modes:
+          - scenario: ProcedureManager 内部 FSM 的 update 驱动时序问题
+            likelihood: medium
+            impact: medium
+            mitigation: 测试中手动调用 GameModule.update(dt) 驱动帧推进
+        tech_stack:
+          - Jest
+          - TypeScript
+          - ProcedureManager
+        test_coverage: "Procedures 75%+"
+        requires_review: false
+        review_depth: null
+        review_security_sensitive: false
+
+  - id: T19
+    title: "IdleGameData 序列化单元测试"
+    description: |
+      创建 `tests/game/demo1-idle/IdleGameData.test.ts`。
+
+      **测试用例**：
+      1. `createDefaultGameData`: 验证初始值（gold=0, clickPower=1, buildings 为空 Map）
+      2. `serializeGameData`: Map → Array, Set → number[] 正确转换
+      3. `deserializeGameData`: Array → Map, number[] → Set 正确转换
+      4. `往返一致性`: serialize → deserialize → 比较所有字段
+      5. `含多个建筑和成就的复杂数据`: 多建筑、多成就的序列化/反序列化
+
+      这些是纯函数测试，不需要框架环境。
+    wave: 5
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: medium
+    status: pending
+    dependencies:
+      - T03
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/game/demo1-idle/data/IdleGameData.ts
+        description: 被测对象
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: small
+        estimated_files: 1
+        estimated_lines: 100
+        focus_area: tests/game/demo1-idle/IdleGameData.test.ts
+        verification:
+          - "npm test -- --testPathPattern=demo1-idle/IdleGameData — 全部通过"
+        acceptance_criteria:
+          - "≥5 个测试用例覆盖序列化/反序列化/默认值"
+          - "Map/Set 转换正确性验证"
+        failure_modes: []
+        tech_stack:
+          - Jest
+          - TypeScript
+        test_coverage: "IdleGameData 函数 95%+"
+        requires_review: false
+        review_depth: null
+        review_security_sensitive: false
+
+  # ═══════════════════════════════════════════════
+  # Wave 7: 集成测试（依赖全部实现 + 单元测试）
+  # ═══════════════════════════════════════════════
+  - id: T20
+    title: "Idle Clicker 集成测试"
+    description: |
+      创建 `tests/game/demo1-idle/integration/idle-clicker.integration.test.ts`。
+
+      端到端测试，验证所有模块协作：
+
+      **测试用例**：
+      1. **Timer 精度测试**: 创建 3 个不同间隔的建筑 Timer，运行 10 秒模拟，验证各建筑产出金额在 ±1 误差内
+      2. **离线收益结算**: 模拟 30 分钟离线 → bootstrap → OfflineSettleProcedure 结算 → 验证金币增加量
+      3. **升级完整流程**: 购买矿场 → 手动点击赚金币 → 升级矿场 → 验证产出增加 → 扣费正确
+      4. **成就触发链**: 累计金币达到 1000 → GOLD_CHANGED → AchievementSystem 检测 → ACHIEVEMENT_UNLOCKED → 验证奖励
+      5. **Procedure 切换**: Main → Settings → Main，验证 Timer 暂停/恢复 + 状态保持
+      6. **自动存档验证**: 运行 31 秒模拟 → 验证 localStorage 中存在存档 → load 后数据一致
+      7. **完整游戏循环**: bootstrap → 购买所有建筑 → 升级到满级 → 验证 MaxLevel 产出 → 存档 → 读档
+
+      测试前置：实例化 IdleClickerDemo → bootstrap → 通过手动 update(dt) 驱动帧。
+    wave: 7
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: high
+    status: pending
+    dependencies:
+      - T12
+      - T13
+      - T14
+      - T15
+      - T16
+      - T17
+      - T18
+      - T19
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/game/demo1-idle/IdleClickerDemo.ts
+        description: Demo 主入口
+      - path: docs/demo-design.md
+        description: 集成测试要点（4.8节）
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: large
+        estimated_files: 1
+        estimated_lines: 300
+        focus_area: tests/game/demo1-idle/integration/idle-clicker.integration.test.ts
+        verification:
+          - "npm test -- --testPathPattern=demo1-idle/integration — 全部通过"
+          - "npm test — 全量测试通过（不破坏现有测试）"
+        acceptance_criteria:
+          - "≥7 个集成测试用例覆盖 4.8 节所有测试点"
+          - "Timer 精度测试误差在 ±1 金币内"
+          - "离线收益计算与手动计算一致"
+          - "完整游戏循环端到端通过"
+          - "不破坏项目现有测试"
+        failure_modes:
+          - scenario: 集成环境中模块初始化顺序或依赖缺失
+            likelihood: medium
+            impact: high
+            mitigation: 使用 IdleClickerDemo.bootstrap() 统一初始化，与 DemoBase 一致
+          - scenario: 手动 update(dt) 驱动与 Timer/FSM 时序不一致
+            likelihood: medium
+            impact: medium
+            mitigation: 使用固定 dt=1/30 步进，累计足够帧数后验证
+        tech_stack:
+          - Jest
+          - TypeScript
+          - IdleClickerDemo
+          - 全部框架模块
+        test_coverage: "集成场景 100%"
+        requires_review: true
+        review_depth: standard
+        review_security_sensitive: false
+
+  - id: T21
+    title: "全量验证：TypeScript 编译 + ESLint + 测试"
+    description: |
+      最终验证，确保所有代码通过项目质量门禁：
+
+      1. `npx tsc --noEmit` — TypeScript 编译无错误
+      2. `npm run lint` — ESLint 无错误
+      3. `npm test` — 全量测试通过（包含新增的 demo1 测试和所有现有测试）
+
+      如果有任何失败，修复后重新验证。
+    wave: 7
+    agent: gem-implementer
+    prototype: false
+    covers: []
+    priority: high
+    status: pending
+    dependencies:
+      - T20
+    conflicts_with: []
+    context_files: []
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: small
+        estimated_files: 0
+        estimated_lines: 0
+        focus_area: null
+        verification:
+          - "npx tsc --noEmit — exit 0"
+          - "npm run lint — exit 0"
+          - "npm test — exit 0, 0 failures"
+        acceptance_criteria:
+          - "TypeScript 编译零错误"
+          - "ESLint 零错误"
+          - "全量测试通过，0 failures"
+          - "不破坏任何现有测试"
+        failure_modes:
+          - scenario: 新增文件与现有代码存在命名冲突
+            likelihood: low
+            impact: medium
+            mitigation: demo1-idle 目录完全独立，与其他 demo 无交叉
+        tech_stack:
+          - TypeScript compiler
+          - ESLint
+          - Jest
+        test_coverage: null
+        requires_review: false
+        review_depth: null
+        review_security_sensitive: false
+
+  - id: T22
+    title: "代码审查 + 提交"
+    description: |
+      对全部 demo1 代码执行 code review skill 检查：
+      1. 正确性：所有测试通过
+      2. 架构：三层分离、模块间通信走 EventManager
+      3. 类型安全：无 any、strict mode
+      4. 性能：Timer 无泄漏、Map/Set 正确使用
+      5. 代码风格：PascalCase/camelCase、中文 JSDoc、Logger 替代 console
+
+      通过后提交到 demo1 worktree 分支。
+    wave: 7
+    agent: gem-reviewer
+    prototype: false
+    covers: []
+    priority: high
+    status: pending
+    dependencies:
+      - T21
+    conflicts_with: []
+    context_files:
+      - path: docs/code-review-checklist.md
+        description: PR 自查清单
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: 初始计划
+        timestamp: "2026-04-21"
+        estimated_effort: medium
+        estimated_files: 0
+        estimated_lines: 0
+        focus_area: null
+        verification:
+          - "code review 检查清单全部通过"
+          - "git status 无未提交文件"
+        acceptance_criteria:
+          - "Review 评分 ≥ 85"
+          - "无 any 类型"
+          - "无 console.log"
+          - "所有 public API 有中文 JSDoc"
+          - "所有测试通过"
+        failure_modes: []
+        requires_review: true
+        review_depth: full
+        review_security_sensitive: false
+
+planning_pass: 1
+planning_history:
+  - pass: 1
+    reason: 初始创建
+    timestamp: "2026-04-21"

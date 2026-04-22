@@ -1,4 +1,4 @@
-# GitHub Actions CI — GameFramework-Cocos
+# GitHub Actions CI — GameForge Cinder
 # 对标 Jenkinsfile 的同等流程：lint → typecheck → test
 # 轻量版，主要用于 GitHub PR 状态检查
 
