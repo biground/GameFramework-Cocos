@@ -64,7 +64,7 @@ interface ShowEntityCallbacks { onSuccess?; onFailure?; }
 - 实体 ID 为简单自增数字，不支持分布式场景
 - EntityGroup 的 `_activeList` 使用 `indexOf` + `splice` 隐藏实体，大量实体时可能有性能瓶颈
 - 不支持实体层级关系（父子实体）
-- 不支持实体组件模式（ECS），如需 ECS 请参考 `packages/gfc-ecs`
+- 不支持实体组件模式（ECS），如需 ECS 请参考 `packages/fbi-ecs`
 
 ## 关联测试
 

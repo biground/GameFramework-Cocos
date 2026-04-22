@@ -15,7 +15,7 @@ import { MinHeap } from './MinHeap';
  *
  * 用法：
  * ```typescript
- * import { HeapTimerManager } from '@gfc/timer-heap';
+ * import { HeapTimerManager } from '@fbi/timer-heap';
  * GameModule.register('TimerManager', new HeapTimerManager(), { allowReplace: true });
  * ```
  */

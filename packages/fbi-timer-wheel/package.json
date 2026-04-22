@@ -1,10 +1,10 @@
 {
-    "name": "@gfc/timer-wheel",
+    "name": "@fbi/timer-wheel",
     "version": "0.1.0",
     "description": "Forge Blaze Ignite 时间轮定时器插件：O(1) 添加/触发，适合海量定时器场景",
     "main": "src/index.ts",
     "peerDependencies": {
-        "@gfc/core": ">=0.1.0"
+        "@fbi/core": ">=0.1.0"
     },
     "keywords": [
         "timer",

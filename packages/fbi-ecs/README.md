@@ -1,16 +1,16 @@
-# @gfc/ecs
+# @fbi/ecs
 
 > Forge Blaze Ignite 的高性能 ECS 插件，基于 SparseSet 架构。Generational Entity ID、多字位掩码（BitMask）、查询缓存、响应式分组（ReactiveGroup）、命令缓冲区——为游戏逻辑提供数据驱动的开发范式。
 
 ## 安装
 
-`@gfc/ecs` 是 Forge Blaze Ignite 的独立插件包，位于 `packages/gfc-ecs/`。
+`@fbi/ecs` 是 Forge Blaze Ignite 的独立插件包，位于 `packages/fbi-ecs/`。
 
 ```jsonc
 // package.json
 {
     "peerDependencies": {
-        "@gfc/core": ">=0.1.0",
+        "@fbi/core": ">=0.1.0",
     },
 }
 ```
@@ -18,7 +18,7 @@
 在项目中直接引用：
 
 ```typescript
-import { EcsWorld, ComponentType, SystemPhase } from '@gfc/ecs';
+import { EcsWorld, ComponentType, SystemPhase } from '@fbi/ecs';
 ```
 
 ## 快速开始
@@ -28,7 +28,7 @@ import { EcsWorld, ComponentType, SystemPhase } from '@gfc/ecs';
 组件是纯数据（Plain Object），通过 `ComponentType<T>` 注册。`ComponentType` 使用 phantom type 确保类型安全——编译期自动推断组件数据类型。
 
 ```typescript
-import { ComponentType } from '@gfc/ecs';
+import { ComponentType } from '@fbi/ecs';
 
 // 每个 ComponentType 实例自动分配唯一 typeId
 // phantom type <T> 确保 addComponent / getComponent 的数据类型正确
@@ -53,7 +53,7 @@ const Health = new ComponentType<Health>('Health');
 ### 2. 创建世界和实体
 
 ```typescript
-import { EcsWorld } from '@gfc/ecs';
+import { EcsWorld } from '@fbi/ecs';
 
 const world = new EcsWorld();
 
@@ -74,7 +74,7 @@ world.addComponent(bullet, Velocity, { dx: 10, dy: 0 });
 System 实现 `ISystem` 接口，在 `update()` 中处理游戏逻辑：
 
 ```typescript
-import { ISystem, IEcsWorldAccess, SystemPhase, QueryHandle } from '@gfc/ecs';
+import { ISystem, IEcsWorldAccess, SystemPhase, QueryHandle } from '@fbi/ecs';
 
 class MovementSystem implements ISystem {
     readonly name = 'MovementSystem';
@@ -190,7 +190,7 @@ if (world.isAlive(this.targetId)) {
 **构造：**
 
 ```typescript
-import { BitMask } from '@gfc/ecs';
+import { BitMask } from '@fbi/ecs';
 
 // 默认容量 64 位（2 个 Uint32 word）
 const mask = new BitMask();
@@ -403,7 +403,7 @@ update(deltaTime: number): void {
 #### 完整示例
 
 ```typescript
-import { ComponentType, EcsWorld, entityIndex } from '@gfc/ecs';
+import { ComponentType, EcsWorld, entityIndex } from '@fbi/ecs';
 
 const Position = new ComponentType<{ x: number; y: number }>('Position');
 const Velocity = new ComponentType<{ dx: number; dy: number }>('Velocity');
@@ -538,7 +538,7 @@ class CameraFollowSystem implements ISystem {
 #### 完整 System 示例
 
 ```typescript
-import { ISystem, IEcsWorldAccess, IReactiveGroup, SystemPhase, ComponentType } from '@gfc/ecs';
+import { ISystem, IEcsWorldAccess, IReactiveGroup, SystemPhase, ComponentType } from '@fbi/ecs';
 
 const Position = new ComponentType<{ x: number; y: number }>('Position');
 const Velocity = new ComponentType<{ dx: number; dy: number }>('Velocity');
@@ -716,14 +716,14 @@ class MovementSystem implements ISystem {
 ## 测试
 
 ```bash
-# 运行 gfc-ecs 全部测试
-npx jest packages/gfc-ecs --no-coverage
+# 运行 fbi-ecs 全部测试
+npx jest packages/fbi-ecs --no-coverage
 
 # 运行单个测试文件
-npx jest packages/gfc-ecs/tests/ecs-world.test.ts
+npx jest packages/fbi-ecs/tests/ecs-world.test.ts
 
 # 查看覆盖率
-npx jest packages/gfc-ecs --coverage
+npx jest packages/fbi-ecs --coverage
 ```
 
 ## 许可
