@@ -1,0 +1,432 @@
+plan_id: demo-e2e
+objective: '研究 Demo E2E 验证的最佳方案，确定 dev server、打包器、HTML 入口、Playwright 配置和依赖需求'
+focus_area: e2e-testing-infrastructure
+created_at: '2026-04-22'
+created_by: researcher
+status: completed
+
+tldr: |
+    - 项目已有 esbuild (^0.28.0) 作为打包器，Demo 1 已有完整的 build + serve 链路（esbuild bundle → npx serve）
+    - HtmlRenderer/DemoBase 使用纯 DOM API（document.createElement），不依赖任何特殊运行时，标准浏览器即可运行
+    - 目前零 E2E 设施：无 Playwright、Cypress、vite.config、webpack.config
+    - 推荐方案：esbuild bundle（已有） + npx serve（已有） + @playwright/test（新增），最小侵入性
+    - Demo 2 尚缺 build/serve 脚本和 HTML 入口，需补充
+
+research_metadata:
+    methodology: 'hybrid retrieval: semantic_search + grep_search + file_search + read_file'
+    scope: '全项目扫描：package.json、tsconfig.json、jest.config.js、dist/、game/shared/、demo1-idle/、demo2-rpg/'
+    confidence: high
+    coverage: 95
+    decision_blockers: 0
+    research_blockers: 0
+
+files_analyzed:
+    - file: package.json
+      path: /Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos/package.json
+      purpose: 项目依赖和脚本配置
+      key_elements:
+          - element: demo1:build
+            type: script
+            location: 'package.json:13'
+            description: 'esbuild 打包 demo1-idle/index.ts → dist/demo1/demo1.js，IIFE 格式，浏览器平台，带 @alias 路径映射'
+          - element: demo1:serve
+            type: script
+            location: 'package.json:14'
+            description: '先 build 再 npx serve dist/demo1 -p 3001'
+          - element: esbuild
+            type: variable
+            location: 'package.json:30'
+            description: 'devDependency: ^0.28.0'
+          - element: jest-environment-jsdom
+            type: variable
+            location: 'package.json:34'
+            description: 'devDependency: ^30.3.0（已安装但 jest.config 未使用）'
+      language: json
+      lines: 60
+
+    - file: tsconfig.json
+      path: /Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos/tsconfig.json
+      purpose: TypeScript 编译配置
+      key_elements:
+          - element: target
+            type: variable
+            location: 'tsconfig.json:3'
+            description: 'ES2020 — 现代浏览器可直接执行'
+          - element: module
+            type: variable
+            location: 'tsconfig.json:4'
+            description: 'ES2020 — 需打包器处理 import/export'
+          - element: lib
+            type: variable
+            location: 'tsconfig.json:5'
+            description: "['ES2020', 'DOM'] — 包含 DOM 类型"
+          - element: paths
+            type: pattern
+            location: 'tsconfig.json:21-26'
+            description: '@framework/*, @runtime/*, @game/*, @utils/* 路径别名'
+      language: json
+      lines: 40
+
+    - file: jest.config.js
+      path: /Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos/jest.config.js
+      purpose: Jest 单元测试配置
+      key_elements:
+          - element: testEnvironment
+            type: variable
+            location: 'jest.config.js:3'
+            description: "'node' — 非 jsdom，单元测试不依赖 DOM"
+          - element: moduleNameMapper
+            type: pattern
+            location: 'jest.config.js:9-14'
+            description: '4 个 @alias 映射 + cc mock'
+      language: javascript
+      lines: 27
+
+    - file: DemoBase.ts
+      path: /Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos/assets/scripts/game/shared/DemoBase.ts
+      purpose: Demo 抽象基类，提供框架模块初始化、Mock 注入、主循环
+      key_elements:
+          - element: HtmlRenderer
+            type: class
+            location: 'DemoBase.ts:46'
+            description: '持有 htmlRenderer 实例，通过构造函数 title 参数创建'
+          - element: bootstrap
+            type: function
+            location: 'DemoBase.ts:97'
+            description: '注册 15 个框架模块 + 注入 Mock 策略'
+          - element: startMainLoop
+            type: function
+            location: 'DemoBase.ts:170'
+            description: 'setInterval 模拟引擎 update 循环，默认 30fps'
+          - element: shutdown
+            type: function
+            location: 'DemoBase.ts:222'
+            description: '停止主循环 + GameModule.shutdownAll()'
+      language: typescript
+      lines: 230
+
+    - file: HtmlRenderer.ts
+      path: /Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos/assets/scripts/game/shared/HtmlRenderer.ts
+      purpose: Demo DOM 渲染基础设施
+      key_elements:
+          - element: constructor
+            type: function
+            location: 'HtmlRenderer.ts:74'
+            description: '纯 document.createElement 构建完整布局（标题栏 + 状态面板 + 日志区 + 按钮区），默认挂载到 document.body'
+          - element: log
+            type: function
+            location: 'HtmlRenderer.ts:128'
+            description: '彩色日志条目，自动滚动'
+          - element: updateLog
+            type: function
+            location: 'HtmlRenderer.ts:147'
+            description: 'key-based 原地更新，避免日志爆炸'
+          - element: createStatusPanel
+            type: function
+            location: 'HtmlRenderer.ts:185'
+            description: '键值对状态面板，实时更新'
+          - element: addButton
+            type: function
+            location: 'HtmlRenderer.ts:209'
+            description: '按钮创建，带 click 事件绑定'
+          - element: createTable
+            type: function
+            location: 'HtmlRenderer.ts:278'
+            description: '数据表格渲染'
+      language: typescript
+      lines: 315
+
+    - file: index.html (demo1)
+      path: /Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos/dist/demo1/index.html
+      purpose: Demo 1 HTML 入口页面
+      key_elements:
+          - element: script_tag
+            type: pattern
+            location: 'index.html:17'
+            description: "<script src='demo1.js'></script> — 加载 esbuild 产出的 IIFE bundle"
+      language: html
+      lines: 19
+
+    - file: index.ts (demo1)
+      path: /Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos/assets/scripts/game/demo1-idle/index.ts
+      purpose: Demo 1 入口脚本
+      key_elements:
+          - element: entry
+            type: pattern
+            location: 'index.ts:7-11'
+            description: 'new IdleClickerDemo() → demo.start() — 极简启动'
+      language: typescript
+      lines: 11
+
+    - file: index.ts (demo2)
+      path: /Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos/assets/scripts/game/demo2-rpg/index.ts
+      purpose: Demo 2 barrel export（非浏览器入口）
+      key_elements:
+          - element: exports
+            type: pattern
+            location: 'index.ts:1-20'
+            description: '仅 re-export 数据类型和模块，无启动逻辑——需要单独创建浏览器入口'
+      language: typescript
+      lines: 20
+
+patterns_found:
+    - category: architecture
+      pattern: 'esbuild IIFE bundle + 静态 HTML'
+      description: 'Demo 1 已建立标准模式：esbuild 将 TS 入口打包为 IIFE → 输出到 dist/demoN/ → HTML 页面通过 <script> 加载'
+      examples:
+          - file: package.json
+            location: 'package.json:13-14'
+            snippet: |
+                "demo1:build": "esbuild assets/scripts/game/demo1-idle/index.ts --bundle --outfile=dist/demo1/demo1.js --platform=browser --format=iife --tsconfig=tsconfig.json --alias:@framework=./assets/scripts/framework --alias:@game=./assets/scripts/game --alias:@utils=./assets/scripts/utils --alias:@runtime=./assets/scripts/runtime"
+                "demo1:serve": "npm run demo1:build && npx serve dist/demo1 -p 3001"
+      prevalence: common
+
+    - category: architecture
+      pattern: '纯 DOM API — 零框架依赖'
+      description: 'HtmlRenderer 和 DemoBase 仅使用标准 DOM API（document.createElement、addEventListener、innerHTML），不依赖 React/Vue/任何 UI 框架'
+      examples:
+          - file: HtmlRenderer.ts
+            location: 'HtmlRenderer.ts:82-98'
+            snippet: |
+                const root = document.createElement('div');
+                root.style.cssText = '...';
+                const header = document.createElement('div');
+                header.textContent = title;
+                root.appendChild(header);
+      prevalence: common
+
+    - category: architecture
+      pattern: 'Mock 策略注入'
+      description: 'DemoBase.bootstrap() 在模块注册后注入 Mock 策略实现（MockResourceLoader、MockAudioPlayer 等），所有 Mock 位于 game/shared/'
+      examples:
+          - file: DemoBase.ts
+            location: 'DemoBase.ts:137-145'
+            snippet: |
+                resourceManager.setResourceLoader(new MockResourceLoader());
+                audioManager.setAudioPlayer(new MockAudioPlayer());
+                sceneManager.setSceneLoader(new MockSceneLoader());
+      prevalence: common
+
+    - category: structure
+      pattern: 'Demo 入口约定'
+      description: '每个 Demo 有独立入口 index.ts，创建 Demo 实例并调用 start()/bootstrap()。Demo 1 的 index.ts 是浏览器入口，Demo 2 的 index.ts 目前仅做 barrel export'
+      examples:
+          - file: index.ts (demo1)
+            location: 'demo1-idle/index.ts:7-10'
+            snippet: |
+                const demo = new IdleClickerDemo();
+                demo.start().catch((err: unknown) => { ... });
+      prevalence: common
+
+    - category: testing
+      pattern: 'Jest 单元测试 + node 环境'
+      description: '所有现有测试为 Jest 单元测试，testEnvironment=node，通过 moduleNameMapper 解析路径别名，mock cc 引擎'
+      examples:
+          - file: jest.config.js
+            location: 'jest.config.js:1-15'
+            snippet: |
+                testEnvironment: 'node',
+                moduleNameMapper: {
+                  '^@framework/(.*)$': '<rootDir>/assets/scripts/framework/$1',
+                }
+      prevalence: common
+
+related_architecture:
+    components_relevant_to_domain:
+        - component: DemoBase
+          responsibility: 'Demo 抽象基类，注册框架模块、注入 Mock、管理主循环'
+          location: 'assets/scripts/game/shared/DemoBase.ts'
+          relationship_to_domain: 'E2E 测试的启动入口——bootstrap() + startMainLoop() 初始化整个运行时'
+        - component: HtmlRenderer
+          responsibility: 'DOM 渲染层，日志/状态面板/按钮/表格'
+          location: 'assets/scripts/game/shared/HtmlRenderer.ts'
+          relationship_to_domain: 'E2E 测试的断言目标——通过 DOM 选择器验证渲染输出'
+        - component: GameModule
+          responsibility: '模块注册中心'
+          location: 'assets/scripts/framework/core/GameModule.ts'
+          relationship_to_domain: '所有模块通过 GameModule.register() 初始化，E2E 需要等待 bootstrap 完成'
+    interfaces_used_by_domain:
+        - interface: StatusPanel
+          location: 'assets/scripts/game/shared/HtmlRenderer.ts'
+          usage_pattern: "createStatusPanel() 返回 { element, update() } 接口，E2E 可通过 data-role='panel-body' 选择器定位值"
+    data_flow_involving_domain: |
+        入口 index.ts → new Demo() → bootstrap() → 注册 15 个模块 + Mock 注入
+        → startMainLoop() → setInterval → GameModule.update(dt)
+        → Procedure/FSM/Timer 驱动业务逻辑
+        → HtmlRenderer 更新 DOM（日志、面板、按钮响应）
+        E2E 测试路径：Playwright 打开 http://localhost:PORT → 等待 DOM 就绪 → 点击按钮 → 断言 DOM 内容
+    key_relationships_to_domain:
+        - from: 'index.ts (入口)'
+          to: 'DemoBase.bootstrap()'
+          relationship: calls
+        - from: 'DemoBase'
+          to: 'HtmlRenderer'
+          relationship: composes
+        - from: 'HtmlRenderer'
+          to: 'DOM (document.body)'
+          relationship: 'creates and manages'
+
+related_technology_stack:
+    languages_used_in_domain:
+        - TypeScript (ES2020 target)
+        - HTML (静态入口页)
+    frameworks_used_in_domain:
+        - name: esbuild
+          usage_in_domain: 'TS → JS 打包，IIFE 格式，--alias 处理路径映射。已有 demo1:build 脚本模板'
+    libraries_used_in_domain:
+        - name: serve (npx serve)
+          purpose_in_domain: '静态文件 HTTP 服务器，demo1:serve 已使用 -p 3001'
+        - name: jest-environment-jsdom
+          purpose_in_domain: '已安装 (^30.3.0) 但未使用——jest.config 仍为 node 环境'
+
+related_conventions:
+    naming_patterns_in_domain: 'demoN:build / demoN:serve 脚本命名；dist/demoN/ 输出目录'
+    structure_of_domain: '每个 Demo 独立目录 + 独立 dist 产出 + 独立端口'
+    error_handling_in_domain: '入口 catch 错误并 throw new Error'
+    testing_in_domain: 'Jest 单元测试覆盖业务逻辑，零 E2E 覆盖'
+    documentation_in_domain: '中文 JSDoc + demo-design.md 总设计文档'
+
+related_dependencies:
+    internal:
+        - component: '@framework/* (全部 15 个模块)'
+          relationship_to_domain: 'DemoBase.bootstrap() 注册全部模块'
+          direction: outbound
+        - component: 'game/shared/Mock* (8 个 Mock 策略)'
+          relationship_to_domain: 'DemoBase 注入 Mock 策略替代引擎实现'
+          direction: outbound
+    external:
+        - name: esbuild (^0.28.0)
+          purpose_for_domain: 'TS 打包为浏览器可执行 JS'
+        - name: serve (npx)
+          purpose_for_domain: '静态文件 HTTP 服务'
+
+testing_patterns:
+    framework: 'Jest 29 + ts-jest'
+    coverage_areas:
+        - 'Demo 2 RPG: 18 个测试文件覆盖 systems/procedures/fsm/data/events/ui'
+        - 'Demo 1 Idle: integration test + SaveSystem test'
+    test_organization: 'tests/game/demoN-name/ 镜像 assets/scripts/game/demoN-name/ 目录结构'
+    mock_patterns:
+        - 'game/shared/Mock*.ts 提供 Mock 策略实现'
+        - 'tests/__mocks__/cc.ts mock Cocos Creator 引擎'
+
+# ─── 推荐方案 ──────────────────────────────────────────
+
+recommendation:
+    dev_server:
+        choice: 'npx serve（已在用）或 esbuild --serve（零额外依赖）'
+        rationale: |
+            - npx serve 已在 demo1:serve 中验证可行，零配置
+            - esbuild 0.17+ 内置 --serve 模式，支持 live reload 但项目版本 ^0.28 更优
+            - 不需要 Vite — 项目无 React/Vue/HMR 需求，纯 DOM 操作
+            - 推荐 Playwright 测试时用 esbuild 的 JS API 启动 serve（可控端口、可编程关闭）
+
+    bundler:
+        choice: 'esbuild（已安装 ^0.28.0，保持现状）'
+        rationale: |
+            - demo1:build 脚本已验证 esbuild + --alias 路径映射方案
+            - IIFE 格式直接 <script> 引入，无需 module loader
+            - 打包速度极快（毫秒级），适合 E2E 测试前 rebuild
+
+    html_entry:
+        choice: '每个 Demo 一个 dist/demoN/index.html（手写静态 HTML）'
+        rationale: |
+            - Demo 1 已有 dist/demo1/index.html 模板（19 行）
+            - 仅需 <script src="demoN.js"></script> 加载 bundle
+            - 可选：统一 HTML 模板由 esbuild 插件或 shell 脚本自动生成
+        template: |
+            <!DOCTYPE html>
+            <html lang="zh-CN">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Demo N — XXX</title>
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    html, body { width: 100%; height: 100%; background: #1a1a2e; color: #eee; font-family: 'Consolas', 'Monaco', 'Courier New', monospace; }
+                    body { padding: 20px; }
+                </style>
+            </head>
+            <body>
+                <script src="demoN.js"></script>
+            </body>
+            </html>
+
+    playwright_config:
+        choice: '@playwright/test'
+        suggested_config: |
+            // playwright.config.ts
+            import { defineConfig } from '@playwright/test';
+            export default defineConfig({
+              testDir: './tests/e2e',
+              timeout: 30_000,
+              retries: 1,
+              use: {
+                baseURL: 'http://localhost:3001',
+                headless: true,
+                screenshot: 'only-on-failure',
+              },
+              webServer: [
+                {
+                  command: 'npm run demo1:serve',
+                  port: 3001,
+                  reuseExistingServer: !process.env.CI,
+                },
+                // Demo 2 追加:
+                // {
+                //   command: 'npm run demo2:serve',
+                //   port: 3002,
+                //   reuseExistingServer: !process.env.CI,
+                // },
+              ],
+              projects: [
+                { name: 'chromium', use: { browserName: 'chromium' } },
+              ],
+            });
+        key_points:
+            - 'webServer 自动在测试前启动 serve、测试后关闭'
+            - "baseURL 让测试用相对路径：page.goto('/') 即可"
+            - 'headless: true 适合 CI，本地调试可 --headed'
+            - 'Playwright 自带 expect(locator).toHaveText() 等 Web-first 断言'
+
+    dependencies_to_install:
+        new:
+            - name: '@playwright/test'
+              version: 'latest'
+              type: devDependency
+              purpose: 'E2E 测试框架'
+        already_installed:
+            - name: esbuild
+              version: '^0.28.0'
+              purpose: 'TS 打包'
+            - name: jest-environment-jsdom
+              version: '^30.3.0'
+              purpose: '已装未用，E2E 不需要'
+
+    scripts_to_add:
+        - name: 'demo2:build'
+          command: 'esbuild assets/scripts/game/demo2-rpg/main.ts --bundle --outfile=dist/demo2/demo2.js --platform=browser --format=iife --tsconfig=tsconfig.json --alias:@framework=./assets/scripts/framework --alias:@game=./assets/scripts/game --alias:@utils=./assets/scripts/utils --alias:@runtime=./assets/scripts/runtime'
+          note: '需先创建 demo2-rpg/main.ts 作为浏览器入口（类似 demo1 的 index.ts）'
+        - name: 'demo2:serve'
+          command: 'npm run demo2:build && npx serve dist/demo2 -p 3002'
+        - name: 'test:e2e'
+          command: 'npx playwright test'
+        - name: 'test:e2e:headed'
+          command: 'npx playwright test --headed'
+
+    demo2_missing_pieces:
+        - '浏览器入口文件 assets/scripts/game/demo2-rpg/main.ts（new TurnBasedRpgDemo() → demo.start()）'
+        - 'HTML 入口 dist/demo2/index.html'
+        - 'package.json 中的 demo2:build 和 demo2:serve 脚本'
+
+open_questions: []
+
+gaps:
+    - area: 'Demo 2 浏览器入口'
+      description: 'demo2-rpg/index.ts 当前是 barrel export，非浏览器入口。需新建 main.ts 启动 TurnBasedRpgDemo'
+      impact: research_blocker
+      affects: ['demo2-e2e']
+    - area: 'serve 进程管理'
+      description: 'npx serve 不支持编程式关闭。若需要更精细控制（如 E2E 并行），可考虑用 esbuild JS API 的 ctx.serve() 替代'
+      impact: nice_to_know
+      affects: ['ci-integration']

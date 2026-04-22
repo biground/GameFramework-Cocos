@@ -1,1495 +1,1495 @@
 plan_id: demo2-rpg
-objective: "实现 Demo 2 Turn-based RPG 回合制 RPG 演示，深度验证 FSM/Procedure/Entity/Event/DataTable/Audio/UI/ObjectPool 等框架模块在真实战斗场景下的协作"
-created_at: "2026-04-22"
+objective: '实现 Demo 2 Turn-based RPG 回合制 RPG 演示，深度验证 FSM/Procedure/Entity/Event/DataTable/Audio/UI/ObjectPool 等框架模块在真实战斗场景下的协作'
+created_at: '2026-04-22'
 created_by: gem-planner
 status: pending_approval
 research_confidence: high
 
 plan_metrics:
-  wave_1_task_count: 5
-  total_dependencies: 30
-  risk_score: medium
+    wave_1_task_count: 5
+    total_dependencies: 30
+    risk_score: medium
 
 tldr: |
-  Demo 2 Turn-based RPG 共 24 个任务、6 个 Wave。
-  Wave 1：基础数据层（事件键 + 4 张 DataTable 行定义 + 游戏状态 + ProcedureContext）— 5 个并行任务
-  Wave 2：核心系统层（伤害计算器 + BUFF 系统 + 敌方 AI + 战斗系统）— 4 个并行任务
-  Wave 3：FSM 层（战斗 FSM 6 状态 + 角色 FSM 4 状态）— 2 个并行任务
-  Wave 4：流程层（6 个 Procedure 实现）— 4 个并行任务
-  Wave 5：展示层（3 个 UI 面板 + 主入口类 + index.ts）— 4 个并行任务
-  Wave 6：集成测试 + 验收（端到端测试 + 最终验证）— 5 个任务
-  严格 TDD：先写测试 → 红灯 → 实现 → 绿灯 → 提交。
+    Demo 2 Turn-based RPG 共 24 个任务、6 个 Wave。
+    Wave 1：基础数据层（事件键 + 4 张 DataTable 行定义 + 游戏状态 + ProcedureContext）— 5 个并行任务
+    Wave 2：核心系统层（伤害计算器 + BUFF 系统 + 敌方 AI + 战斗系统）— 4 个并行任务
+    Wave 3：FSM 层（战斗 FSM 6 状态 + 角色 FSM 4 状态）— 2 个并行任务
+    Wave 4：流程层（6 个 Procedure 实现）— 4 个并行任务
+    Wave 5：展示层（3 个 UI 面板 + 主入口类 + index.ts）— 4 个并行任务
+    Wave 6：集成测试 + 验收（端到端测试 + 最终验证）— 5 个任务
+    严格 TDD：先写测试 → 红灯 → 实现 → 绿灯 → 提交。
 
 open_questions: []
 
 pre_mortem:
-  overall_risk_level: medium
-  critical_failure_modes:
-    - scenario: "BattleFsm 状态切换逻辑复杂，SelectAction ↔ ExecuteAction 循环可能出现死循环"
-      likelihood: medium
-      impact: high
-      mitigation: "为 BattleFsm 添加最大迭代守卫（如单回合 actionIndex 不超过队伍总人数），单测覆盖循环边界"
-    - scenario: "伤害计算公式 ATK × damageRate - DEF 可能产生负值"
-      likelihood: medium
-      impact: medium
-      mitigation: "DamageCalculator 中 Math.max(1, result) 保底最小伤害为 1"
-    - scenario: "CharacterFsm 多实例（每个角色一个）与 BattleFsm 生命周期管理冲突"
-      likelihood: low
-      impact: high
-      mitigation: "BattlePrepProcedure 创建、SettleProcedure 统一销毁，用 entityId 后缀命名保证唯一"
-    - scenario: "BUFF 效果堆叠和回合递减逻辑与 Timer 交叉导致时序问题"
-      likelihood: medium
-      impact: medium
-      mitigation: "BUFF 用回合计数器而非 TimerManager 秒计时，在 RoundEnd 统一递减和清理"
-  assumptions:
-    - "Demo 0 共享基础设施（DemoBase + HtmlRenderer + 12 Mock）已完全就绪"
-    - "框架模块 API（FSM/Procedure/Entity/Event/DataTable/Audio/UI/ObjectPool/Timer）已稳定"
-    - "遵循 Demo 1 已建立的目录结构和编码模式"
-    - "所有网络通信通过 MockNetworkSocket 模拟"
+    overall_risk_level: medium
+    critical_failure_modes:
+        - scenario: 'BattleFsm 状态切换逻辑复杂，SelectAction ↔ ExecuteAction 循环可能出现死循环'
+          likelihood: medium
+          impact: high
+          mitigation: '为 BattleFsm 添加最大迭代守卫（如单回合 actionIndex 不超过队伍总人数），单测覆盖循环边界'
+        - scenario: '伤害计算公式 ATK × damageRate - DEF 可能产生负值'
+          likelihood: medium
+          impact: medium
+          mitigation: 'DamageCalculator 中 Math.max(1, result) 保底最小伤害为 1'
+        - scenario: 'CharacterFsm 多实例（每个角色一个）与 BattleFsm 生命周期管理冲突'
+          likelihood: low
+          impact: high
+          mitigation: 'BattlePrepProcedure 创建、SettleProcedure 统一销毁，用 entityId 后缀命名保证唯一'
+        - scenario: 'BUFF 效果堆叠和回合递减逻辑与 Timer 交叉导致时序问题'
+          likelihood: medium
+          impact: medium
+          mitigation: 'BUFF 用回合计数器而非 TimerManager 秒计时，在 RoundEnd 统一递减和清理'
+    assumptions:
+        - 'Demo 0 共享基础设施（DemoBase + HtmlRenderer + 12 Mock）已完全就绪'
+        - '框架模块 API（FSM/Procedure/Entity/Event/DataTable/Audio/UI/ObjectPool/Timer）已稳定'
+        - '遵循 Demo 1 已建立的目录结构和编码模式'
+        - '所有网络通信通过 MockNetworkSocket 模拟'
 
 implementation_specification:
-  code_structure: |
-    Demo 2 采用与 Demo 1 一致的分层架构：
-    - data/: 4 张 DataTable 行类型定义 + 静态数据 + RpgGameData 运行时状态
-    - events/: EventKey<T> 类型安全事件键，'rpg:' 前缀
-    - fsm/: BattleFsm（6 状态）+ CharacterFsm（4 状态），黑板模式共享数据
-    - procedures/: 6 个 Procedure + IProcedureContext
-    - systems/: BattleSystem（战斗引擎）+ DamageCalculator + BuffSystem + EnemyAI
-    - ui/: LobbyPanel + BattlePanel + SettlePanel
-    - TurnBasedRpgDemo.ts 主入口 + index.ts 导出
+    code_structure: |
+        Demo 2 采用与 Demo 1 一致的分层架构：
+        - data/: 4 张 DataTable 行类型定义 + 静态数据 + RpgGameData 运行时状态
+        - events/: EventKey<T> 类型安全事件键，'rpg:' 前缀
+        - fsm/: BattleFsm（6 状态）+ CharacterFsm（4 状态），黑板模式共享数据
+        - procedures/: 6 个 Procedure + IProcedureContext
+        - systems/: BattleSystem（战斗引擎）+ DamageCalculator + BuffSystem + EnemyAI
+        - ui/: LobbyPanel + BattlePanel + SettlePanel
+        - TurnBasedRpgDemo.ts 主入口 + index.ts 导出
 
-  affected_areas:
-    - assets/scripts/game/demo2-rpg/ （全部新建）
-    - tests/integration/demo2-rpg.integration.test.ts （新建）
+    affected_areas:
+        - assets/scripts/game/demo2-rpg/ （全部新建）
+        - tests/integration/demo2-rpg.integration.test.ts （新建）
 
-  component_details:
-    - component: RpgGameData
-      responsibility: "游戏运行时状态：玩家金币、经验、角色等级、当前关卡、战斗回合数等"
-      interfaces:
-        - "gold: number"
-        - "exp: number"
-        - "selectedStageId: number"
-        - "playerCharacters: CharacterState[]"
-        - "currentRound: number"
+    component_details:
+        - component: RpgGameData
+          responsibility: '游戏运行时状态：玩家金币、经验、角色等级、当前关卡、战斗回合数等'
+          interfaces:
+              - 'gold: number'
+              - 'exp: number'
+              - 'selectedStageId: number'
+              - 'playerCharacters: CharacterState[]'
+              - 'currentRound: number'
 
-    - component: DamageCalculator
-      responsibility: "纯函数伤害计算：ATK × damageRate - DEF，保底最小 1"
-      interfaces:
-        - "calculateDamage(attacker, skill, defender): number"
-        - "calculateHeal(caster, skill): number"
+        - component: DamageCalculator
+          responsibility: '纯函数伤害计算：ATK × damageRate - DEF，保底最小 1'
+          interfaces:
+              - 'calculateDamage(attacker, skill, defender): number'
+              - 'calculateHeal(caster, skill): number'
 
-    - component: BuffSystem
-      responsibility: "BUFF/DEBUFF 管理：应用、堆叠、回合递减、清理"
-      interfaces:
-        - "applyBuff(targetId, buffType, duration, value): void"
-        - "tickBuffs(targetId): void"
-        - "getActiveBuffs(targetId): Buff[]"
-        - "clearBuffs(targetId): void"
+        - component: BuffSystem
+          responsibility: 'BUFF/DEBUFF 管理：应用、堆叠、回合递减、清理'
+          interfaces:
+              - 'applyBuff(targetId, buffType, duration, value): void'
+              - 'tickBuffs(targetId): void'
+              - 'getActiveBuffs(targetId): Buff[]'
+              - 'clearBuffs(targetId): void'
 
-    - component: EnemyAI
-      responsibility: "敌方 AI 决策：优先攻击 HP 最低的玩家角色"
-      interfaces:
-        - "decideAction(enemy, playerCharacters): ActionDecision"
+        - component: EnemyAI
+          responsibility: '敌方 AI 决策：优先攻击 HP 最低的玩家角色'
+          interfaces:
+              - 'decideAction(enemy, playerCharacters): ActionDecision'
 
-    - component: BattleSystem
-      responsibility: "回合制战斗引擎：SPD 排序、回合执行、胜负判定"
-      interfaces:
-        - "calculateTurnOrder(characters): CharacterState[]"
-        - "executeAction(action): ActionResult"
-        - "checkBattleEnd(players, enemies): BattleEndResult"
+        - component: BattleSystem
+          responsibility: '回合制战斗引擎：SPD 排序、回合执行、胜负判定'
+          interfaces:
+              - 'calculateTurnOrder(characters): CharacterState[]'
+              - 'executeAction(action): ActionResult'
+              - 'checkBattleEnd(players, enemies): BattleEndResult'
 
-    - component: BattleFsm（6 状态）
-      responsibility: "战斗流程驱动：RoundStart → SelectAction → ExecuteAction → RoundEnd → Victory/Defeat"
-      interfaces:
-        - "IBattleBlackboard: { battleSystem, buffSystem, ... }"
-        - "各 State 实现 onEnter/onUpdate/onLeave"
+        - component: BattleFsm（6 状态）
+          responsibility: '战斗流程驱动：RoundStart → SelectAction → ExecuteAction → RoundEnd → Victory/Defeat'
+          interfaces:
+              - 'IBattleBlackboard: { battleSystem, buffSystem, ... }'
+              - '各 State 实现 onEnter/onUpdate/onLeave'
 
-    - component: CharacterFsm（4 状态）
-      responsibility: "角色状态：Idle → Acting → Stunned / Dead"
-      interfaces:
-        - "ICharacterBlackboard: { characterId, characterState }"
+        - component: CharacterFsm（4 状态）
+          responsibility: '角色状态：Idle → Acting → Stunned / Dead'
+          interfaces:
+              - 'ICharacterBlackboard: { characterId, characterState }'
 
-    - component: TurnBasedRpgDemo
-      responsibility: "主入口类，继承 DemoBase，串联所有系统和流程"
-      interfaces:
-        - "start(): Promise<void>"
-        - "setupProcedures(): void"
-        - "setupDataTables(): void"
+        - component: TurnBasedRpgDemo
+          responsibility: '主入口类，继承 DemoBase，串联所有系统和流程'
+          interfaces:
+              - 'start(): Promise<void>'
+              - 'setupProcedures(): void'
+              - 'setupDataTables(): void'
 
-  dependencies:
-    - component: BattleSystem
-      relationship: "调用 DamageCalculator 计算伤害，调用 BuffSystem 查询 BUFF 效果"
-    - component: BattleFsm states
-      relationship: "调用 BattleSystem 执行战斗逻辑，通过 EventManager 发布事件"
-    - component: Procedures
-      relationship: "通过 IProcedureContext 访问所有系统和框架模块"
-    - component: UI panels
-      relationship: "监听 EventManager 事件更新显示，通过 HtmlRenderer 渲染"
+    dependencies:
+        - component: BattleSystem
+          relationship: '调用 DamageCalculator 计算伤害，调用 BuffSystem 查询 BUFF 效果'
+        - component: BattleFsm states
+          relationship: '调用 BattleSystem 执行战斗逻辑，通过 EventManager 发布事件'
+        - component: Procedures
+          relationship: '通过 IProcedureContext 访问所有系统和框架模块'
+        - component: UI panels
+          relationship: '监听 EventManager 事件更新显示，通过 HtmlRenderer 渲染'
 
-  integration_points:
-    - "DemoBase.bootstrap() 注册 15 个框架模块 + Mock 注入"
-    - "ProcedureManager.initialize() 注册 6 个 Procedure"
-    - "DataTableManager.createTableFromRawData() 注册 4 张配置表"
-    - "FsmManager.createFsm() 创建 BattleFsm + CharacterFsm"
-    - "EntityManager.showEntity/hideEntity 管理角色实体"
-    - "EventManager 事件流连接战斗逻辑 ↔ UI ↔ 音效"
+    integration_points:
+        - 'DemoBase.bootstrap() 注册 15 个框架模块 + Mock 注入'
+        - 'ProcedureManager.initialize() 注册 6 个 Procedure'
+        - 'DataTableManager.createTableFromRawData() 注册 4 张配置表'
+        - 'FsmManager.createFsm() 创建 BattleFsm + CharacterFsm'
+        - 'EntityManager.showEntity/hideEntity 管理角色实体'
+        - 'EventManager 事件流连接战斗逻辑 ↔ UI ↔ 音效'
 
 contracts:
-  - from_task: T01
-    to_task: T06,T07,T08,T09,T14,T15,T16,T17
-    interface: "RpgEvents 事件键常量，被所有系统、FSM、Procedure、UI 引用"
-    format: "EventKey<T> 类型安全常量导出"
+    - from_task: T01
+      to_task: T06,T07,T08,T09,T14,T15,T16,T17
+      interface: 'RpgEvents 事件键常量，被所有系统、FSM、Procedure、UI 引用'
+      format: 'EventKey<T> 类型安全常量导出'
 
-  - from_task: T02
-    to_task: T06,T09,T14,T15,T16,T17
-    interface: "CharacterConfigRow + CHAR_DATA, SkillConfigRow + SKILL_DATA, MonsterConfigRow + MONSTER_DATA, StageConfigRow + STAGE_DATA"
-    format: "TypeScript class + 静态数组常量"
+    - from_task: T02
+      to_task: T06,T09,T14,T15,T16,T17
+      interface: 'CharacterConfigRow + CHAR_DATA, SkillConfigRow + SKILL_DATA, MonsterConfigRow + MONSTER_DATA, StageConfigRow + STAGE_DATA'
+      format: 'TypeScript class + 静态数组常量'
 
-  - from_task: T03
-    to_task: T06,T07,T08,T09,T10,T11,T14,T15,T16,T17
-    interface: "RpgGameData 运行时状态 + CharacterState/BuffState 类型定义"
-    format: "TypeScript class + interface 导出"
+    - from_task: T03
+      to_task: T06,T07,T08,T09,T10,T11,T14,T15,T16,T17
+      interface: 'RpgGameData 运行时状态 + CharacterState/BuffState 类型定义'
+      format: 'TypeScript class + interface 导出'
 
-  - from_task: T04
-    to_task: T14,T15,T16,T17,T18
-    interface: "IRpgProcedureContext 接口 + PROCEDURE_CONTEXT_KEY 常量"
-    format: "TypeScript interface + string 常量"
+    - from_task: T04
+      to_task: T14,T15,T16,T17,T18
+      interface: 'IRpgProcedureContext 接口 + PROCEDURE_CONTEXT_KEY 常量'
+      format: 'TypeScript interface + string 常量'
 
-  - from_task: T06
-    to_task: T09,T10
-    interface: "DamageCalculator.calculateDamage/calculateHeal 纯函数"
-    format: "TypeScript static methods"
+    - from_task: T06
+      to_task: T09,T10
+      interface: 'DamageCalculator.calculateDamage/calculateHeal 纯函数'
+      format: 'TypeScript static methods'
 
-  - from_task: T07
-    to_task: T09,T10
-    interface: "BuffSystem.applyBuff/tickBuffs/getActiveBuffs/clearBuffs"
-    format: "TypeScript class methods"
+    - from_task: T07
+      to_task: T09,T10
+      interface: 'BuffSystem.applyBuff/tickBuffs/getActiveBuffs/clearBuffs'
+      format: 'TypeScript class methods'
 
-  - from_task: T08
-    to_task: T10
-    interface: "EnemyAI.decideAction 决策函数"
-    format: "TypeScript static method"
+    - from_task: T08
+      to_task: T10
+      interface: 'EnemyAI.decideAction 决策函数'
+      format: 'TypeScript static method'
 
-  - from_task: T09
-    to_task: T10,T11,T15,T16
-    interface: "BattleSystem.calculateTurnOrder/executeAction/checkBattleEnd"
-    format: "TypeScript class methods"
+    - from_task: T09
+      to_task: T10,T11,T15,T16
+      interface: 'BattleSystem.calculateTurnOrder/executeAction/checkBattleEnd'
+      format: 'TypeScript class methods'
 
-  - from_task: T10
-    to_task: T16
-    interface: "BattleFsm 6 个状态类（RoundStart/SelectAction/ExecuteAction/RoundEnd/Victory/Defeat）"
-    format: "FsmState 子类"
+    - from_task: T10
+      to_task: T16
+      interface: 'BattleFsm 6 个状态类（RoundStart/SelectAction/ExecuteAction/RoundEnd/Victory/Defeat）'
+      format: 'FsmState 子类'
 
-  - from_task: T11
-    to_task: T15
-    interface: "CharacterFsm 4 个状态类（Idle/Acting/Stunned/Dead）"
-    format: "FsmState 子类"
+    - from_task: T11
+      to_task: T15
+      interface: 'CharacterFsm 4 个状态类（Idle/Acting/Stunned/Dead）'
+      format: 'FsmState 子类'
 
-  - from_task: T14,T15,T16,T17
-    to_task: T18
-    interface: "6 个 Procedure 类 供 TurnBasedRpgDemo.setupProcedures 注册"
-    format: "ProcedureBase 子类"
+    - from_task: T14,T15,T16,T17
+      to_task: T18
+      interface: '6 个 Procedure 类 供 TurnBasedRpgDemo.setupProcedures 注册'
+      format: 'ProcedureBase 子类'
 
 tasks:
-  # ═══════════════════════════════════════════════════════
-  # Wave 1: 基础数据层（无依赖，全部并行）
-  # ═══════════════════════════════════════════════════════
-
-  - id: T01
-    title: "定义 RPG 事件键（RpgEvents.ts）"
-    description: |
-      创建 `assets/scripts/game/demo2-rpg/events/RpgEvents.ts`。
-      使用 EventKey<T> 幻影类型，'rpg:' 前缀。
-      定义以下事件键：
-      - ATTACK: { attackerId, defenderId, damage, skillId }
-      - CHARACTER_HURT: { characterId, damage, remainingHp }
-      - CHARACTER_DEAD: { characterId, group }
-      - CHARACTER_HEALED: { characterId, amount, remainingHp }
-      - ROUND_START: { roundNumber }
-      - ROUND_END: { roundNumber }
-      - SKILL_USED: { casterId, skillId, targetIds }
-      - BUFF_APPLIED: { targetId, buffType, duration }
-      - BUFF_EXPIRED: { targetId, buffType }
-      - BATTLE_VICTORY: { expReward, goldReward }
-      - BATTLE_DEFEAT: {}
-      - STAGE_SELECTED: { stageId }
-      - PROCEDURE_CHANGED: { from, to }
-
-      TDD：先写测试验证每个事件键的 eventName 和类型正确。
-    wave: 1
-    agent: gem-implementer
-    prototype: false
-    priority: high
-    status: pending
-    dependencies: []
-    conflicts_with: []
-    context_files:
-      - path: assets/scripts/game/demo1-idle/events/IdleEvents.ts
-        description: "Demo 1 事件键定义模式参考"
-      - path: assets/scripts/framework/event/EventDefs.ts
-        description: "EventKey<T> 定义"
-      - path: docs/demo-design.md
-        description: "5.7 节日志示例中涉及的事件"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: small
-        estimated_files: 2
-        estimated_lines: 80
-        focus_area: "事件键定义"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg' 通过"
-          - "每个事件键的 eventName 包含 'rpg:' 前缀"
-        acceptance_criteria:
-          - "13 个事件键全部定义，类型参数正确"
-          - "测试覆盖所有事件键实例化和 eventName 断言"
-        failure_modes:
-          - scenario: "事件 payload 类型与后续系统不匹配"
-            likelihood: low
-            impact: medium
-            mitigation: "严格按设计文档定义 payload，后续系统引用时编译器自动检查"
-        tech_stack:
-          - TypeScript
-        test_coverage: "100%"
-
-  - id: T02
-    title: "定义 4 张 DataTable 行类型 + 静态数据"
-    description: |
-      创建 4 个文件：
-      1. `data/CharacterConfigRow.ts` — 字段：id, name, hp, mp, atk, def, spd, skills（string）
-         静态数据 CHAR_DATA：3 个角色（战士/法师/牧师）
-      2. `data/SkillConfigRow.ts` — 字段：id, name, mpCost, damageRate, target, effect, effectDuration, cooldown
-         静态数据 SKILL_DATA：8~10 个技能（含普攻、重击、火球、治愈、攻击强化、眩晕攻击等）
-      3. `data/MonsterConfigRow.ts` — 字段：id, name, hp, atk, def, spd, expReward, goldReward
-         静态数据 MONSTER_DATA：5~6 种怪物
-      4. `data/StageConfigRow.ts` — 字段：id, name, monsters（string）, bgm, maxRound
-         静态数据 STAGE_DATA：3 个关卡
-
-      每个 Row 类继承 DataTableRow（实现 parseRow 方法），参考 Demo 1 的 BuildingConfigRow。
-
-      TDD：先写测试验证 Row 类的 parseRow 正确性和数据完整性。
-    wave: 1
-    agent: gem-implementer
-    prototype: false
-    priority: high
-    status: pending
-    dependencies: []
-    conflicts_with: []
-    context_files:
-      - path: assets/scripts/game/demo1-idle/data/BuildingConfigRow.ts
-        description: "Demo 1 DataTable 行定义模式参考"
-      - path: docs/demo-design.md
-        description: "5.6 节 DataTable 结构定义"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: medium
-        estimated_files: 4
-        estimated_lines: 280
-        focus_area: "DataTable 配置数据定义"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg' 通过"
-          - "4 张表的 parseRow 方法能正确解析所有字段"
-        acceptance_criteria:
-          - "4 个 Row 类全部实现 parseRow"
-          - "静态数据数量：角色 3、技能 8+、怪物 5+、关卡 3"
-          - "字段类型与设计文档一致"
-          - "测试覆盖 parseRow 和数据完整性"
-        failure_modes:
-          - scenario: "skills/monsters 字段（逗号分隔字符串）解析逻辑遗漏"
-            likelihood: medium
-            impact: medium
-            mitigation: "为逗号分隔字段添加辅助解析方法和专项测试"
-        tech_stack:
-          - TypeScript
-        test_coverage: "100%"
-
-  - id: T03
-    title: "定义 RpgGameData 运行时状态"
-    description: |
-      创建 `data/RpgGameData.ts`。
-      定义以下类型和类：
-      - `CharacterState` 接口：id, name, maxHp, hp, maxMp, mp, atk, def, spd, skills(number[]), level, exp, isAlive, group('player'|'enemy')
-      - `BuffState` 接口：buffType(string), remainingRounds(number), value(number)
-      - `ActionDecision` 接口：actorId, skillId, targetIds(number[])
-      - `ActionResult` 接口：actorId, skillId, targetIds, damages(Map<number,number>), heals(Map<number,number>), buffsApplied(BuffState[])
-      - `BattleEndResult` 接口：ended(boolean), victory(boolean | null)
-      - `RpgGameData` 类：gold, totalExp, selectedStageId, playerCharacters(CharacterState[]), currentRound, battleLog(string[])
-
-      TDD：测试 RpgGameData 的初始化和状态修改。
-    wave: 1
-    agent: gem-implementer
-    prototype: false
-    priority: high
-    status: pending
-    dependencies: []
-    conflicts_with: []
-    context_files:
-      - path: assets/scripts/game/demo1-idle/data/IdleGameData.ts
-        description: "Demo 1 游戏状态类参考"
-      - path: docs/demo-design.md
-        description: "5.2 节角色系统和技能系统描述"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: small
-        estimated_files: 2
-        estimated_lines: 120
-        focus_area: "运行时状态定义"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg' 通过"
-          - "所有接口和类型可被后续系统正确引用"
-        acceptance_criteria:
-          - "CharacterState 包含所有角色属性字段"
-          - "RpgGameData 提供 reset() 方法重置状态"
-          - "所有接口类型导出"
-        failure_modes:
-          - scenario: "类型定义不足导致后续任务需频繁回改"
-            likelihood: low
-            impact: low
-            mitigation: "按设计文档完整定义，预留 buffs: BuffState[] 字段在 CharacterState 中"
-        tech_stack:
-          - TypeScript
-        test_coverage: "90%"
-
-  - id: T04
-    title: "定义 RPG ProcedureContext"
-    description: |
-      创建 `procedures/ProcedureContext.ts`。
-      定义 `IRpgProcedureContext` 接口，聚合所有系统和框架模块引用：
-      - gameData: RpgGameData
-      - battleSystem: BattleSystem
-      - buffSystem: BuffSystem
-      - damageCalculator: DamageCalculator (类型引用)
-      - enemyAI: EnemyAI (类型引用)
-      - renderer: HtmlRenderer
-      - eventManager: EventManager
-      - timerManager: TimerManager
-      - fsmManager: FsmManager
-      - entityManager: EntityManager
-      - audioManager: AudioManager
-      - uiManager: UIManager
-      - dataTableManager: DataTableManager
-      - objectPoolManager: ObjectPoolManager
-
-      导出 `RPG_PROCEDURE_CONTEXT_KEY = '__rpg_procedure_context__'`。
-
-      TDD：测试接口可实例化（mock 对象满足接口约束）。
-    wave: 1
-    agent: gem-implementer
-    prototype: false
-    priority: medium
-    status: pending
-    dependencies: []
-    conflicts_with: []
-    context_files:
-      - path: assets/scripts/game/demo1-idle/procedures/ProcedureContext.ts
-        description: "Demo 1 ProcedureContext 模式参考"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: small
-        estimated_files: 2
-        estimated_lines: 60
-        focus_area: "Procedure 上下文接口"
-        verification:
-          - "TypeScript 编译通过，接口字段与实际模块类型兼容"
-        acceptance_criteria:
-          - "IRpgProcedureContext 包含所有必要的系统和模块引用"
-          - "RPG_PROCEDURE_CONTEXT_KEY 常量导出"
-        failure_modes: []
-        tech_stack:
-          - TypeScript
-        test_coverage: "80%"
-
-  - id: T05
-    title: "定义 FSM 黑板接口和常量"
-    description: |
-      创建两个文件：
-      1. `fsm/BattleFsmDefs.ts`：
-         - `IBattleBlackboard` 接口：battleSystem, buffSystem, gameData, turnOrder(CharacterState[]),
-           currentActorIndex(number), actionDecision(ActionDecision|null), renderer, eventManager,
-           audioManager, entityManager, fsmManager
-         - `BattleFsmDataKeys = { BLACKBOARD: 'battle_blackboard' }` 常量
-         - `BattleFsmStateNames` 常量：ROUND_START/SELECT_ACTION/EXECUTE_ACTION/ROUND_END/VICTORY/DEFEAT
-
-      2. `fsm/CharacterFsmDefs.ts`：
-         - `ICharacterBlackboard` 接口：characterId(number), characterState(CharacterState), eventManager
-         - `CharacterFsmDataKeys = { BLACKBOARD: 'character_blackboard' }` 常量
-         - `CharacterFsmStateNames` 常量：IDLE/ACTING/STUNNED/DEAD
-
-      TDD：测试常量值唯一性和接口可实例化。
-    wave: 1
-    agent: gem-implementer
-    prototype: false
-    priority: medium
-    status: pending
-    dependencies: []
-    conflicts_with: []
-    context_files:
-      - path: assets/scripts/game/demo1-idle/fsm/BuildingFsmDefs.ts
-        description: "Demo 1 FSM 黑板模式参考"
-      - path: docs/demo-design.md
-        description: "5.5 节 FSM 设计"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: small
-        estimated_files: 3
-        estimated_lines: 80
-        focus_area: "FSM 数据定义"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg' 通过"
-          - "状态名常量无重复"
-        acceptance_criteria:
-          - "IBattleBlackboard 和 ICharacterBlackboard 类型完整"
-          - "状态名常量与设计文档 FSM 图一致"
-        failure_modes: []
-        tech_stack:
-          - TypeScript
-        test_coverage: "90%"
-
-  # ═══════════════════════════════════════════════════════
-  # Wave 2: 核心系统层（依赖 Wave 1 数据定义）
-  # ═══════════════════════════════════════════════════════
-
-  - id: T06
-    title: "实现 DamageCalculator 伤害计算器"
-    description: |
-      创建 `systems/DamageCalculator.ts`。
-      纯函数/静态方法类，无状态：
-      - `calculateDamage(attackerAtk: number, skillDamageRate: number, defenderDef: number): number`
-        公式：Math.max(1, Math.floor(attackerAtk * skillDamageRate - defenderDef))
-      - `calculateHeal(casterAtk: number, skillDamageRate: number): number`
-        公式：Math.floor(casterAtk * skillDamageRate)
-      - 考虑 BUFF 加成参数：`calculateDamageWithBuff(baseAtk, buffAtkBonus, rate, def): number`
-
-      TDD 重点：边界值测试（0 防御、高防御、负值保底、BUFF 加成）。
-    wave: 2
-    agent: gem-implementer
-    prototype: false
-    priority: high
-    status: pending
-    dependencies:
-      - T03
-    conflicts_with: []
-    context_files:
-      - path: docs/demo-design.md
-        description: "5.7 节日志示例中的伤害公式 ATK:30 × 1.5 - DEF:10"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: small
-        estimated_files: 2
-        estimated_lines: 80
-        focus_area: "伤害计算纯函数"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg' 通过"
-          - "边界值测试全部通过（最小伤害 1、0 防御、高防御）"
-        acceptance_criteria:
-          - "calculateDamage 公式正确：Math.max(1, floor(atk * rate - def))"
-          - "calculateHeal 公式正确：floor(atk * rate)"
-          - "BUFF 加成版本公式正确"
-          - "100% 测试覆盖"
-        failure_modes:
-          - scenario: "浮点精度导致伤害计算不一致"
-            likelihood: low
-            impact: low
-            mitigation: "统一使用 Math.floor 取整"
-        tech_stack:
-          - TypeScript
-        test_coverage: "100%"
-
-  - id: T07
-    title: "实现 BuffSystem BUFF 管理系统"
-    description: |
-      创建 `systems/BuffSystem.ts`。
-      管理所有角色的 BUFF/DEBUFF 状态：
-      - `applyBuff(targetId, buffType, duration, value): void` — 应用 BUFF（同类型刷新持续时间）
-      - `tickBuffs(targetId): BuffState[]` — 回合递减，返回过期的 BUFF 列表
-      - `getActiveBuffs(targetId): BuffState[]` — 查询当前活跃 BUFF
-      - `getBuffValue(targetId, buffType): number` — 获取指定 BUFF 的数值
-      - `clearBuffs(targetId): void` — 清除角色所有 BUFF
-      - `clearAll(): void` — 清除所有角色的 BUFF（战斗结束时用）
-
-      BUFF 类型枚举：ATK_UP / DEF_UP / STUN / POISON（预留）
-
-      TDD 重点：应用、刷新、递减、过期清理、多角色隔离。
-    wave: 2
-    agent: gem-implementer
-    prototype: false
-    priority: high
-    status: pending
-    dependencies:
-      - T03
-      - T01
-    conflicts_with: []
-    context_files:
-      - path: docs/demo-design.md
-        description: "5.2 节技能效果（stun/heal/buff_atk）和 5.6 节技能表 effectDuration"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: small
-        estimated_files: 2
-        estimated_lines: 150
-        focus_area: "BUFF 生命周期管理"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg' 通过"
-          - "BUFF 应用、刷新、递减、过期、清理全路径测试通过"
-        acceptance_criteria:
-          - "同类型 BUFF 刷新持续时间而非叠加"
-          - "tickBuffs 正确递减并返回过期列表"
-          - "clearAll 在战斗结束时清除所有"
-          - "STUN 类型可被 BattleFsm 查询用于跳过行动"
-        failure_modes:
-          - scenario: "多角色 BUFF 数据互相污染"
-            likelihood: low
-            impact: high
-            mitigation: "用 Map<number, BuffState[]> 按 targetId 隔离存储"
-        tech_stack:
-          - TypeScript
-        test_coverage: "100%"
-
-  - id: T08
-    title: "实现 EnemyAI 敌方 AI 决策"
-    description: |
-      创建 `systems/EnemyAI.ts`。
-      静态方法类，无状态：
-      - `decideAction(enemy: CharacterState, playerChars: CharacterState[], skills: SkillConfigRow[]): ActionDecision`
-        策略：
-        1. 过滤存活的玩家角色
-        2. 选择 HP 最低的玩家角色作为目标
-        3. 从可用技能中选择（MP 足够且未冷却）；默认使用普攻（id=1）
-        4. 返回 ActionDecision
-
-      TDD 重点：HP 最低选择、MP 不足时回退普攻、所有敌人已死亡时的边界处理。
-    wave: 2
-    agent: gem-implementer
-    prototype: false
-    priority: medium
-    status: pending
-    dependencies:
-      - T02
-      - T03
-    conflicts_with: []
-    context_files:
-      - path: docs/demo-design.md
-        description: "5.2 节敌人 AI——优先攻击 HP 最低的角色"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: small
-        estimated_files: 2
-        estimated_lines: 80
-        focus_area: "敌方 AI 决策逻辑"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg' 通过"
-          - "AI 选择 HP 最低目标的测试通过"
-        acceptance_criteria:
-          - "AI 正确选择 HP 最低的存活玩家角色"
-          - "MP 不足时自动回退普攻"
-          - "无存活目标时返回空操作"
-        failure_modes: []
-        tech_stack:
-          - TypeScript
-        test_coverage: "100%"
-
-  - id: T09
-    title: "实现 BattleSystem 战斗引擎"
-    description: |
-      创建 `systems/BattleSystem.ts`。
-      战斗核心引擎，依赖 DamageCalculator 和 BuffSystem：
-      - `calculateTurnOrder(characters: CharacterState[]): CharacterState[]` — 按 SPD 降序排列存活角色
-      - `executeAction(action: ActionDecision, allChars: CharacterState[], skillTable, buffSystem, damageCalc): ActionResult`
-        流程：查找施法者 → 获取技能配置 → 扣除 MP → 对每个目标计算伤害/治疗 → 应用 BUFF → 判定死亡 → 返回结果
-      - `checkBattleEnd(players: CharacterState[], enemies: CharacterState[]): BattleEndResult`
-        逻辑：敌方全灭 → victory=true；我方全灭 → victory=false；否则 ended=false
-      - `calculateRewards(enemies: CharacterState[]): { exp: number, gold: number }`
-
-      TDD 重点：SPD 排序、完整 executeAction 流程、胜负判定边界。
-    wave: 2
-    agent: gem-implementer
-    prototype: false
-    priority: high
-    status: pending
-    dependencies:
-      - T02
-      - T03
-      - T06
-      - T07
-    conflicts_with: []
-    context_files:
-      - path: docs/demo-design.md
-        description: "5.2 节回合机制和 5.5 节 FSM 设计"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: medium
-        estimated_files: 2
-        estimated_lines: 250
-        focus_area: "回合制战斗核心逻辑"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg' 通过"
-          - "SPD 排序测试通过"
-          - "完整 executeAction 流程测试通过（伤害/治疗/BUFF/死亡）"
-        acceptance_criteria:
-          - "SPD 排序正确（降序，相同 SPD 按 id 升序稳定排序）"
-          - "executeAction 正确扣 MP、计算伤害、应用效果"
-          - "checkBattleEnd 正确判定三种情况"
-          - "calculateRewards 正确累加经验和金币"
-        failure_modes:
-          - scenario: "executeAction 中目标已死亡但仍计算伤害"
-            likelihood: medium
-            impact: medium
-            mitigation: "执行前过滤 isAlive=false 的目标"
-        tech_stack:
-          - TypeScript
-        test_coverage: "95%"
-
-  # ═══════════════════════════════════════════════════════
-  # Wave 3: FSM 层（依赖 Wave 2 系统层）
-  # ═══════════════════════════════════════════════════════
-
-  - id: T10
-    title: "实现 BattleFsm 6 个战斗状态"
-    description: |
-      创建 `fsm/BattleFsmStates.ts`。
-      6 个状态类继承 FsmState<IBattleBlackboard>：
-
-      1. **RoundStartState**：
-         - onEnter: 回合数+1 → calculateTurnOrder → 重置 currentActorIndex=0 → emit ROUND_START → changeState(SelectAction)
-
-      2. **SelectActionState**：
-         - onEnter: 获取当前行动角色 → 检查 STUN → 如果是敌人调用 EnemyAI → 如果是玩家等待 UI 输入
-         - receiveAction(decision): 设置 actionDecision → changeState(ExecuteAction)
-
-      3. **ExecuteActionState**：
-         - onEnter: 从黑板取 actionDecision → battleSystem.executeAction → emit 事件（ATTACK/HURT/DEAD等）
-           → 播放音效 → currentActorIndex++ → 检查是否还有角色未行动
-           → 有则 changeState(SelectAction)，无则 changeState(RoundEnd)
-
-      4. **RoundEndState**：
-         - onEnter: buffSystem.tickBuffs 所有角色 → emit 过期 BUFF 事件 → checkBattleEnd
-           → 胜利 changeState(Victory) / 失败 changeState(Defeat) / 继续 changeState(RoundStart)
-
-      5. **VictoryState**：
-         - onEnter: emit BATTLE_VICTORY → 播放胜利音效
-
-      6. **DefeatState**：
-         - onEnter: emit BATTLE_DEFEAT → 播放失败音效
-
-      TDD 重点：状态间转换序列、STUN 跳过行动、全回合完整流程。
-    wave: 3
-    agent: gem-implementer
-    prototype: false
-    priority: high
-    status: pending
-    dependencies:
-      - T05
-      - T09
-      - T08
-      - T07
-      - T06
-      - T01
-      - T03
-    conflicts_with:
-      - T11
-    context_files:
-      - path: assets/scripts/game/demo1-idle/fsm/BuildingFsmStates.ts
-        description: "Demo 1 FSM 状态实现参考"
-      - path: assets/scripts/framework/fsm/FsmState.ts
-        description: "FsmState 基类"
-      - path: docs/demo-design.md
-        description: "5.5 节战斗 FSM 状态转换图"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: large
-        estimated_files: 2
-        estimated_lines: 300
-        focus_area: "战斗 FSM 核心状态机"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg' 通过"
-          - "状态转换序列测试：RoundStart → SelectAction → ExecuteAction → RoundEnd → RoundStart 循环"
-          - "胜利/失败路径测试通过"
-        acceptance_criteria:
-          - "6 个状态全部实现 onEnter/onUpdate/onLeave"
-          - "STUN 角色在 SelectAction 自动跳过"
-          - "单回合多角色行动循环正确"
-          - "全灭判定正确触发 Victory/Defeat"
-          - "事件发布覆盖所有战斗事件"
-        failure_modes:
-          - scenario: "SelectAction ↔ ExecuteAction 循环超出队伍人数不终止"
-            likelihood: medium
-            impact: high
-            mitigation: "currentActorIndex >= turnOrder.length 时强制进入 RoundEnd"
-        tech_stack:
-          - TypeScript
-        test_coverage: "95%"
-
-  - id: T11
-    title: "实现 CharacterFsm 4 个角色状态"
-    description: |
-      创建 `fsm/CharacterFsmStates.ts`。
-      4 个状态类继承 FsmState<ICharacterBlackboard>：
-
-      1. **CharIdleState**：等待行动。onEnter 检查 HP ≤ 0 → 如果是则 changeState(Dead)
-      2. **CharActingState**：执行行动中。onEnter 设置 acting 标记。完成后 changeState(Idle)
-      3. **CharStunnedState**：被眩晕。onEnter 记录剩余回合。回合结束时递减 → 为 0 时 changeState(Idle)
-      4. **CharDeadState**：已阵亡。onEnter emit CHARACTER_DEAD 事件。终态，不可切换。
-
-      TDD 重点：状态切换条件、HP 检测、眩晕递减。
-    wave: 3
-    agent: gem-implementer
-    prototype: false
-    priority: medium
-    status: pending
-    dependencies:
-      - T05
-      - T01
-      - T03
-    conflicts_with:
-      - T10
-    context_files:
-      - path: docs/demo-design.md
-        description: "5.5 节角色 FSM 状态转换图"
-      - path: assets/scripts/framework/fsm/FsmState.ts
-        description: "FsmState 基类"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: small
-        estimated_files: 2
-        estimated_lines: 120
-        focus_area: "角色状态机"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg' 通过"
-          - "状态切换条件测试全部通过"
-        acceptance_criteria:
-          - "4 个状态全部实现"
-          - "HP ≤ 0 自动进入 Dead 状态"
-          - "眩晕回合递减正确"
-          - "Dead 为终态"
-        failure_modes: []
-        tech_stack:
-          - TypeScript
-        test_coverage: "95%"
-
-  # ═══════════════════════════════════════════════════════
-  # Wave 4: 流程层（依赖 Wave 3 FSM + Wave 2 系统）
-  # ═══════════════════════════════════════════════════════
-
-  - id: T12
-    title: "实现 LaunchProcedure + PreloadProcedure"
-    description: |
-      创建两个文件：
-      1. `procedures/LaunchProcedure.ts`：
-         - onEnter: 日志"框架初始化完成" → 短暂等待 → changeProcedure(PreloadProcedure)
-
-      2. `procedures/PreloadProcedure.ts`：
-         - onEnter: 从 fsm 获取上下文 → DataTableManager 注册 4 张配置表数据
-           → ResourceManager 模拟加载角色/技能/关卡资源 → 日志进度
-           → changeProcedure(LobbyProcedure)
-
-      TDD：测试流程切换顺序和数据表注册。
-    wave: 4
-    agent: gem-implementer
-    prototype: false
-    priority: medium
-    status: pending
-    dependencies:
-      - T04
-      - T02
-      - T01
-    conflicts_with: []
-    context_files:
-      - path: assets/scripts/game/demo1-idle/procedures/LaunchProcedure.ts
-        description: "Demo 1 LaunchProcedure 参考"
-      - path: assets/scripts/game/demo1-idle/procedures/PreloadProcedure.ts
-        description: "Demo 1 PreloadProcedure 参考"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: small
-        estimated_files: 2
-        estimated_lines: 120
-        focus_area: "启动和预加载流程"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg' 通过"
-          - "Launch → Preload → Lobby 切换序列正确"
-        acceptance_criteria:
-          - "LaunchProcedure 正确切换到 PreloadProcedure"
-          - "PreloadProcedure 注册 4 张配置表后切换到 LobbyProcedure"
-        failure_modes: []
-        tech_stack:
-          - TypeScript
-        test_coverage: "90%"
-
-  - id: T13
-    title: "实现 LobbyProcedure"
-    description: |
-      创建 `procedures/LobbyProcedure.ts`。
-      大厅流程：
-      - onEnter: 从上下文获取 renderer → 显示大厅 UI（角色列表 + 关卡选择 + 出发按钮）
-        → 初始化 3 个玩家角色的 CharacterState（从 DataTable 读取基础属性 + 当前等级加成）
-        → 注册按钮回调：选关卡 → 设置 selectedStageId；出发 → changeProcedure(BattlePrep)
-      - onLeave: 清除大厅 UI 按钮
-
-      TDD：测试角色初始化、关卡选择、流程切换条件。
-    wave: 4
-    agent: gem-implementer
-    prototype: false
-    priority: medium
-    status: pending
-    dependencies:
-      - T04
-      - T02
-      - T03
-      - T01
-    conflicts_with: []
-    context_files:
-      - path: docs/demo-design.md
-        description: "5.4 节 Procedure 流程图和 5.7 节大厅按钮组"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: small
-        estimated_files: 2
-        estimated_lines: 150
-        focus_area: "大厅流程和编队"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg' 通过"
-          - "角色初始化属性与 DataTable 一致"
-        acceptance_criteria:
-          - "3 个玩家角色正确从配置表初始化"
-          - "关卡选择更新 gameData.selectedStageId"
-          - "出发按钮触发切换到 BattlePrepProcedure"
-        failure_modes: []
-        tech_stack:
-          - TypeScript
-        test_coverage: "90%"
-
-  - id: T14
-    title: "实现 BattlePrepProcedure"
-    description: |
-      创建 `procedures/BattlePrepProcedure.ts`。
-      战前准备流程：
-      - onEnter:
-        1. 从上下文获取 entityManager、fsmManager
-        2. 注册 Entity 分组：'player' 和 'enemy'
-        3. 为每个玩家角色调用 entityManager.showEntity('player', characterData)
-        4. 从 stage_config 读取当前关卡的怪物列表 → 从 monster_config 读取属性
-        5. 为每个怪物调用 entityManager.showEntity('enemy', monsterData)
-        6. 创建 BattleFsm + 各角色的 CharacterFsm
-        7. 播放战斗 BGM
-        8. 初始化 gameData.currentRound = 0
-        9. changeProcedure(BattleProcedure)
-      - onLeave: 无特殊清理
-
-      TDD：测试 Entity 创建数量、FSM 创建、BGM 播放。
-    wave: 4
-    agent: gem-implementer
-    prototype: false
-    priority: high
-    status: pending
-    dependencies:
-      - T04
-      - T02
-      - T03
-      - T05
-      - T10
-      - T11
-    conflicts_with: []
-    context_files:
-      - path: docs/demo-design.md
-        description: "5.4 节 BattlePrep 流程"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: medium
-        estimated_files: 2
-        estimated_lines: 180
-        focus_area: "战前准备和 Entity/FSM 创建"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg' 通过"
-          - "玩家 Entity 数 = 3，敌人 Entity 数 = 关卡配置的怪物数"
-        acceptance_criteria:
-          - "正确创建 'player' 和 'enemy' 分组的 Entity"
-          - "BattleFsm 创建成功"
-          - "CharacterFsm 为每个角色创建"
-          - "战斗 BGM 播放"
-          - "切换到 BattleProcedure"
-        failure_modes:
-          - scenario: "Entity 分组未注册导致 showEntity 失败"
-            likelihood: low
-            impact: high
-            mitigation: "先 registerGroup 再 showEntity，单测验证"
-        tech_stack:
-          - TypeScript
-        test_coverage: "90%"
-
-  - id: T15
-    title: "实现 BattleProcedure + SettleProcedure"
-    description: |
-      创建两个文件：
-      1. `procedures/BattleProcedure.ts`：
-         - onEnter: 获取上下文 → 启动 BattleFsm（start RoundStartState）
-           → 注册战斗事件监听（更新 UI、播放音效、记录日志）
-         - onUpdate: FsmManager.onUpdate 驱动 BattleFsm
-         - 监听 BATTLE_VICTORY/BATTLE_DEFEAT 事件 → changeProcedure(SettleProcedure)
-         - onLeave: 取消事件监听
-
-      2. `procedures/SettleProcedure.ts`：
-         - onEnter: 从上下文获取 gameData → 计算总经验/金币
-           → 检查角色升级（简单公式：每 100 exp 升一级，升级恢复全 HP/MP）
-           → 显示结算面板 → 回收所有 Entity → 销毁 BattleFsm + CharacterFsm
-           → buffSystem.clearAll() → 停止战斗 BGM
-           → 提供"返回大厅"按钮 → changeProcedure(LobbyProcedure)
-
-      TDD：测试战斗流程驱动、事件监听注册/注销、结算计算、Entity 回收。
-    wave: 4
-    agent: gem-implementer
-    prototype: false
-    priority: high
-    status: pending
-    dependencies:
-      - T04
-      - T10
-      - T11
-      - T09
-      - T07
-      - T01
-      - T03
-    conflicts_with: []
-    context_files:
-      - path: docs/demo-design.md
-        description: "5.4 节 Battle 和 Settle 流程"
-      - path: assets/scripts/game/demo1-idle/procedures/MainProcedure.ts
-        description: "Demo 1 主流程参考"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: medium
-        estimated_files: 2
-        estimated_lines: 250
-        focus_area: "战斗主循环和结算"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg' 通过"
-          - "战斗胜利后结算正确发放经验/金币"
-          - "Entity 全部回收"
-        acceptance_criteria:
-          - "BattleProcedure 正确启动和驱动 BattleFsm"
-          - "战斗事件正确转发给 UI 和音效"
-          - "SettleProcedure 正确计算奖励和升级"
-          - "所有 Entity 回收、FSM 销毁、BUFF 清除"
-          - "返回大厅按钮切换到 LobbyProcedure"
-        failure_modes:
-          - scenario: "BattleProcedure onLeave 时事件监听未注销导致内存泄漏"
-            likelihood: medium
-            impact: medium
-            mitigation: "onLeave 中显式 off 所有 on 注册的事件"
-        tech_stack:
-          - TypeScript
-        test_coverage: "90%"
-
-  # ═══════════════════════════════════════════════════════
-  # Wave 5: 展示层（依赖 Wave 4 流程层）
-  # ═══════════════════════════════════════════════════════
-
-  - id: T16
-    title: "实现 LobbyPanel 大厅面板"
-    description: |
-      创建 `ui/LobbyPanel.ts`。
-      继承 UIFormBase，使用 HtmlRenderer 渲染：
-      - 状态面板：显示玩家金币、经验
-      - 角色信息区：3 个角色的 HP/MP/ATK/DEF/SPD/等级
-      - 关卡按钮组：3 个关卡按钮（名称 + 难度提示）
-      - 出发按钮（选关后激活）
-
-      所有文本通过事件通知 Procedure 处理逻辑，面板只负责展示。
-
-      TDD：测试面板创建、按钮回调触发事件、数据刷新。
-    wave: 5
-    agent: gem-implementer
-    prototype: false
-    priority: medium
-    status: pending
-    dependencies:
-      - T13
-      - T03
-      - T01
-    conflicts_with: []
-    context_files:
-      - path: assets/scripts/game/demo1-idle/ui/IdleMainPanel.ts
-        description: "Demo 1 UI 面板参考"
-      - path: docs/demo-design.md
-        description: "5.7 节大厅按钮组"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: small
-        estimated_files: 2
-        estimated_lines: 150
-        focus_area: "大厅 UI 面板"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg' 通过"
-        acceptance_criteria:
-          - "显示 3 个角色属性"
-          - "3 个关卡选择按钮"
-          - "出发按钮触发 STAGE_SELECTED 事件"
-        failure_modes: []
-        tech_stack:
-          - TypeScript
-        test_coverage: "85%"
-
-  - id: T17
-    title: "实现 BattlePanel 战斗面板"
-    description: |
-      创建 `ui/BattlePanel.ts`。
-      继承 UIFormBase，使用 HtmlRenderer 渲染：
-      - 状态面板区：
-        - 回合数显示
-        - 玩家角色 HP/MP 条（实时更新，使用 updateStatus）
-        - 敌人 HP 条
-      - 技能按钮组：当前行动角色的可用技能（普通攻击 + 技能1 + 技能2）
-      - 目标选择按钮组：选择攻击/治疗目标
-      - 自动战斗开关按钮
-      - 战斗日志区：关键事件追加日志（使用 log，非 updateLog）
-
-      监听战斗事件更新显示，技能/目标选择通过回调通知 BattleProcedure。
-
-      TDD：测试面板更新、技能按钮生成、事件监听。
-    wave: 5
-    agent: gem-implementer
-    prototype: false
-    priority: medium
-    status: pending
-    dependencies:
-      - T15
-      - T09
-      - T03
-      - T01
-    conflicts_with: []
-    context_files:
-      - path: docs/demo-design.md
-        description: "5.7 节战斗中按钮组和日志示例"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: medium
-        estimated_files: 2
-        estimated_lines: 250
-        focus_area: "战斗 UI 面板"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg' 通过"
-        acceptance_criteria:
-          - "实时显示所有角色 HP/MP"
-          - "技能按钮正确显示当前角色可用技能"
-          - "目标选择按钮正确显示存活目标"
-          - "战斗日志格式与设计文档 5.7 节一致"
-          - "自动战斗开关功能正常"
-        failure_modes:
-          - scenario: "高频 HP 更新导致 DOM 性能问题"
-            likelihood: low
-            impact: low
-            mitigation: "使用 updateStatus 原地更新而非 log 追加"
-        tech_stack:
-          - TypeScript
-        test_coverage: "85%"
-
-  - id: T18
-    title: "实现 SettlePanel 结算面板"
-    description: |
-      创建 `ui/SettlePanel.ts`。
-      继承 UIFormBase，使用 HtmlRenderer 渲染：
-      - 战斗结果（胜利/失败）
-      - 经验和金币获取
-      - 角色升级信息（如有）
-      - "返回大厅" 按钮
-
-      TDD：测试胜利/失败两种显示、升级信息展示。
-    wave: 5
-    agent: gem-implementer
-    prototype: false
-    priority: low
-    status: pending
-    dependencies:
-      - T15
-      - T03
-      - T01
-    conflicts_with: []
-    context_files:
-      - path: docs/demo-design.md
-        description: "5.7 节结算日志"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: small
-        estimated_files: 2
-        estimated_lines: 100
-        focus_area: "结算 UI 面板"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg' 通过"
-        acceptance_criteria:
-          - "胜利和失败两种结果正确显示"
-          - "经验、金币、升级信息正确"
-          - "返回大厅按钮功能正常"
-        failure_modes: []
-        tech_stack:
-          - TypeScript
-        test_coverage: "80%"
-
-  - id: T19
-    title: "实现 TurnBasedRpgDemo 主入口 + index.ts"
-    description: |
-      创建两个文件：
-      1. `TurnBasedRpgDemo.ts`：
-         - 继承 DemoBase，constructor 传入 'Turn-based RPG Demo'
-         - setupProcedures: 创建 BattleSystem/BuffSystem 等系统 → 构建 IRpgProcedureContext
-           → procMgr.initialize(6 个 Procedure) → procMgr.setData(key, ctx)
-         - setupDataTables: dtMgr.createTableFromRawData 注册 4 张表
-         - start(): bootstrap → startProcedure(LaunchProcedure) → startMainLoop(30)
-
-      2. `index.ts`：
-         - new TurnBasedRpgDemo().start().catch(...)
-
-      TDD：测试 bootstrap 正确、Procedure 注册数量、DataTable 注册数量。
-    wave: 5
-    agent: gem-implementer
-    prototype: false
-    priority: high
-    status: pending
-    dependencies:
-      - T12
-      - T13
-      - T14
-      - T15
-      - T16
-      - T17
-      - T18
-      - T09
-      - T07
-    conflicts_with: []
-    context_files:
-      - path: assets/scripts/game/demo1-idle/IdleClickerDemo.ts
-        description: "Demo 1 主入口类参考"
-      - path: assets/scripts/game/demo1-idle/index.ts
-        description: "Demo 1 index.ts 参考"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: medium
-        estimated_files: 2
-        estimated_lines: 200
-        focus_area: "主入口类串联所有模块"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg' 通过"
-          - "bootstrap 注册 15 个模块"
-          - "6 个 Procedure 注册成功"
-          - "4 张 DataTable 注册成功"
-        acceptance_criteria:
-          - "TurnBasedRpgDemo 完整继承 DemoBase 模式"
-          - "所有系统正确创建和注入上下文"
-          - "start() 流程完整：bootstrap → startProcedure → startMainLoop"
-          - "index.ts 可独立运行"
-        failure_modes:
-          - scenario: "系统初始化顺序错误导致依赖未就绪"
-            likelihood: low
-            impact: high
-            mitigation: "严格按 DemoBase.bootstrap 后再创建系统，参考 Demo 1 顺序"
-        tech_stack:
-          - TypeScript
-        test_coverage: "90%"
-
-  # ═══════════════════════════════════════════════════════
-  # Wave 6: 集成测试 + 验收
-  # ═══════════════════════════════════════════════════════
-
-  - id: T20
-    title: "集成测试：完整战斗流程端到端"
-    description: |
-      创建 `tests/integration/demo2-rpg.integration.test.ts`。
-      参考 Demo 0/Demo 1 集成测试模式：
-      - @jest-environment jsdom
-      - jest.mock Logger
-      - jest.useFakeTimers
-      - TestRpgDemo 继承 TurnBasedRpgDemo 或直接使用
-
-      测试用例：
-      1. **完整战斗流程**：bootstrap → 预加载 → 大厅选关 → 战前准备 → 战斗 → 结算 → 回大厅
-      2. **SPD 排序正确性**：验证行动顺序按 SPD 降序
-      3. **伤害计算公式**：ATK × rate - DEF，验证具体数值
-      4. **技能效果**：治疗恢复 HP、BUFF 增加 ATK、眩晕跳过行动
-      5. **Entity 生命周期**：战前创建、战后回收
-      6. **FSM 状态切换**：完整回合的状态转换序列
-      7. **死亡判定**：HP ≤ 0 触发 CHARACTER_DEAD，全灭触发 BATTLE_VICTORY/DEFEAT
-    wave: 6
-    agent: gem-implementer
-    prototype: false
-    covers:
-      - "完整战斗流程端到端"
-      - "SPD 排序正确"
-      - "伤害计算公式"
-      - "技能效果"
-      - "Entity 生命周期"
-      - "FSM 状态切换"
-      - "死亡判定"
-    priority: high
-    status: pending
-    dependencies:
-      - T19
-    conflicts_with: []
-    context_files:
-      - path: tests/integration/demo0-infrastructure.test.ts
-        description: "Demo 0 集成测试模式参考"
-      - path: docs/demo-design.md
-        description: "5.8 节集成测试要点"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: large
-        estimated_files: 1
-        estimated_lines: 300
-        focus_area: "端到端集成测试"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg.integration' 全部通过"
-          - "7 个测试用例全部绿灯"
-        acceptance_criteria:
-          - "7 个核心测试用例全部通过"
-          - "测试覆盖设计文档 5.8 节所有要点"
-          - "无跳过或待定的测试"
-        failure_modes:
-          - scenario: "jsdom 环境下 Timer 和 FSM 更新时序不一致"
-            likelihood: medium
-            impact: medium
-            mitigation: "使用 jest.useFakeTimers + advanceTimersByTime 精确控制时间推进"
-        tech_stack:
-          - TypeScript
-          - Jest
-        test_coverage: null
-
-  - id: T21
-    title: "集成测试：BUFF 系统和 Timer 交互"
-    description: |
-      在集成测试文件中追加 BUFF 相关测试用例：
-      1. **BUFF 持续多回合**：应用 2 回合 ATK_UP → 验证伤害增加 → 2 回合后过期 → 验证伤害恢复
-      2. **STUN 跳过行动**：角色被眩晕 → 验证该角色回合被跳过 → 眩晕结束后正常行动
-      3. **BUFF 战斗结束清理**：战斗结束时所有 BUFF 清除
-
-      TDD：先写失败测试，再确保实现通过。
-    wave: 6
-    agent: gem-implementer
-    prototype: false
-    priority: medium
-    status: pending
-    dependencies:
-      - T20
-    conflicts_with: []
-    context_files:
-      - path: docs/demo-design.md
-        description: "5.6 节技能效果和持续时间"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: small
-        estimated_files: 1
-        estimated_lines: 120
-        focus_area: "BUFF 系统集成验证"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg.integration' 全部通过"
-        acceptance_criteria:
-          - "BUFF 持续时间正确递减"
-          - "STUN 跳过行动验证"
-          - "战斗结束 BUFF 清理验证"
-        failure_modes: []
-        tech_stack:
-          - TypeScript
-          - Jest
-        test_coverage: null
-
-  - id: T22
-    title: "集成测试：多关卡循环和升级系统"
-    description: |
-      追加测试用例：
-      1. **关卡循环**：完成关卡 1 → 返回大厅 → 选择关卡 2 → 完成 → 返回 → 验证金币/经验累加
-      2. **角色升级**：累计 100 exp → 验证角色等级 +1、HP/MP 恢复满
-      3. **不同关卡怪物组合**：验证 3 个关卡加载不同怪物配置
-
-      TDD：先写测试再验证。
-    wave: 6
-    agent: gem-implementer
-    prototype: false
-    priority: medium
-    status: pending
-    dependencies:
-      - T20
-    conflicts_with: []
-    context_files:
-      - path: docs/demo-design.md
-        description: "5.2 节关卡系统和经验/升级"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: small
-        estimated_files: 1
-        estimated_lines: 120
-        focus_area: "多关卡循环验证"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg.integration' 全部通过"
-        acceptance_criteria:
-          - "多关卡循环金币/经验正确累加"
-          - "升级机制正确触发"
-          - "不同关卡怪物配置正确"
-        failure_modes: []
-        tech_stack:
-          - TypeScript
-          - Jest
-        test_coverage: null
-
-  - id: T23
-    title: "集成测试：音效和场景切换验证"
-    description: |
-      追加测试用例：
-      1. **音效播放**：战斗 BGM 播放、攻击音效、技能音效、胜利/失败音效
-      2. **场景切换**：大厅 → 战斗场景 → 大厅 切换验证
-      3. **ObjectPool 复用**：连续两场战斗，验证 Entity 复用池化
-
-      通过 MockAudioPlayer.playHistory 和 MockSceneLoader 断言。
-    wave: 6
-    agent: gem-implementer
-    prototype: false
-    priority: low
-    status: pending
-    dependencies:
-      - T20
-    conflicts_with: []
-    context_files:
-      - path: assets/scripts/game/shared/MockAudioPlayer.ts
-        description: "MockAudioPlayer 播放历史追踪"
-      - path: assets/scripts/game/shared/MockSceneLoader.ts
-        description: "MockSceneLoader 场景切换历史"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: small
-        estimated_files: 1
-        estimated_lines: 100
-        focus_area: "音效和场景验证"
-        verification:
-          - "npm test -- --testPathPattern='demo2-rpg.integration' 全部通过"
-        acceptance_criteria:
-          - "所有音效播放时机正确"
-          - "场景切换序列正确"
-          - "Entity 池化复用验证"
-        failure_modes: []
-        tech_stack:
-          - TypeScript
-          - Jest
-        test_coverage: null
-
-  - id: T24
-    title: "最终验证：全量测试 + lint 检查"
-    description: |
-      最终验收步骤：
-      1. `npm test` — 全量测试通过
-      2. `npm run lint` — ESLint 无报错
-      3. `npm test -- --testPathPattern='demo2-rpg' --coverage` — 覆盖率报告检查
-      4. 验证目录结构完整性（对照研究文件中的 structure_of_domain）
-      5. 验证所有 public API 有中文 JSDoc
-      6. 验证无 `any` 类型、无 `console.log`
-
-      修复发现的任何问题。
-    wave: 6
-    agent: gem-implementer
-    prototype: false
-    priority: high
-    status: pending
-    dependencies:
-      - T20
-      - T21
-      - T22
-      - T23
-    conflicts_with: []
-    context_files:
-      - path: docs/code-review-checklist.md
-        description: "PR 自查清单"
-    planning_pass: 1
-    planning_history:
-      - pass: 1
-        reason: "初始规划"
-        timestamp: "2026-04-22"
-        estimated_effort: small
-        estimated_files: 0
-        estimated_lines: 50
-        focus_area: "最终验收"
-        verification:
-          - "npm test 退出码 0"
-          - "npm run lint 退出码 0"
-          - "无 any 类型"
-          - "无 console.log"
-          - "所有 public API 有中文 JSDoc"
-        acceptance_criteria:
-          - "全量测试通过 0 failures"
-          - "ESLint 检查 0 errors"
-          - "Demo 2 目录结构完整"
-          - "代码规范合规"
-        failure_modes:
-          - scenario: "其他 Demo 测试因共享代码变更而失败"
-            likelihood: low
-            impact: medium
-            mitigation: "Demo 2 不修改 shared/ 或 framework/ 代码，仅新增文件"
-        tech_stack:
-          - TypeScript
-          - Jest
-          - ESLint
-        test_coverage: null
-        requires_review: true
-        review_depth: standard
-        review_security_sensitive: false
+    # ═══════════════════════════════════════════════════════
+    # Wave 1: 基础数据层（无依赖，全部并行）
+    # ═══════════════════════════════════════════════════════
+
+    - id: T01
+      title: '定义 RPG 事件键（RpgEvents.ts）'
+      description: |
+          创建 `assets/scripts/game/demo2-rpg/events/RpgEvents.ts`。
+          使用 EventKey<T> 幻影类型，'rpg:' 前缀。
+          定义以下事件键：
+          - ATTACK: { attackerId, defenderId, damage, skillId }
+          - CHARACTER_HURT: { characterId, damage, remainingHp }
+          - CHARACTER_DEAD: { characterId, group }
+          - CHARACTER_HEALED: { characterId, amount, remainingHp }
+          - ROUND_START: { roundNumber }
+          - ROUND_END: { roundNumber }
+          - SKILL_USED: { casterId, skillId, targetIds }
+          - BUFF_APPLIED: { targetId, buffType, duration }
+          - BUFF_EXPIRED: { targetId, buffType }
+          - BATTLE_VICTORY: { expReward, goldReward }
+          - BATTLE_DEFEAT: {}
+          - STAGE_SELECTED: { stageId }
+          - PROCEDURE_CHANGED: { from, to }
+
+          TDD：先写测试验证每个事件键的 eventName 和类型正确。
+      wave: 1
+      agent: gem-implementer
+      prototype: false
+      priority: high
+      status: pending
+      dependencies: []
+      conflicts_with: []
+      context_files:
+          - path: assets/scripts/game/demo1-idle/events/IdleEvents.ts
+            description: 'Demo 1 事件键定义模式参考'
+          - path: assets/scripts/framework/event/EventDefs.ts
+            description: 'EventKey<T> 定义'
+          - path: docs/demo-design.md
+            description: '5.7 节日志示例中涉及的事件'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: small
+            estimated_files: 2
+            estimated_lines: 80
+            focus_area: '事件键定义'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg' 通过"
+                - "每个事件键的 eventName 包含 'rpg:' 前缀"
+            acceptance_criteria:
+                - '13 个事件键全部定义，类型参数正确'
+                - '测试覆盖所有事件键实例化和 eventName 断言'
+            failure_modes:
+                - scenario: '事件 payload 类型与后续系统不匹配'
+                  likelihood: low
+                  impact: medium
+                  mitigation: '严格按设计文档定义 payload，后续系统引用时编译器自动检查'
+            tech_stack:
+                - TypeScript
+            test_coverage: '100%'
+
+    - id: T02
+      title: '定义 4 张 DataTable 行类型 + 静态数据'
+      description: |
+          创建 4 个文件：
+          1. `data/CharacterConfigRow.ts` — 字段：id, name, hp, mp, atk, def, spd, skills（string）
+             静态数据 CHAR_DATA：3 个角色（战士/法师/牧师）
+          2. `data/SkillConfigRow.ts` — 字段：id, name, mpCost, damageRate, target, effect, effectDuration, cooldown
+             静态数据 SKILL_DATA：8~10 个技能（含普攻、重击、火球、治愈、攻击强化、眩晕攻击等）
+          3. `data/MonsterConfigRow.ts` — 字段：id, name, hp, atk, def, spd, expReward, goldReward
+             静态数据 MONSTER_DATA：5~6 种怪物
+          4. `data/StageConfigRow.ts` — 字段：id, name, monsters（string）, bgm, maxRound
+             静态数据 STAGE_DATA：3 个关卡
+
+          每个 Row 类继承 DataTableRow（实现 parseRow 方法），参考 Demo 1 的 BuildingConfigRow。
+
+          TDD：先写测试验证 Row 类的 parseRow 正确性和数据完整性。
+      wave: 1
+      agent: gem-implementer
+      prototype: false
+      priority: high
+      status: pending
+      dependencies: []
+      conflicts_with: []
+      context_files:
+          - path: assets/scripts/game/demo1-idle/data/BuildingConfigRow.ts
+            description: 'Demo 1 DataTable 行定义模式参考'
+          - path: docs/demo-design.md
+            description: '5.6 节 DataTable 结构定义'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: medium
+            estimated_files: 4
+            estimated_lines: 280
+            focus_area: 'DataTable 配置数据定义'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg' 通过"
+                - '4 张表的 parseRow 方法能正确解析所有字段'
+            acceptance_criteria:
+                - '4 个 Row 类全部实现 parseRow'
+                - '静态数据数量：角色 3、技能 8+、怪物 5+、关卡 3'
+                - '字段类型与设计文档一致'
+                - '测试覆盖 parseRow 和数据完整性'
+            failure_modes:
+                - scenario: 'skills/monsters 字段（逗号分隔字符串）解析逻辑遗漏'
+                  likelihood: medium
+                  impact: medium
+                  mitigation: '为逗号分隔字段添加辅助解析方法和专项测试'
+            tech_stack:
+                - TypeScript
+            test_coverage: '100%'
+
+    - id: T03
+      title: '定义 RpgGameData 运行时状态'
+      description: |
+          创建 `data/RpgGameData.ts`。
+          定义以下类型和类：
+          - `CharacterState` 接口：id, name, maxHp, hp, maxMp, mp, atk, def, spd, skills(number[]), level, exp, isAlive, group('player'|'enemy')
+          - `BuffState` 接口：buffType(string), remainingRounds(number), value(number)
+          - `ActionDecision` 接口：actorId, skillId, targetIds(number[])
+          - `ActionResult` 接口：actorId, skillId, targetIds, damages(Map<number,number>), heals(Map<number,number>), buffsApplied(BuffState[])
+          - `BattleEndResult` 接口：ended(boolean), victory(boolean | null)
+          - `RpgGameData` 类：gold, totalExp, selectedStageId, playerCharacters(CharacterState[]), currentRound, battleLog(string[])
+
+          TDD：测试 RpgGameData 的初始化和状态修改。
+      wave: 1
+      agent: gem-implementer
+      prototype: false
+      priority: high
+      status: pending
+      dependencies: []
+      conflicts_with: []
+      context_files:
+          - path: assets/scripts/game/demo1-idle/data/IdleGameData.ts
+            description: 'Demo 1 游戏状态类参考'
+          - path: docs/demo-design.md
+            description: '5.2 节角色系统和技能系统描述'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: small
+            estimated_files: 2
+            estimated_lines: 120
+            focus_area: '运行时状态定义'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg' 通过"
+                - '所有接口和类型可被后续系统正确引用'
+            acceptance_criteria:
+                - 'CharacterState 包含所有角色属性字段'
+                - 'RpgGameData 提供 reset() 方法重置状态'
+                - '所有接口类型导出'
+            failure_modes:
+                - scenario: '类型定义不足导致后续任务需频繁回改'
+                  likelihood: low
+                  impact: low
+                  mitigation: '按设计文档完整定义，预留 buffs: BuffState[] 字段在 CharacterState 中'
+            tech_stack:
+                - TypeScript
+            test_coverage: '90%'
+
+    - id: T04
+      title: '定义 RPG ProcedureContext'
+      description: |
+          创建 `procedures/ProcedureContext.ts`。
+          定义 `IRpgProcedureContext` 接口，聚合所有系统和框架模块引用：
+          - gameData: RpgGameData
+          - battleSystem: BattleSystem
+          - buffSystem: BuffSystem
+          - damageCalculator: DamageCalculator (类型引用)
+          - enemyAI: EnemyAI (类型引用)
+          - renderer: HtmlRenderer
+          - eventManager: EventManager
+          - timerManager: TimerManager
+          - fsmManager: FsmManager
+          - entityManager: EntityManager
+          - audioManager: AudioManager
+          - uiManager: UIManager
+          - dataTableManager: DataTableManager
+          - objectPoolManager: ObjectPoolManager
+
+          导出 `RPG_PROCEDURE_CONTEXT_KEY = '__rpg_procedure_context__'`。
+
+          TDD：测试接口可实例化（mock 对象满足接口约束）。
+      wave: 1
+      agent: gem-implementer
+      prototype: false
+      priority: medium
+      status: pending
+      dependencies: []
+      conflicts_with: []
+      context_files:
+          - path: assets/scripts/game/demo1-idle/procedures/ProcedureContext.ts
+            description: 'Demo 1 ProcedureContext 模式参考'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: small
+            estimated_files: 2
+            estimated_lines: 60
+            focus_area: 'Procedure 上下文接口'
+            verification:
+                - 'TypeScript 编译通过，接口字段与实际模块类型兼容'
+            acceptance_criteria:
+                - 'IRpgProcedureContext 包含所有必要的系统和模块引用'
+                - 'RPG_PROCEDURE_CONTEXT_KEY 常量导出'
+            failure_modes: []
+            tech_stack:
+                - TypeScript
+            test_coverage: '80%'
+
+    - id: T05
+      title: '定义 FSM 黑板接口和常量'
+      description: |
+          创建两个文件：
+          1. `fsm/BattleFsmDefs.ts`：
+             - `IBattleBlackboard` 接口：battleSystem, buffSystem, gameData, turnOrder(CharacterState[]),
+               currentActorIndex(number), actionDecision(ActionDecision|null), renderer, eventManager,
+               audioManager, entityManager, fsmManager
+             - `BattleFsmDataKeys = { BLACKBOARD: 'battle_blackboard' }` 常量
+             - `BattleFsmStateNames` 常量：ROUND_START/SELECT_ACTION/EXECUTE_ACTION/ROUND_END/VICTORY/DEFEAT
+
+          2. `fsm/CharacterFsmDefs.ts`：
+             - `ICharacterBlackboard` 接口：characterId(number), characterState(CharacterState), eventManager
+             - `CharacterFsmDataKeys = { BLACKBOARD: 'character_blackboard' }` 常量
+             - `CharacterFsmStateNames` 常量：IDLE/ACTING/STUNNED/DEAD
+
+          TDD：测试常量值唯一性和接口可实例化。
+      wave: 1
+      agent: gem-implementer
+      prototype: false
+      priority: medium
+      status: pending
+      dependencies: []
+      conflicts_with: []
+      context_files:
+          - path: assets/scripts/game/demo1-idle/fsm/BuildingFsmDefs.ts
+            description: 'Demo 1 FSM 黑板模式参考'
+          - path: docs/demo-design.md
+            description: '5.5 节 FSM 设计'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: small
+            estimated_files: 3
+            estimated_lines: 80
+            focus_area: 'FSM 数据定义'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg' 通过"
+                - '状态名常量无重复'
+            acceptance_criteria:
+                - 'IBattleBlackboard 和 ICharacterBlackboard 类型完整'
+                - '状态名常量与设计文档 FSM 图一致'
+            failure_modes: []
+            tech_stack:
+                - TypeScript
+            test_coverage: '90%'
+
+    # ═══════════════════════════════════════════════════════
+    # Wave 2: 核心系统层（依赖 Wave 1 数据定义）
+    # ═══════════════════════════════════════════════════════
+
+    - id: T06
+      title: '实现 DamageCalculator 伤害计算器'
+      description: |
+          创建 `systems/DamageCalculator.ts`。
+          纯函数/静态方法类，无状态：
+          - `calculateDamage(attackerAtk: number, skillDamageRate: number, defenderDef: number): number`
+            公式：Math.max(1, Math.floor(attackerAtk * skillDamageRate - defenderDef))
+          - `calculateHeal(casterAtk: number, skillDamageRate: number): number`
+            公式：Math.floor(casterAtk * skillDamageRate)
+          - 考虑 BUFF 加成参数：`calculateDamageWithBuff(baseAtk, buffAtkBonus, rate, def): number`
+
+          TDD 重点：边界值测试（0 防御、高防御、负值保底、BUFF 加成）。
+      wave: 2
+      agent: gem-implementer
+      prototype: false
+      priority: high
+      status: pending
+      dependencies:
+          - T03
+      conflicts_with: []
+      context_files:
+          - path: docs/demo-design.md
+            description: '5.7 节日志示例中的伤害公式 ATK:30 × 1.5 - DEF:10'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: small
+            estimated_files: 2
+            estimated_lines: 80
+            focus_area: '伤害计算纯函数'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg' 通过"
+                - '边界值测试全部通过（最小伤害 1、0 防御、高防御）'
+            acceptance_criteria:
+                - 'calculateDamage 公式正确：Math.max(1, floor(atk * rate - def))'
+                - 'calculateHeal 公式正确：floor(atk * rate)'
+                - 'BUFF 加成版本公式正确'
+                - '100% 测试覆盖'
+            failure_modes:
+                - scenario: '浮点精度导致伤害计算不一致'
+                  likelihood: low
+                  impact: low
+                  mitigation: '统一使用 Math.floor 取整'
+            tech_stack:
+                - TypeScript
+            test_coverage: '100%'
+
+    - id: T07
+      title: '实现 BuffSystem BUFF 管理系统'
+      description: |
+          创建 `systems/BuffSystem.ts`。
+          管理所有角色的 BUFF/DEBUFF 状态：
+          - `applyBuff(targetId, buffType, duration, value): void` — 应用 BUFF（同类型刷新持续时间）
+          - `tickBuffs(targetId): BuffState[]` — 回合递减，返回过期的 BUFF 列表
+          - `getActiveBuffs(targetId): BuffState[]` — 查询当前活跃 BUFF
+          - `getBuffValue(targetId, buffType): number` — 获取指定 BUFF 的数值
+          - `clearBuffs(targetId): void` — 清除角色所有 BUFF
+          - `clearAll(): void` — 清除所有角色的 BUFF（战斗结束时用）
+
+          BUFF 类型枚举：ATK_UP / DEF_UP / STUN / POISON（预留）
+
+          TDD 重点：应用、刷新、递减、过期清理、多角色隔离。
+      wave: 2
+      agent: gem-implementer
+      prototype: false
+      priority: high
+      status: pending
+      dependencies:
+          - T03
+          - T01
+      conflicts_with: []
+      context_files:
+          - path: docs/demo-design.md
+            description: '5.2 节技能效果（stun/heal/buff_atk）和 5.6 节技能表 effectDuration'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: small
+            estimated_files: 2
+            estimated_lines: 150
+            focus_area: 'BUFF 生命周期管理'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg' 通过"
+                - 'BUFF 应用、刷新、递减、过期、清理全路径测试通过'
+            acceptance_criteria:
+                - '同类型 BUFF 刷新持续时间而非叠加'
+                - 'tickBuffs 正确递减并返回过期列表'
+                - 'clearAll 在战斗结束时清除所有'
+                - 'STUN 类型可被 BattleFsm 查询用于跳过行动'
+            failure_modes:
+                - scenario: '多角色 BUFF 数据互相污染'
+                  likelihood: low
+                  impact: high
+                  mitigation: '用 Map<number, BuffState[]> 按 targetId 隔离存储'
+            tech_stack:
+                - TypeScript
+            test_coverage: '100%'
+
+    - id: T08
+      title: '实现 EnemyAI 敌方 AI 决策'
+      description: |
+          创建 `systems/EnemyAI.ts`。
+          静态方法类，无状态：
+          - `decideAction(enemy: CharacterState, playerChars: CharacterState[], skills: SkillConfigRow[]): ActionDecision`
+            策略：
+            1. 过滤存活的玩家角色
+            2. 选择 HP 最低的玩家角色作为目标
+            3. 从可用技能中选择（MP 足够且未冷却）；默认使用普攻（id=1）
+            4. 返回 ActionDecision
+
+          TDD 重点：HP 最低选择、MP 不足时回退普攻、所有敌人已死亡时的边界处理。
+      wave: 2
+      agent: gem-implementer
+      prototype: false
+      priority: medium
+      status: pending
+      dependencies:
+          - T02
+          - T03
+      conflicts_with: []
+      context_files:
+          - path: docs/demo-design.md
+            description: '5.2 节敌人 AI——优先攻击 HP 最低的角色'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: small
+            estimated_files: 2
+            estimated_lines: 80
+            focus_area: '敌方 AI 决策逻辑'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg' 通过"
+                - 'AI 选择 HP 最低目标的测试通过'
+            acceptance_criteria:
+                - 'AI 正确选择 HP 最低的存活玩家角色'
+                - 'MP 不足时自动回退普攻'
+                - '无存活目标时返回空操作'
+            failure_modes: []
+            tech_stack:
+                - TypeScript
+            test_coverage: '100%'
+
+    - id: T09
+      title: '实现 BattleSystem 战斗引擎'
+      description: |
+          创建 `systems/BattleSystem.ts`。
+          战斗核心引擎，依赖 DamageCalculator 和 BuffSystem：
+          - `calculateTurnOrder(characters: CharacterState[]): CharacterState[]` — 按 SPD 降序排列存活角色
+          - `executeAction(action: ActionDecision, allChars: CharacterState[], skillTable, buffSystem, damageCalc): ActionResult`
+            流程：查找施法者 → 获取技能配置 → 扣除 MP → 对每个目标计算伤害/治疗 → 应用 BUFF → 判定死亡 → 返回结果
+          - `checkBattleEnd(players: CharacterState[], enemies: CharacterState[]): BattleEndResult`
+            逻辑：敌方全灭 → victory=true；我方全灭 → victory=false；否则 ended=false
+          - `calculateRewards(enemies: CharacterState[]): { exp: number, gold: number }`
+
+          TDD 重点：SPD 排序、完整 executeAction 流程、胜负判定边界。
+      wave: 2
+      agent: gem-implementer
+      prototype: false
+      priority: high
+      status: pending
+      dependencies:
+          - T02
+          - T03
+          - T06
+          - T07
+      conflicts_with: []
+      context_files:
+          - path: docs/demo-design.md
+            description: '5.2 节回合机制和 5.5 节 FSM 设计'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: medium
+            estimated_files: 2
+            estimated_lines: 250
+            focus_area: '回合制战斗核心逻辑'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg' 通过"
+                - 'SPD 排序测试通过'
+                - '完整 executeAction 流程测试通过（伤害/治疗/BUFF/死亡）'
+            acceptance_criteria:
+                - 'SPD 排序正确（降序，相同 SPD 按 id 升序稳定排序）'
+                - 'executeAction 正确扣 MP、计算伤害、应用效果'
+                - 'checkBattleEnd 正确判定三种情况'
+                - 'calculateRewards 正确累加经验和金币'
+            failure_modes:
+                - scenario: 'executeAction 中目标已死亡但仍计算伤害'
+                  likelihood: medium
+                  impact: medium
+                  mitigation: '执行前过滤 isAlive=false 的目标'
+            tech_stack:
+                - TypeScript
+            test_coverage: '95%'
+
+    # ═══════════════════════════════════════════════════════
+    # Wave 3: FSM 层（依赖 Wave 2 系统层）
+    # ═══════════════════════════════════════════════════════
+
+    - id: T10
+      title: '实现 BattleFsm 6 个战斗状态'
+      description: |
+          创建 `fsm/BattleFsmStates.ts`。
+          6 个状态类继承 FsmState<IBattleBlackboard>：
+
+          1. **RoundStartState**：
+             - onEnter: 回合数+1 → calculateTurnOrder → 重置 currentActorIndex=0 → emit ROUND_START → changeState(SelectAction)
+
+          2. **SelectActionState**：
+             - onEnter: 获取当前行动角色 → 检查 STUN → 如果是敌人调用 EnemyAI → 如果是玩家等待 UI 输入
+             - receiveAction(decision): 设置 actionDecision → changeState(ExecuteAction)
+
+          3. **ExecuteActionState**：
+             - onEnter: 从黑板取 actionDecision → battleSystem.executeAction → emit 事件（ATTACK/HURT/DEAD等）
+               → 播放音效 → currentActorIndex++ → 检查是否还有角色未行动
+               → 有则 changeState(SelectAction)，无则 changeState(RoundEnd)
+
+          4. **RoundEndState**：
+             - onEnter: buffSystem.tickBuffs 所有角色 → emit 过期 BUFF 事件 → checkBattleEnd
+               → 胜利 changeState(Victory) / 失败 changeState(Defeat) / 继续 changeState(RoundStart)
+
+          5. **VictoryState**：
+             - onEnter: emit BATTLE_VICTORY → 播放胜利音效
+
+          6. **DefeatState**：
+             - onEnter: emit BATTLE_DEFEAT → 播放失败音效
+
+          TDD 重点：状态间转换序列、STUN 跳过行动、全回合完整流程。
+      wave: 3
+      agent: gem-implementer
+      prototype: false
+      priority: high
+      status: pending
+      dependencies:
+          - T05
+          - T09
+          - T08
+          - T07
+          - T06
+          - T01
+          - T03
+      conflicts_with:
+          - T11
+      context_files:
+          - path: assets/scripts/game/demo1-idle/fsm/BuildingFsmStates.ts
+            description: 'Demo 1 FSM 状态实现参考'
+          - path: assets/scripts/framework/fsm/FsmState.ts
+            description: 'FsmState 基类'
+          - path: docs/demo-design.md
+            description: '5.5 节战斗 FSM 状态转换图'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: large
+            estimated_files: 2
+            estimated_lines: 300
+            focus_area: '战斗 FSM 核心状态机'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg' 通过"
+                - '状态转换序列测试：RoundStart → SelectAction → ExecuteAction → RoundEnd → RoundStart 循环'
+                - '胜利/失败路径测试通过'
+            acceptance_criteria:
+                - '6 个状态全部实现 onEnter/onUpdate/onLeave'
+                - 'STUN 角色在 SelectAction 自动跳过'
+                - '单回合多角色行动循环正确'
+                - '全灭判定正确触发 Victory/Defeat'
+                - '事件发布覆盖所有战斗事件'
+            failure_modes:
+                - scenario: 'SelectAction ↔ ExecuteAction 循环超出队伍人数不终止'
+                  likelihood: medium
+                  impact: high
+                  mitigation: 'currentActorIndex >= turnOrder.length 时强制进入 RoundEnd'
+            tech_stack:
+                - TypeScript
+            test_coverage: '95%'
+
+    - id: T11
+      title: '实现 CharacterFsm 4 个角色状态'
+      description: |
+          创建 `fsm/CharacterFsmStates.ts`。
+          4 个状态类继承 FsmState<ICharacterBlackboard>：
+
+          1. **CharIdleState**：等待行动。onEnter 检查 HP ≤ 0 → 如果是则 changeState(Dead)
+          2. **CharActingState**：执行行动中。onEnter 设置 acting 标记。完成后 changeState(Idle)
+          3. **CharStunnedState**：被眩晕。onEnter 记录剩余回合。回合结束时递减 → 为 0 时 changeState(Idle)
+          4. **CharDeadState**：已阵亡。onEnter emit CHARACTER_DEAD 事件。终态，不可切换。
+
+          TDD 重点：状态切换条件、HP 检测、眩晕递减。
+      wave: 3
+      agent: gem-implementer
+      prototype: false
+      priority: medium
+      status: pending
+      dependencies:
+          - T05
+          - T01
+          - T03
+      conflicts_with:
+          - T10
+      context_files:
+          - path: docs/demo-design.md
+            description: '5.5 节角色 FSM 状态转换图'
+          - path: assets/scripts/framework/fsm/FsmState.ts
+            description: 'FsmState 基类'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: small
+            estimated_files: 2
+            estimated_lines: 120
+            focus_area: '角色状态机'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg' 通过"
+                - '状态切换条件测试全部通过'
+            acceptance_criteria:
+                - '4 个状态全部实现'
+                - 'HP ≤ 0 自动进入 Dead 状态'
+                - '眩晕回合递减正确'
+                - 'Dead 为终态'
+            failure_modes: []
+            tech_stack:
+                - TypeScript
+            test_coverage: '95%'
+
+    # ═══════════════════════════════════════════════════════
+    # Wave 4: 流程层（依赖 Wave 3 FSM + Wave 2 系统）
+    # ═══════════════════════════════════════════════════════
+
+    - id: T12
+      title: '实现 LaunchProcedure + PreloadProcedure'
+      description: |
+          创建两个文件：
+          1. `procedures/LaunchProcedure.ts`：
+             - onEnter: 日志"框架初始化完成" → 短暂等待 → changeProcedure(PreloadProcedure)
+
+          2. `procedures/PreloadProcedure.ts`：
+             - onEnter: 从 fsm 获取上下文 → DataTableManager 注册 4 张配置表数据
+               → ResourceManager 模拟加载角色/技能/关卡资源 → 日志进度
+               → changeProcedure(LobbyProcedure)
+
+          TDD：测试流程切换顺序和数据表注册。
+      wave: 4
+      agent: gem-implementer
+      prototype: false
+      priority: medium
+      status: pending
+      dependencies:
+          - T04
+          - T02
+          - T01
+      conflicts_with: []
+      context_files:
+          - path: assets/scripts/game/demo1-idle/procedures/LaunchProcedure.ts
+            description: 'Demo 1 LaunchProcedure 参考'
+          - path: assets/scripts/game/demo1-idle/procedures/PreloadProcedure.ts
+            description: 'Demo 1 PreloadProcedure 参考'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: small
+            estimated_files: 2
+            estimated_lines: 120
+            focus_area: '启动和预加载流程'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg' 通过"
+                - 'Launch → Preload → Lobby 切换序列正确'
+            acceptance_criteria:
+                - 'LaunchProcedure 正确切换到 PreloadProcedure'
+                - 'PreloadProcedure 注册 4 张配置表后切换到 LobbyProcedure'
+            failure_modes: []
+            tech_stack:
+                - TypeScript
+            test_coverage: '90%'
+
+    - id: T13
+      title: '实现 LobbyProcedure'
+      description: |
+          创建 `procedures/LobbyProcedure.ts`。
+          大厅流程：
+          - onEnter: 从上下文获取 renderer → 显示大厅 UI（角色列表 + 关卡选择 + 出发按钮）
+            → 初始化 3 个玩家角色的 CharacterState（从 DataTable 读取基础属性 + 当前等级加成）
+            → 注册按钮回调：选关卡 → 设置 selectedStageId；出发 → changeProcedure(BattlePrep)
+          - onLeave: 清除大厅 UI 按钮
+
+          TDD：测试角色初始化、关卡选择、流程切换条件。
+      wave: 4
+      agent: gem-implementer
+      prototype: false
+      priority: medium
+      status: pending
+      dependencies:
+          - T04
+          - T02
+          - T03
+          - T01
+      conflicts_with: []
+      context_files:
+          - path: docs/demo-design.md
+            description: '5.4 节 Procedure 流程图和 5.7 节大厅按钮组'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: small
+            estimated_files: 2
+            estimated_lines: 150
+            focus_area: '大厅流程和编队'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg' 通过"
+                - '角色初始化属性与 DataTable 一致'
+            acceptance_criteria:
+                - '3 个玩家角色正确从配置表初始化'
+                - '关卡选择更新 gameData.selectedStageId'
+                - '出发按钮触发切换到 BattlePrepProcedure'
+            failure_modes: []
+            tech_stack:
+                - TypeScript
+            test_coverage: '90%'
+
+    - id: T14
+      title: '实现 BattlePrepProcedure'
+      description: |
+          创建 `procedures/BattlePrepProcedure.ts`。
+          战前准备流程：
+          - onEnter:
+            1. 从上下文获取 entityManager、fsmManager
+            2. 注册 Entity 分组：'player' 和 'enemy'
+            3. 为每个玩家角色调用 entityManager.showEntity('player', characterData)
+            4. 从 stage_config 读取当前关卡的怪物列表 → 从 monster_config 读取属性
+            5. 为每个怪物调用 entityManager.showEntity('enemy', monsterData)
+            6. 创建 BattleFsm + 各角色的 CharacterFsm
+            7. 播放战斗 BGM
+            8. 初始化 gameData.currentRound = 0
+            9. changeProcedure(BattleProcedure)
+          - onLeave: 无特殊清理
+
+          TDD：测试 Entity 创建数量、FSM 创建、BGM 播放。
+      wave: 4
+      agent: gem-implementer
+      prototype: false
+      priority: high
+      status: pending
+      dependencies:
+          - T04
+          - T02
+          - T03
+          - T05
+          - T10
+          - T11
+      conflicts_with: []
+      context_files:
+          - path: docs/demo-design.md
+            description: '5.4 节 BattlePrep 流程'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: medium
+            estimated_files: 2
+            estimated_lines: 180
+            focus_area: '战前准备和 Entity/FSM 创建'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg' 通过"
+                - '玩家 Entity 数 = 3，敌人 Entity 数 = 关卡配置的怪物数'
+            acceptance_criteria:
+                - "正确创建 'player' 和 'enemy' 分组的 Entity"
+                - 'BattleFsm 创建成功'
+                - 'CharacterFsm 为每个角色创建'
+                - '战斗 BGM 播放'
+                - '切换到 BattleProcedure'
+            failure_modes:
+                - scenario: 'Entity 分组未注册导致 showEntity 失败'
+                  likelihood: low
+                  impact: high
+                  mitigation: '先 registerGroup 再 showEntity，单测验证'
+            tech_stack:
+                - TypeScript
+            test_coverage: '90%'
+
+    - id: T15
+      title: '实现 BattleProcedure + SettleProcedure'
+      description: |
+          创建两个文件：
+          1. `procedures/BattleProcedure.ts`：
+             - onEnter: 获取上下文 → 启动 BattleFsm（start RoundStartState）
+               → 注册战斗事件监听（更新 UI、播放音效、记录日志）
+             - onUpdate: FsmManager.onUpdate 驱动 BattleFsm
+             - 监听 BATTLE_VICTORY/BATTLE_DEFEAT 事件 → changeProcedure(SettleProcedure)
+             - onLeave: 取消事件监听
+
+          2. `procedures/SettleProcedure.ts`：
+             - onEnter: 从上下文获取 gameData → 计算总经验/金币
+               → 检查角色升级（简单公式：每 100 exp 升一级，升级恢复全 HP/MP）
+               → 显示结算面板 → 回收所有 Entity → 销毁 BattleFsm + CharacterFsm
+               → buffSystem.clearAll() → 停止战斗 BGM
+               → 提供"返回大厅"按钮 → changeProcedure(LobbyProcedure)
+
+          TDD：测试战斗流程驱动、事件监听注册/注销、结算计算、Entity 回收。
+      wave: 4
+      agent: gem-implementer
+      prototype: false
+      priority: high
+      status: pending
+      dependencies:
+          - T04
+          - T10
+          - T11
+          - T09
+          - T07
+          - T01
+          - T03
+      conflicts_with: []
+      context_files:
+          - path: docs/demo-design.md
+            description: '5.4 节 Battle 和 Settle 流程'
+          - path: assets/scripts/game/demo1-idle/procedures/MainProcedure.ts
+            description: 'Demo 1 主流程参考'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: medium
+            estimated_files: 2
+            estimated_lines: 250
+            focus_area: '战斗主循环和结算'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg' 通过"
+                - '战斗胜利后结算正确发放经验/金币'
+                - 'Entity 全部回收'
+            acceptance_criteria:
+                - 'BattleProcedure 正确启动和驱动 BattleFsm'
+                - '战斗事件正确转发给 UI 和音效'
+                - 'SettleProcedure 正确计算奖励和升级'
+                - '所有 Entity 回收、FSM 销毁、BUFF 清除'
+                - '返回大厅按钮切换到 LobbyProcedure'
+            failure_modes:
+                - scenario: 'BattleProcedure onLeave 时事件监听未注销导致内存泄漏'
+                  likelihood: medium
+                  impact: medium
+                  mitigation: 'onLeave 中显式 off 所有 on 注册的事件'
+            tech_stack:
+                - TypeScript
+            test_coverage: '90%'
+
+    # ═══════════════════════════════════════════════════════
+    # Wave 5: 展示层（依赖 Wave 4 流程层）
+    # ═══════════════════════════════════════════════════════
+
+    - id: T16
+      title: '实现 LobbyPanel 大厅面板'
+      description: |
+          创建 `ui/LobbyPanel.ts`。
+          继承 UIFormBase，使用 HtmlRenderer 渲染：
+          - 状态面板：显示玩家金币、经验
+          - 角色信息区：3 个角色的 HP/MP/ATK/DEF/SPD/等级
+          - 关卡按钮组：3 个关卡按钮（名称 + 难度提示）
+          - 出发按钮（选关后激活）
+
+          所有文本通过事件通知 Procedure 处理逻辑，面板只负责展示。
+
+          TDD：测试面板创建、按钮回调触发事件、数据刷新。
+      wave: 5
+      agent: gem-implementer
+      prototype: false
+      priority: medium
+      status: pending
+      dependencies:
+          - T13
+          - T03
+          - T01
+      conflicts_with: []
+      context_files:
+          - path: assets/scripts/game/demo1-idle/ui/IdleMainPanel.ts
+            description: 'Demo 1 UI 面板参考'
+          - path: docs/demo-design.md
+            description: '5.7 节大厅按钮组'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: small
+            estimated_files: 2
+            estimated_lines: 150
+            focus_area: '大厅 UI 面板'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg' 通过"
+            acceptance_criteria:
+                - '显示 3 个角色属性'
+                - '3 个关卡选择按钮'
+                - '出发按钮触发 STAGE_SELECTED 事件'
+            failure_modes: []
+            tech_stack:
+                - TypeScript
+            test_coverage: '85%'
+
+    - id: T17
+      title: '实现 BattlePanel 战斗面板'
+      description: |
+          创建 `ui/BattlePanel.ts`。
+          继承 UIFormBase，使用 HtmlRenderer 渲染：
+          - 状态面板区：
+            - 回合数显示
+            - 玩家角色 HP/MP 条（实时更新，使用 updateStatus）
+            - 敌人 HP 条
+          - 技能按钮组：当前行动角色的可用技能（普通攻击 + 技能1 + 技能2）
+          - 目标选择按钮组：选择攻击/治疗目标
+          - 自动战斗开关按钮
+          - 战斗日志区：关键事件追加日志（使用 log，非 updateLog）
+
+          监听战斗事件更新显示，技能/目标选择通过回调通知 BattleProcedure。
+
+          TDD：测试面板更新、技能按钮生成、事件监听。
+      wave: 5
+      agent: gem-implementer
+      prototype: false
+      priority: medium
+      status: pending
+      dependencies:
+          - T15
+          - T09
+          - T03
+          - T01
+      conflicts_with: []
+      context_files:
+          - path: docs/demo-design.md
+            description: '5.7 节战斗中按钮组和日志示例'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: medium
+            estimated_files: 2
+            estimated_lines: 250
+            focus_area: '战斗 UI 面板'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg' 通过"
+            acceptance_criteria:
+                - '实时显示所有角色 HP/MP'
+                - '技能按钮正确显示当前角色可用技能'
+                - '目标选择按钮正确显示存活目标'
+                - '战斗日志格式与设计文档 5.7 节一致'
+                - '自动战斗开关功能正常'
+            failure_modes:
+                - scenario: '高频 HP 更新导致 DOM 性能问题'
+                  likelihood: low
+                  impact: low
+                  mitigation: '使用 updateStatus 原地更新而非 log 追加'
+            tech_stack:
+                - TypeScript
+            test_coverage: '85%'
+
+    - id: T18
+      title: '实现 SettlePanel 结算面板'
+      description: |
+          创建 `ui/SettlePanel.ts`。
+          继承 UIFormBase，使用 HtmlRenderer 渲染：
+          - 战斗结果（胜利/失败）
+          - 经验和金币获取
+          - 角色升级信息（如有）
+          - "返回大厅" 按钮
+
+          TDD：测试胜利/失败两种显示、升级信息展示。
+      wave: 5
+      agent: gem-implementer
+      prototype: false
+      priority: low
+      status: pending
+      dependencies:
+          - T15
+          - T03
+          - T01
+      conflicts_with: []
+      context_files:
+          - path: docs/demo-design.md
+            description: '5.7 节结算日志'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: small
+            estimated_files: 2
+            estimated_lines: 100
+            focus_area: '结算 UI 面板'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg' 通过"
+            acceptance_criteria:
+                - '胜利和失败两种结果正确显示'
+                - '经验、金币、升级信息正确'
+                - '返回大厅按钮功能正常'
+            failure_modes: []
+            tech_stack:
+                - TypeScript
+            test_coverage: '80%'
+
+    - id: T19
+      title: '实现 TurnBasedRpgDemo 主入口 + index.ts'
+      description: |
+          创建两个文件：
+          1. `TurnBasedRpgDemo.ts`：
+             - 继承 DemoBase，constructor 传入 'Turn-based RPG Demo'
+             - setupProcedures: 创建 BattleSystem/BuffSystem 等系统 → 构建 IRpgProcedureContext
+               → procMgr.initialize(6 个 Procedure) → procMgr.setData(key, ctx)
+             - setupDataTables: dtMgr.createTableFromRawData 注册 4 张表
+             - start(): bootstrap → startProcedure(LaunchProcedure) → startMainLoop(30)
+
+          2. `index.ts`：
+             - new TurnBasedRpgDemo().start().catch(...)
+
+          TDD：测试 bootstrap 正确、Procedure 注册数量、DataTable 注册数量。
+      wave: 5
+      agent: gem-implementer
+      prototype: false
+      priority: high
+      status: pending
+      dependencies:
+          - T12
+          - T13
+          - T14
+          - T15
+          - T16
+          - T17
+          - T18
+          - T09
+          - T07
+      conflicts_with: []
+      context_files:
+          - path: assets/scripts/game/demo1-idle/IdleClickerDemo.ts
+            description: 'Demo 1 主入口类参考'
+          - path: assets/scripts/game/demo1-idle/index.ts
+            description: 'Demo 1 index.ts 参考'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: medium
+            estimated_files: 2
+            estimated_lines: 200
+            focus_area: '主入口类串联所有模块'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg' 通过"
+                - 'bootstrap 注册 15 个模块'
+                - '6 个 Procedure 注册成功'
+                - '4 张 DataTable 注册成功'
+            acceptance_criteria:
+                - 'TurnBasedRpgDemo 完整继承 DemoBase 模式'
+                - '所有系统正确创建和注入上下文'
+                - 'start() 流程完整：bootstrap → startProcedure → startMainLoop'
+                - 'index.ts 可独立运行'
+            failure_modes:
+                - scenario: '系统初始化顺序错误导致依赖未就绪'
+                  likelihood: low
+                  impact: high
+                  mitigation: '严格按 DemoBase.bootstrap 后再创建系统，参考 Demo 1 顺序'
+            tech_stack:
+                - TypeScript
+            test_coverage: '90%'
+
+    # ═══════════════════════════════════════════════════════
+    # Wave 6: 集成测试 + 验收
+    # ═══════════════════════════════════════════════════════
+
+    - id: T20
+      title: '集成测试：完整战斗流程端到端'
+      description: |
+          创建 `tests/integration/demo2-rpg.integration.test.ts`。
+          参考 Demo 0/Demo 1 集成测试模式：
+          - @jest-environment jsdom
+          - jest.mock Logger
+          - jest.useFakeTimers
+          - TestRpgDemo 继承 TurnBasedRpgDemo 或直接使用
+
+          测试用例：
+          1. **完整战斗流程**：bootstrap → 预加载 → 大厅选关 → 战前准备 → 战斗 → 结算 → 回大厅
+          2. **SPD 排序正确性**：验证行动顺序按 SPD 降序
+          3. **伤害计算公式**：ATK × rate - DEF，验证具体数值
+          4. **技能效果**：治疗恢复 HP、BUFF 增加 ATK、眩晕跳过行动
+          5. **Entity 生命周期**：战前创建、战后回收
+          6. **FSM 状态切换**：完整回合的状态转换序列
+          7. **死亡判定**：HP ≤ 0 触发 CHARACTER_DEAD，全灭触发 BATTLE_VICTORY/DEFEAT
+      wave: 6
+      agent: gem-implementer
+      prototype: false
+      covers:
+          - '完整战斗流程端到端'
+          - 'SPD 排序正确'
+          - '伤害计算公式'
+          - '技能效果'
+          - 'Entity 生命周期'
+          - 'FSM 状态切换'
+          - '死亡判定'
+      priority: high
+      status: pending
+      dependencies:
+          - T19
+      conflicts_with: []
+      context_files:
+          - path: tests/integration/demo0-infrastructure.test.ts
+            description: 'Demo 0 集成测试模式参考'
+          - path: docs/demo-design.md
+            description: '5.8 节集成测试要点'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: large
+            estimated_files: 1
+            estimated_lines: 300
+            focus_area: '端到端集成测试'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg.integration' 全部通过"
+                - '7 个测试用例全部绿灯'
+            acceptance_criteria:
+                - '7 个核心测试用例全部通过'
+                - '测试覆盖设计文档 5.8 节所有要点'
+                - '无跳过或待定的测试'
+            failure_modes:
+                - scenario: 'jsdom 环境下 Timer 和 FSM 更新时序不一致'
+                  likelihood: medium
+                  impact: medium
+                  mitigation: '使用 jest.useFakeTimers + advanceTimersByTime 精确控制时间推进'
+            tech_stack:
+                - TypeScript
+                - Jest
+            test_coverage: null
+
+    - id: T21
+      title: '集成测试：BUFF 系统和 Timer 交互'
+      description: |
+          在集成测试文件中追加 BUFF 相关测试用例：
+          1. **BUFF 持续多回合**：应用 2 回合 ATK_UP → 验证伤害增加 → 2 回合后过期 → 验证伤害恢复
+          2. **STUN 跳过行动**：角色被眩晕 → 验证该角色回合被跳过 → 眩晕结束后正常行动
+          3. **BUFF 战斗结束清理**：战斗结束时所有 BUFF 清除
+
+          TDD：先写失败测试，再确保实现通过。
+      wave: 6
+      agent: gem-implementer
+      prototype: false
+      priority: medium
+      status: pending
+      dependencies:
+          - T20
+      conflicts_with: []
+      context_files:
+          - path: docs/demo-design.md
+            description: '5.6 节技能效果和持续时间'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: small
+            estimated_files: 1
+            estimated_lines: 120
+            focus_area: 'BUFF 系统集成验证'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg.integration' 全部通过"
+            acceptance_criteria:
+                - 'BUFF 持续时间正确递减'
+                - 'STUN 跳过行动验证'
+                - '战斗结束 BUFF 清理验证'
+            failure_modes: []
+            tech_stack:
+                - TypeScript
+                - Jest
+            test_coverage: null
+
+    - id: T22
+      title: '集成测试：多关卡循环和升级系统'
+      description: |
+          追加测试用例：
+          1. **关卡循环**：完成关卡 1 → 返回大厅 → 选择关卡 2 → 完成 → 返回 → 验证金币/经验累加
+          2. **角色升级**：累计 100 exp → 验证角色等级 +1、HP/MP 恢复满
+          3. **不同关卡怪物组合**：验证 3 个关卡加载不同怪物配置
+
+          TDD：先写测试再验证。
+      wave: 6
+      agent: gem-implementer
+      prototype: false
+      priority: medium
+      status: pending
+      dependencies:
+          - T20
+      conflicts_with: []
+      context_files:
+          - path: docs/demo-design.md
+            description: '5.2 节关卡系统和经验/升级'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: small
+            estimated_files: 1
+            estimated_lines: 120
+            focus_area: '多关卡循环验证'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg.integration' 全部通过"
+            acceptance_criteria:
+                - '多关卡循环金币/经验正确累加'
+                - '升级机制正确触发'
+                - '不同关卡怪物配置正确'
+            failure_modes: []
+            tech_stack:
+                - TypeScript
+                - Jest
+            test_coverage: null
+
+    - id: T23
+      title: '集成测试：音效和场景切换验证'
+      description: |
+          追加测试用例：
+          1. **音效播放**：战斗 BGM 播放、攻击音效、技能音效、胜利/失败音效
+          2. **场景切换**：大厅 → 战斗场景 → 大厅 切换验证
+          3. **ObjectPool 复用**：连续两场战斗，验证 Entity 复用池化
+
+          通过 MockAudioPlayer.playHistory 和 MockSceneLoader 断言。
+      wave: 6
+      agent: gem-implementer
+      prototype: false
+      priority: low
+      status: pending
+      dependencies:
+          - T20
+      conflicts_with: []
+      context_files:
+          - path: assets/scripts/game/shared/MockAudioPlayer.ts
+            description: 'MockAudioPlayer 播放历史追踪'
+          - path: assets/scripts/game/shared/MockSceneLoader.ts
+            description: 'MockSceneLoader 场景切换历史'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: small
+            estimated_files: 1
+            estimated_lines: 100
+            focus_area: '音效和场景验证'
+            verification:
+                - "npm test -- --testPathPattern='demo2-rpg.integration' 全部通过"
+            acceptance_criteria:
+                - '所有音效播放时机正确'
+                - '场景切换序列正确'
+                - 'Entity 池化复用验证'
+            failure_modes: []
+            tech_stack:
+                - TypeScript
+                - Jest
+            test_coverage: null
+
+    - id: T24
+      title: '最终验证：全量测试 + lint 检查'
+      description: |
+          最终验收步骤：
+          1. `npm test` — 全量测试通过
+          2. `npm run lint` — ESLint 无报错
+          3. `npm test -- --testPathPattern='demo2-rpg' --coverage` — 覆盖率报告检查
+          4. 验证目录结构完整性（对照研究文件中的 structure_of_domain）
+          5. 验证所有 public API 有中文 JSDoc
+          6. 验证无 `any` 类型、无 `console.log`
+
+          修复发现的任何问题。
+      wave: 6
+      agent: gem-implementer
+      prototype: false
+      priority: high
+      status: pending
+      dependencies:
+          - T20
+          - T21
+          - T22
+          - T23
+      conflicts_with: []
+      context_files:
+          - path: docs/code-review-checklist.md
+            description: 'PR 自查清单'
+      planning_pass: 1
+      planning_history:
+          - pass: 1
+            reason: '初始规划'
+            timestamp: '2026-04-22'
+            estimated_effort: small
+            estimated_files: 0
+            estimated_lines: 50
+            focus_area: '最终验收'
+            verification:
+                - 'npm test 退出码 0'
+                - 'npm run lint 退出码 0'
+                - '无 any 类型'
+                - '无 console.log'
+                - '所有 public API 有中文 JSDoc'
+            acceptance_criteria:
+                - '全量测试通过 0 failures'
+                - 'ESLint 检查 0 errors'
+                - 'Demo 2 目录结构完整'
+                - '代码规范合规'
+            failure_modes:
+                - scenario: '其他 Demo 测试因共享代码变更而失败'
+                  likelihood: low
+                  impact: medium
+                  mitigation: 'Demo 2 不修改 shared/ 或 framework/ 代码，仅新增文件'
+            tech_stack:
+                - TypeScript
+                - Jest
+                - ESLint
+            test_coverage: null
+            requires_review: true
+            review_depth: standard
+            review_security_sensitive: false

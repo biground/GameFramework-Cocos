@@ -60,12 +60,21 @@ describe('TurnBasedRpgDemo', () => {
     });
 
     describe('setupDataTables()', () => {
-        it('注册 4 张配置表', () => {
+        it('DataTable 在 PreloadProcedure 中注册（bootstrap 后需等待 Procedure 流转）', () => {
             jest.useFakeTimers();
             const demo = createDemo();
             demo.bootstrap();
 
             const dtMgr = GameModule.getModule<DataTableManager>('DataTableManager');
+
+            // bootstrap 后 setupDataTables 是空操作，表尚不存在
+            expect(dtMgr.hasTable('character_config')).toBe(false);
+
+            // 启动 Procedure 并推进 setTimeout 链：Launch → Preload（注册表） → Lobby
+            const procMgr = GameModule.getModule<ProcedureManager>('ProcedureManager');
+            procMgr.startProcedure(LaunchProcedure);
+            jest.runAllTimers(); // Launch → Preload
+            jest.runAllTimers(); // Preload → Lobby
 
             expect(dtMgr.hasTable('character_config')).toBe(true);
             expect(dtMgr.hasTable('monster_config')).toBe(true);

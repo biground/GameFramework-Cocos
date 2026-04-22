@@ -116,6 +116,9 @@ function createMockFsm(bb: IBattleBlackboard): {
         hasState(): boolean {
             return true;
         },
+        start(): void {
+            // mock: 不实际启动
+        },
     };
 
     return {
@@ -199,6 +202,9 @@ function createBlackboard(overrides: Partial<IBattleBlackboard> = {}): IBattleBl
 // ─── 测试套件 ──────────────────────────────────────────
 
 describe('BattleFsm — 战斗状态机', () => {
+    // 战斗状态通过 setTimeout(0) 延迟切换，需要 fakeTimers 才能同步验证
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
     // ─── RoundStartState ─────────────────────────
 
     describe('RoundStartState — 回合开始', () => {
@@ -238,6 +244,7 @@ describe('BattleFsm — 战斗状态机', () => {
             const mock = createMockFsm(bb);
             const state = new RoundStartState();
             state.onEnter(mock.fsm);
+            jest.runAllTimers();
 
             expect(mock.lastChangedState).toBe(SelectActionState);
         });
@@ -261,6 +268,7 @@ describe('BattleFsm — 战斗状态机', () => {
 
             expect(spy).toHaveBeenCalledWith(enemy, [player], bb.skillTable);
             expect(bb.actionDecision).not.toBeNull();
+            jest.runAllTimers();
             expect(mock.lastChangedState).toBe(ExecuteActionState);
 
             spy.mockRestore();
@@ -282,6 +290,7 @@ describe('BattleFsm — 战斗状态机', () => {
                 skillId: 1,
                 targetIds: [100],
             });
+            jest.runAllTimers();
             expect(mock.lastChangedState).toBe(ExecuteActionState);
         });
 
@@ -331,6 +340,7 @@ describe('BattleFsm — 战斗状态机', () => {
             const mock = createMockFsm(bb);
             const state = new SelectActionState();
             state.onEnter(mock.fsm);
+            jest.runAllTimers();
 
             expect(mock.lastChangedState).toBe(RoundEndState);
         });
@@ -414,6 +424,7 @@ describe('BattleFsm — 战斗状态机', () => {
             const mock = createMockFsm(bb);
             const state = new ExecuteActionState();
             state.onEnter(mock.fsm);
+            jest.runAllTimers();
 
             expect(mock.lastChangedState).toBe(VictoryState);
         });
@@ -433,6 +444,7 @@ describe('BattleFsm — 战斗状态机', () => {
             const mock = createMockFsm(bb);
             const state = new ExecuteActionState();
             state.onEnter(mock.fsm);
+            jest.runAllTimers();
 
             expect(mock.lastChangedState).toBe(DefeatState);
         });
@@ -455,6 +467,7 @@ describe('BattleFsm — 战斗状态机', () => {
 
             // currentActorIndex 应该递增
             expect(bb.currentActorIndex).toBe(1);
+            jest.runAllTimers();
             expect(mock.lastChangedState).toBe(SelectActionState);
         });
 
@@ -475,6 +488,7 @@ describe('BattleFsm — 战斗状态机', () => {
             state.onEnter(mock.fsm);
 
             // turnOrder 只有 1 个，index 递增到 1 后 >= length
+            jest.runAllTimers();
             expect(mock.lastChangedState).toBe(RoundEndState);
         });
     });
@@ -550,6 +564,7 @@ describe('BattleFsm — 战斗状态机', () => {
             const mock = createMockFsm(bb);
             const state = new RoundEndState();
             state.onEnter(mock.fsm);
+            jest.runAllTimers();
 
             expect(mock.lastChangedState).toBe(RoundStartState);
         });
@@ -561,6 +576,7 @@ describe('BattleFsm — 战斗状态机', () => {
             const mock = createMockFsm(bb);
             const state = new RoundEndState();
             state.onEnter(mock.fsm);
+            jest.runAllTimers();
 
             expect(mock.lastChangedState).toBe(DefeatState);
         });
@@ -572,6 +588,7 @@ describe('BattleFsm — 战斗状态机', () => {
             const mock = createMockFsm(bb);
             const state = new RoundEndState();
             state.onEnter(mock.fsm);
+            jest.runAllTimers();
 
             expect(mock.lastChangedState).toBe(RoundStartState);
         });

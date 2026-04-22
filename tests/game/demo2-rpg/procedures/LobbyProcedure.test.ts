@@ -33,6 +33,7 @@ function createMockFsm(data: Map<string, unknown>): IFsm<unknown> {
         },
         removeData: (key: string) => data.delete(key),
         hasState: () => false,
+        start: jest.fn(),
     };
 }
 

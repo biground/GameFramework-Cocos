@@ -1,52 +1,69 @@
 import { test, expect } from '@playwright/test';
 
+/**
+ * Demo 2 — Turn-based RPG E2E 测试
+ *
+ * HtmlRenderer 使用纯内联样式，无 CSS class，
+ * 因此选择器主要依赖 role、text 匹配和结构定位。
+ *
+ * 流程：Launch → (setTimeout) → Preload → (setTimeout) → Lobby
+ * Lobby 渲染后才有按钮，需要 waitFor 而非固定 timeout。
+ */
 test.describe('Demo 2 - Turn-based RPG', () => {
     test.beforeEach(async ({ page }) => {
+        // 监听页面错误，方便调试
+        page.on('pageerror', (err) => console.error('[PageError]', err.message));
         await page.goto('/');
-        // 等待 Demo 初始化
-        await page.waitForTimeout(2000);
     });
 
     test('应该正确加载并显示标题', async ({ page }) => {
-        // 验证页面标题或 Demo 标题
-        const title = page.locator('h1, h2, .demo-title').first();
-        await expect(title).toBeVisible();
+        // HtmlRenderer 构造函数同步创建标题 div（textContent = title 参数）
+        const title = page.getByText('Turn-based RPG Demo', { exact: true });
+        await expect(title).toBeVisible({ timeout: 5000 });
     });
 
     test('应该显示大厅界面', async ({ page }) => {
-        // 验证大厅按钮存在
-        const stageButton = page.locator('button', { hasText: /关卡|新手村/ });
-        await expect(stageButton.first()).toBeVisible();
+        // Lobby 在 2 个 setTimeout(0) 后渲染，等待"出发"按钮出现
+        const goBtn = page.getByRole('button', { name: '出发' });
+        await expect(goBtn).toBeVisible({ timeout: 10000 });
+
+        // 验证关卡按钮也存在（PreloadProcedure 注册了"草原之路"等关卡）
+        const stageBtn = page.getByRole('button', { name: /草原之路/ });
+        await expect(stageBtn).toBeVisible();
     });
 
     test('应该能选择关卡并出发', async ({ page }) => {
-        // 点击关卡选择
-        const stageBtn = page.locator('button', { hasText: /新手村/ });
+        // 等待大厅 UI 就绪
+        const goBtn = page.getByRole('button', { name: '出发' });
+        await expect(goBtn).toBeVisible({ timeout: 10000 });
+
+        // 选择关卡
+        const stageBtn = page.getByRole('button', { name: /草原之路/ });
         await stageBtn.click();
 
+        // 验证选关日志
+        await expect(page.getByText(/已选择关卡/)).toBeVisible({ timeout: 3000 });
+
         // 点击出发
-        const goBtn = page.locator('button', { hasText: /出发/ });
         await goBtn.click();
 
-        // 验证进入战斗
-        await page.waitForTimeout(1000);
-        // 检查战斗相关 UI 出现
+        // 验证进入战斗准备或战斗流程（BattlePrepProcedure 会输出日志）
+        await expect(page.getByText(/回合开始/).first()).toBeVisible({ timeout: 10000 });
     });
 
     test('应该能完成一场战斗', async ({ page }) => {
-        // 选关卡 → 出发 → 等待战斗完成 → 验证结算
-        const stageBtn = page.locator('button', { hasText: /新手村/ });
-        await stageBtn.click();
+        // 等待大厅
+        const goBtn = page.getByRole('button', { name: '出发' });
+        await expect(goBtn).toBeVisible({ timeout: 10000 });
 
-        const goBtn = page.locator('button', { hasText: /出发/ });
+        // 选关卡 → 出发
+        await page.getByRole('button', { name: /草原之路/ }).click();
         await goBtn.click();
 
-        // 等待战斗（自动战斗模式）
-        await page.waitForTimeout(5000);
+        // 等待战斗日志出现（自动战斗，BattleProcedure 会输出回合、攻击等日志）
+        await expect(page.getByText(/回合开始/).first()).toBeVisible({ timeout: 15000 });
 
-        // 检查是否有战斗日志输出
-        const logArea = page.locator('.log-entry, [class*="log"]');
-        const logCount = await logArea.count();
-        expect(logCount).toBeGreaterThan(0);
+        // 等待战斗结束（SettleProcedure 输出结算信息）
+        await expect(page.getByText(/战斗结束|胜利|失败|结算/)).toBeVisible({ timeout: 20000 });
     });
 });

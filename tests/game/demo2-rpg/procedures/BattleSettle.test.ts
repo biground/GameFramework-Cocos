@@ -108,6 +108,7 @@ function createMockAudioManager(): IRpgProcedureContext['audioManager'] {
 function createMockFsmManager(): IRpgProcedureContext['fsmManager'] {
     return {
         destroyFsm: jest.fn(),
+        getFsm: jest.fn().mockReturnValue(undefined),
     } as unknown as IRpgProcedureContext['fsmManager'];
 }
 
@@ -140,6 +141,9 @@ function createMockProcedureFsm(ctx: IRpgProcedureContext): {
         },
         hasState(): boolean {
             return true;
+        },
+        start(): void {
+            // mock
         },
     };
 
@@ -244,6 +248,7 @@ describe('BattleProcedure — 战斗流程', () => {
             setData: jest.fn(),
             removeData: jest.fn(),
             hasState: jest.fn(),
+            start: jest.fn(),
         };
 
         const procedure = new BattleProcedure();
@@ -430,6 +435,7 @@ describe('SettleProcedure — 结算流程', () => {
             setData: jest.fn(),
             removeData: jest.fn(),
             hasState: jest.fn(),
+            start: jest.fn(),
         };
 
         const procedure = new SettleProcedure();

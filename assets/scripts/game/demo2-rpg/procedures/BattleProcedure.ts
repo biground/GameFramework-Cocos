@@ -12,6 +12,8 @@ import { Logger } from '@framework/debug/Logger';
 import { IRpgProcedureContext, RPG_PROCEDURE_CONTEXT_KEY } from './RpgProcedureContext';
 import { SettleProcedure } from './SettleProcedure';
 import { RpgEvents } from '../events/RpgEvents';
+import { IBattleBlackboard } from '../fsm/BattleFsmDefs';
+import { RoundStartState } from '../fsm/battle/RoundStartState';
 
 const TAG = 'BattleProcedure';
 
@@ -80,6 +82,16 @@ export class BattleProcedure extends ProcedureBase {
 
         ctx.eventManager.on(RpgEvents.BATTLE_VICTORY, this._onVictory, this);
         ctx.eventManager.on(RpgEvents.BATTLE_DEFEAT, this._onDefeat, this);
+
+        // 启动 BattleFsm，从 RoundStartState 开始战斗循环
+        const battleFsm = ctx.fsmManager.getFsm('battle_fsm') as
+            | IFsm<IBattleBlackboard>
+            | undefined;
+        if (battleFsm) {
+            battleFsm.start(RoundStartState);
+        } else {
+            Logger.error(TAG, 'battle_fsm 不存在，无法启动战斗');
+        }
 
         Logger.info(TAG, '战斗开始');
     }

@@ -120,9 +120,9 @@ export class ExecuteActionState extends FsmState<IBattleBlackboard> {
 
         if (endResult.ended) {
             if (endResult.victory) {
-                this.changeState(fsm, VictoryState);
+                setTimeout(() => this.changeState(fsm, VictoryState), 0);
             } else {
-                this.changeState(fsm, DefeatState);
+                setTimeout(() => this.changeState(fsm, DefeatState), 0);
             }
             return;
         }
@@ -137,9 +137,9 @@ export class ExecuteActionState extends FsmState<IBattleBlackboard> {
      */
     private _nextStep(fsm: IFsm<IBattleBlackboard>, bb: IBattleBlackboard): void {
         if (bb.currentActorIndex < bb.turnOrder.length) {
-            this.changeState(fsm, SelectActionState);
+            setTimeout(() => this.changeState(fsm, SelectActionState), 0);
         } else {
-            this.changeState(fsm, RoundEndState);
+            setTimeout(() => this.changeState(fsm, RoundEndState), 0);
         }
     }
 }

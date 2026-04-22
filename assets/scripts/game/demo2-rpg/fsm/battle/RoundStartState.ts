@@ -51,7 +51,7 @@ export class RoundStartState extends FsmState<IBattleBlackboard> {
         const orderNames = bb.turnOrder.map((c) => c.name).join(' → ');
         Logger.info(TAG, `=== 第 ${round} 回合 === 行动顺序: ${orderNames}`);
 
-        // 切换到选择行动
-        this.changeState(fsm, SelectActionState);
+        // 切换到选择行动（延迟到下一个宏任务，避免 FSM 递归切换）
+        setTimeout(() => this.changeState(fsm, SelectActionState), 0);
     }
 }

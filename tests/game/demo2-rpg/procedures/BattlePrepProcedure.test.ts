@@ -350,9 +350,12 @@ describe('BattlePrepProcedure', () => {
 
     describe('切换到 BattleProcedure', () => {
         it('应在准备完成后切换流程', () => {
+            jest.useFakeTimers();
             procedure.onEnter(fsm);
+            jest.runAllTimers();
 
             expect(fsm.changeState).toHaveBeenCalledTimes(1);
+            jest.useRealTimers();
         });
     });
 

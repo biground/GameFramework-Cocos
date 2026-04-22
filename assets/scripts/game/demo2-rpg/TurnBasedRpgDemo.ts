@@ -19,10 +19,6 @@ import { UIManager } from '@framework/ui/UIManager';
 import { EntityManager } from '@framework/entity/EntityManager';
 import { ReferencePool } from '@framework/objectpool/ReferencePool';
 import { RpgGameData } from '@game/demo2-rpg/data/RpgGameData';
-import { CharacterConfigRow } from '@game/demo2-rpg/data/CharacterConfigRow';
-import { MonsterConfigRow } from '@game/demo2-rpg/data/MonsterConfigRow';
-import { SkillConfigRow } from '@game/demo2-rpg/data/SkillConfigRow';
-import { StageConfigRow } from '@game/demo2-rpg/data/StageConfigRow';
 import { BattleSystem } from '@game/demo2-rpg/systems/BattleSystem';
 import { BuffSystem } from '@game/demo2-rpg/systems/BuffSystem';
 import { DamageCalculator } from '@game/demo2-rpg/systems/DamageCalculator';
@@ -119,20 +115,11 @@ export class TurnBasedRpgDemo extends DemoBase {
     /**
      * 实现 DemoBase.setupDataTables
      *
-     * 注册 4 张配置表：character_config, monster_config, skill_config, stage_config。
+     * DataTable 的实际注册在 PreloadProcedure 中完成（带真实配置数据），
+     * 此处不重复创建，避免 "数据表已存在" 错误。
      */
     setupDataTables(): void {
-        const dtMgr = this.getModule<DataTableManager>('DataTableManager');
-
-        dtMgr.createTableFromRawData<CharacterConfigRow>('character_config', []);
-        dtMgr.createTableFromRawData<MonsterConfigRow>('monster_config', []);
-        dtMgr.createTableFromRawData<SkillConfigRow>('skill_config', []);
-        dtMgr.createTableFromRawData<StageConfigRow>('stage_config', []);
-
-        Logger.info(
-            TAG,
-            '数据表注册完成: character_config, monster_config, skill_config, stage_config',
-        );
+        Logger.info(TAG, 'DataTable 将在 PreloadProcedure 中注册');
     }
 
     /**
