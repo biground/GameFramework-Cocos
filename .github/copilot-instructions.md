@@ -1,4 +1,4 @@
-# GameForge Cinder
+# Forge Blaze Ignite
 
 引擎无关的模块化 TypeScript 游戏框架，灵感源自 Unity GameFramework，通过 IoC/DI 实现引擎解耦。
 兼作 8 周主程培训项目（详见 `training/progress.md`）。
@@ -18,11 +18,11 @@ npm run format        # Prettier 格式化
 
 三层分离，详见 [docs/architecture.md](docs/architecture.md)：
 
-| 层 | 路径 | 职责 | 约束 |
-|---|---|---|---|
+| 层        | 路径                        | 职责         | 约束                          |
+| --------- | --------------------------- | ------------ | ----------------------------- |
 | Framework | `assets/scripts/framework/` | 纯 TS 框架层 | **禁止** `import` cc 命名空间 |
-| Runtime | `assets/scripts/runtime/` | 桥接引擎 API | 唯一允许依赖 cc 的层 |
-| Game | `assets/scripts/game/` | Demo 业务层 | 依赖接口，不依赖实现 |
+| Runtime   | `assets/scripts/runtime/`   | 桥接引擎 API | 唯一允许依赖 cc 的层          |
+| Game      | `assets/scripts/game/`      | Demo 业务层  | 依赖接口，不依赖实现          |
 
 ### 硬性规则
 
@@ -31,7 +31,7 @@ npm run format        # Prettier 格式化
 - 频繁创建销毁的对象 **必须** 走 `ObjectPool`
 - 每个模块先在 `framework/interfaces/` 定义接口，业务层依赖接口
 - `GameModule.register()` 支持 `allowReplace`，第三方插件可替换默认实现
-- 插件命名：`gfc-{plugin-name}`，peerDependency 指向 `@gfc/core`
+- 插件命名：`fbi-{plugin-name}`，peerDependency 指向 `@fbi/core`
 - Priority 分配：0-99 基础设施 / 100-199 核心服务 / 200-299 业务模块（详见 [docs/module-registry.md](docs/module-registry.md)）
 
 ### 生命周期
@@ -59,6 +59,7 @@ npm run format        # Prettier 格式化
 ## Documentation Protocol
 
 新建模块时**必须同步**：
+
 1. 创建模块目录下的 `README.md`（模板：[docs/module-readme-template.md](docs/module-readme-template.md)）
 2. 更新 [docs/module-registry.md](docs/module-registry.md) 的状态和 API
 3. 代码必须通过 [docs/consistency-guide.md](docs/consistency-guide.md) 三维度检查
@@ -66,6 +67,7 @@ npm run format        # Prettier 格式化
 ## Session Continuity
 
 本项目跨 session 开发。当用户说"继续培训"或开始新任务时，**必须先读取**：
+
 - `training/progress.md` — 当前进度和会话断点
 - `docs/module-registry.md` — 模块依赖关系
 - 当前模块的 `README.md`（如存在）
@@ -74,10 +76,10 @@ npm run format        # Prettier 格式化
 
 ## Key Docs
 
-| 文档 | 用途 |
-|------|------|
-| [docs/architecture.md](docs/architecture.md) | 分层架构、模块清单、插件化设计 |
-| [docs/module-registry.md](docs/module-registry.md) | 模块依赖图、priority 分配、API 摘要 |
-| [docs/consistency-guide.md](docs/consistency-guide.md) | 跨 session 一致性三维度检查 |
-| [docs/code-review-checklist.md](docs/code-review-checklist.md) | PR 自查清单 |
-| [training/progress.md](training/progress.md) | 培训进度、能力追踪、会话断点 |
+| 文档                                                           | 用途                                |
+| -------------------------------------------------------------- | ----------------------------------- |
+| [docs/architecture.md](docs/architecture.md)                   | 分层架构、模块清单、插件化设计      |
+| [docs/module-registry.md](docs/module-registry.md)             | 模块依赖图、priority 分配、API 摘要 |
+| [docs/consistency-guide.md](docs/consistency-guide.md)         | 跨 session 一致性三维度检查         |
+| [docs/code-review-checklist.md](docs/code-review-checklist.md) | PR 自查清单                         |
+| [training/progress.md](training/progress.md)                   | 培训进度、能力追踪、会话断点        |

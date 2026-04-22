@@ -1,38 +1,38 @@
-# GitHub Actions CI — GameForge Cinder
+# GitHub Actions CI — Forge Blaze Ignite
 # 对标 Jenkinsfile 的同等流程：lint → typecheck → test
 # 轻量版，主要用于 GitHub PR 状态检查
 
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
 
 jobs:
-  ci:
-    name: Lint · Typecheck · Test
-    runs-on: ubuntu-latest
+    ci:
+        name: Lint · Typecheck · Test
+        runs-on: ubuntu-latest
 
-    steps:
-      # 1. 拉代码
-      - uses: actions/checkout@v4
+        steps:
+            # 1. 拉代码
+            - uses: actions/checkout@v4
 
-      # 2. 安装 Node（内置 npm 缓存）
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'          # 等价于 Jenkins 的 NPM_CACHE_DIR 方案
+            # 2. 安装 Node（内置 npm 缓存）
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: 'npm' # 等价于 Jenkins 的 NPM_CACHE_DIR 方案
 
-      # 3. 安装依赖（等价于 Jenkinsfile 的 npm ci）
-      - run: npm ci
+            # 3. 安装依赖（等价于 Jenkinsfile 的 npm ci）
+            - run: npm ci
 
-      # 4. Lint
-      - run: npm run lint
+            # 4. Lint
+            - run: npm run lint
 
-      # 5. TypeScript 类型检查
-      - run: npx tsc --noEmit
+            # 5. TypeScript 类型检查
+            - run: npx tsc --noEmit
 
-      # 6. 单元测试
-      - run: npm test -- --ci --runInBand
+            # 6. 单元测试
+            - run: npm test -- --ci --runInBand

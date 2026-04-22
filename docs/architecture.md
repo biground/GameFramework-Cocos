@@ -1,4 +1,4 @@
-# 🏗️ GameForge Cinder 架构设计文档
+# 🏗️ Forge Blaze Ignite 架构设计文档
 
 > 本文档随框架开发持续更新
 
@@ -67,10 +67,10 @@
 ### 包结构规划
 
 ```
-@gfc/core              ← 基础框架（接口层 + 默认实现）
-gfc-fast-pool          ← 高级对象池（Int32Array 侵入式空闲链表）
-gfc-ecs                ← ECS 实体组件系统
-gfc-behavior-tree      ← 行为树
+@fbi/core              ← 基础框架（接口层 + 默认实现）
+fbi-fast-pool          ← 高级对象池（Int32Array 侵入式空闲链表）
+fbi-ecs                ← ECS 实体组件系统
+fbi-behavior-tree      ← 行为树
 ```
 
 ### 分层对应
@@ -83,7 +83,7 @@ framework/
 └── event/              ← 默认事件实现（implements IEventManager）
 
 npm 插件包：
-gfc-fast-pool/
+fbi-fast-pool/
 ├── src/FastPool.ts     ← implements IObjectPoolManager
 └── src/index.ts        ← 导出 IPlugin 实现
 ```

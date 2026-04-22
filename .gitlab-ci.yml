@@ -1,5 +1,5 @@
 # =============================================================================
-# GameForge Cinder GitLab CI/CD 配置
+# Forge Blaze Ignite GitLab CI/CD 配置
 # =============================================================================
 # 触发条件：push 到任意分支、Merge Request
 # 流水线结构：check（lint + test 并行）→ report
@@ -10,116 +10,116 @@ image: node:22-alpine
 
 # 全局缓存：按分支缓存 node_modules，加速后续构建
 cache:
-  key:
-    files:
-      - package-lock.json  # lock 文件变化时自动刷新缓存
-  paths:
-    - node_modules/
-  policy: pull-push
+    key:
+        files:
+            - package-lock.json # lock 文件变化时自动刷新缓存
+    paths:
+        - node_modules/
+    policy: pull-push
 
 # =============================================================================
 # 阶段定义（串行执行，同阶段内 Job 并行）
 # =============================================================================
 stages:
-  - install
-  - check
-  - report
+    - install
+    - check
+    - report
 
 # =============================================================================
 # 全局变量
 # =============================================================================
 variables:
-  # 强制 CI 环境（部分工具会根据此变量调整行为）
-  CI: "true"
-  # npm 使用国内镜像（如果 Runner 在国内可减少安装耗时）
-  # NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
+    # 强制 CI 环境（部分工具会根据此变量调整行为）
+    CI: 'true'
+    # npm 使用国内镜像（如果 Runner 在国内可减少安装耗时）
+    # NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
 
 # =============================================================================
 # Job: 安装依赖
 # =============================================================================
 install_deps:
-  stage: install
-  script:
-    - npm ci --prefer-offline
-  # 仅当 lock 文件变化时才重新安装（覆盖全局缓存策略）
-  cache:
-    key:
-      files:
-        - package-lock.json
-    paths:
-      - node_modules/
-    policy: pull-push
+    stage: install
+    script:
+        - npm ci --prefer-offline
+    # 仅当 lock 文件变化时才重新安装（覆盖全局缓存策略）
+    cache:
+        key:
+            files:
+                - package-lock.json
+        paths:
+            - node_modules/
+        policy: pull-push
 
 # =============================================================================
 # Job: ESLint 检查
 # =============================================================================
 lint:
-  stage: check
-  needs: ["install_deps"]  # DAG 依赖：install 完成即可开始，不等其他 install stage job
-  script:
-    - npm run lint
-  # 失效时允许继续（不阻塞 test），但标记为 warning
-  allow_failure: false
-  cache:
-    key:
-      files:
-        - package-lock.json
-    paths:
-      - node_modules/
-    policy: pull
+    stage: check
+    needs: ['install_deps'] # DAG 依赖：install 完成即可开始，不等其他 install stage job
+    script:
+        - npm run lint
+    # 失效时允许继续（不阻塞 test），但标记为 warning
+    allow_failure: false
+    cache:
+        key:
+            files:
+                - package-lock.json
+        paths:
+            - node_modules/
+        policy: pull
 
 # =============================================================================
 # Job: Jest 单元测试
 # =============================================================================
 test:
-  stage: check
-  needs: ["install_deps"]
-  script:
-    - npm test -- --ci --coverage --reporters=default --reporters=jest-junit
-  # 收集测试报告（GitLab 原生支持，MR 页面直接显示测试结果）
-  artifacts:
-    when: always
-    paths:
-      - coverage/
-      - junit.xml
-    reports:
-      junit: junit.xml
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage/cobertura-coverage.xml
-    expire_in: 7 days
-  # 从测试输出中提取覆盖率（显示在 MR badge 上）
-  coverage: '/All files\s*\|\s*(\d+\.?\d*)\s*\|/'
-  cache:
-    key:
-      files:
-        - package-lock.json
-    paths:
-      - node_modules/
-    policy: pull
+    stage: check
+    needs: ['install_deps']
+    script:
+        - npm test -- --ci --coverage --reporters=default --reporters=jest-junit
+    # 收集测试报告（GitLab 原生支持，MR 页面直接显示测试结果）
+    artifacts:
+        when: always
+        paths:
+            - coverage/
+            - junit.xml
+        reports:
+            junit: junit.xml
+            coverage_report:
+                coverage_format: cobertura
+                path: coverage/cobertura-coverage.xml
+        expire_in: 7 days
+    # 从测试输出中提取覆盖率（显示在 MR badge 上）
+    coverage: '/All files\s*\|\s*(\d+\.?\d*)\s*\|/'
+    cache:
+        key:
+            files:
+                - package-lock.json
+        paths:
+            - node_modules/
+        policy: pull
 
 # =============================================================================
 # Job: 测试结果汇总（可选，用于 MR 合入门禁）
 # =============================================================================
 quality_gate:
-  stage: report
-  needs: ["lint", "test"]
-  script:
-    - echo "✅ lint 通过，test 通过 — 代码质量门禁 OK"
-  rules:
-    # 仅在 MR pipeline 中运行
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    # 推送到 main/develop 也运行
-    - if: $CI_COMMIT_BRANCH =~ /^(main|develop)$/
+    stage: report
+    needs: ['lint', 'test']
+    script:
+        - echo "✅ lint 通过，test 通过 — 代码质量门禁 OK"
+    rules:
+        # 仅在 MR pipeline 中运行
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+        # 推送到 main/develop 也运行
+        - if: $CI_COMMIT_BRANCH =~ /^(main|develop)$/
 
 # =============================================================================
 # 触发规则（全局）
 # =============================================================================
 workflow:
-  rules:
-    # MR 触发
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    # 推送到任意分支触发（但排除 MR 已触发的重复 pipeline）
-    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
-      when: never
-    - if: $CI_COMMIT_BRANCH
+    rules:
+        # MR 触发
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+        # 推送到任意分支触发（但排除 MR 已触发的重复 pipeline）
+        - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+          when: never
+        - if: $CI_COMMIT_BRANCH

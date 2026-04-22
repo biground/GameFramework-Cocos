@@ -9,7 +9,7 @@
 ## 任务 1：ECS 架构设计探索（1.5h）
 
 ### 目标
-对比 EC（Entity-Component）和 ECS（Entity-Component-System）两种架构，为 gfc-ecs 插件设计方案定稿。
+对比 EC（Entity-Component）和 ECS（Entity-Component-System）两种架构，为 fbi-ecs 插件设计方案定稿。
 
 ### 具体内容
 1. 阅读 `packages/gfc-ecs/` 现有代码和 README

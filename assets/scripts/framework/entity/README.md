@@ -40,14 +40,14 @@ interface ShowEntityCallbacks { onSuccess?; onFailure?; }
 
 ## 设计决策
 
-| 决策 | 选择 | 原因 |
-|------|------|------|
-| 分组管理 | `Map<groupName, EntityGroup>` | 同类实体共享对象池，按组批量操作 |
-| 工厂策略 | `IEntityFactory` 接口注入 | Framework 层不依赖引擎 API，Runtime 层提供 Cocos 实现 |
-| ID 分配 | 管理器自增 `_nextEntityId` | 全局唯一、简单高效，无需外部协调 |
-| 对象池复用 | EntityGroup 内部 `_waitingList` | 优先从等待池取出复用，减少实例创建和 GC |
-| 快照遍历 | `update` 中 `slice()` 活跃列表 | 防止 onUpdate 中 show/hide 修改列表导致遍历异常 |
-| Priority | 180 | 在 UIManager（200）之前更新，确保 UI 读到当帧最新实体状态 |
+| 决策       | 选择                            | 原因                                                      |
+| ---------- | ------------------------------- | --------------------------------------------------------- |
+| 分组管理   | `Map<groupName, EntityGroup>`   | 同类实体共享对象池，按组批量操作                          |
+| 工厂策略   | `IEntityFactory` 接口注入       | Framework 层不依赖引擎 API，Runtime 层提供 Cocos 实现     |
+| ID 分配    | 管理器自增 `_nextEntityId`      | 全局唯一、简单高效，无需外部协调                          |
+| 对象池复用 | EntityGroup 内部 `_waitingList` | 优先从等待池取出复用，减少实例创建和 GC                   |
+| 快照遍历   | `update` 中 `slice()` 活跃列表  | 防止 onUpdate 中 show/hide 修改列表导致遍历异常           |
+| Priority   | 180                             | 在 UIManager（200）之前更新，确保 UI 读到当帧最新实体状态 |
 
 ## 依赖
 

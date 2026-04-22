@@ -25,8 +25,8 @@
 | AudioManager（音频管理器）                  | ✅ 已完成 | 2026-04-13 | 88          | Week 4 Day 2；音量乘法链 + IAudioPlayer 策略注入，27 个测试                                                                                                               |
 | SceneManager（场景管理器）                  | ✅ 已完成 | 2026-04-14 | 90          | Week 4 Day 3；三层加载去重 + ISceneLoader 策略注入，15 个测试，Phase 2 最后模块                                                                                           |
 | TimerManager（定时器管理器）                | ✅ 已完成 | 2026-04-16 | 88          | Week 4 Day 8；mark-delete 遍历安全 + 溢出精度保留 + timeScale + tag 批量操作 + initialDelay，35 个测试                                                                    |
-| gfc-timer-heap（最小堆定时器插件）      | ✅ 已完成 | 2026-04-16 | -           | MinHeap + HeapTimerManager，绝对到期时间 expireTime，无触发帧 O(1)，47 个测试                                                                                                           |
-| gfc-timer-wheel（时间轮定时器插件）    | ✅ 已完成 | 2026-04-16 | -           | WheelTimerManager，slot 数组 + tick 前进 + 整数 tick 计数 + epsilon 浮点修正 + 多圈 remainingRounds，39 个测试                                                                           |
+| fbi-timer-heap（最小堆定时器插件）      | ✅ 已完成 | 2026-04-16 | -           | MinHeap + HeapTimerManager，绝对到期时间 expireTime，无触发帧 O(1)，47 个测试                                                                                                           |
+| fbi-timer-wheel（时间轮定时器插件）    | ✅ 已完成 | 2026-04-16 | -           | WheelTimerManager，slot 数组 + tick 前进 + 整数 tick 计数 + epsilon 浮点修正 + 多圈 remainingRounds，39 个测试                                                                           |
 | DataTable（数据表）                         | ✅ 已完成 | 2026-04-17 | -           | Week 5 Day 1（补录）；泛型容器 + 双存储模式 + indexMap O(1) + IDataTableParser 策略注入                                                                                  |
 | LocalizationManager（多语言管理器）         | ✅ 已完成 | 2026-04-18 | -           | Week 5 Day 1（补录）；多语言管理 + ILocalizationLoader 策略注入                                                                                                          |
 | Logger（日志管理器）                        | ✅ 已完成 | 2026-04-15 | 93          | Week 4 Day 4-5；基础 19 测 + 增强 48 测（ILogOutput/Tag 过滤/时间戳/堆栈/Ring Buffer/颜色/time-timeEnd/GFC_DEBUG 裁剪）；全框架 Logger 集成（~96 调试日志 + 46 错误日志） |
@@ -60,7 +60,7 @@
 - [x] ✅ 发布-订阅模式：EventManager 实现完成，理解 emit 遍历安全
 - [x] ✅ EventKey<T> 类型安全事件系统：掌握条件 rest params + phantom type
 - [x] ✅ 对象池模式：ObjectPool<T> 栈模式 + ReferencePool 多类型管理
-- [x] ✅ 插件化架构思维：提出 gfc-fast-pool 热拔插方案
+- [x] ✅ 插件化架构思维：提出 fbi-fast-pool 热拔插方案
 - [x] ✅ DI/IoC 模式：Container + ServiceKey<T> phantom type + 装饰器元数据 + 循环依赖检测
 - [x] ✅ TypeScript 装饰器：ClassDecorator / ParameterDecorator / Reflect.defineMetadata / getOwnMetadata
 - [x] ✅ 类型体操：never[] vs unknown[] 逆变规则，构造函数类型约束

@@ -5,7 +5,7 @@ import { IPoolable, Constructor, PoolStats } from '../objectpool/PoolDefs';
  * 定义对象池系统的公共契约，业务层应依赖此接口而非 ReferencePool 实现类
  *
  * 任何实现此接口的模块都可以通过插件机制替换默认的 ReferencePool
- * 例如：gfc-fast-pool 可以提供基于 Int32Array 侵入式空闲链表的高性能实现
+ * 例如：fbi-fast-pool 可以提供基于 Int32Array 侵入式空闲链表的高性能实现
  */
 export interface IObjectPoolManager {
     /**

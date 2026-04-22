@@ -25,8 +25,8 @@ applyTo: 'training/**'
 
 ```
 /Volumes/Extreme SSD/BigroundObsidianVault/开发相关/
-├── GameForge Cinder 框架总览：为什么我们需要一个游戏框架.md  ← 索引页
-└── GameForge Cinder/
+├── Forge Blaze Ignite 框架总览：为什么我们需要一个游戏框架.md  ← 索引页
+└── Forge Blaze Ignite/
     ├── 01-Core 模块：游戏框架的心脏.md
     ├── 02-Event 模块：解耦的艺术.md
     ├── 03-ObjectPool 模块：驯服 GC 的艺术.md

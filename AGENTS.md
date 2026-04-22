@@ -1,4 +1,4 @@
-# GameForge Cinder — Agent Rules
+# Forge Blaze Ignite — Agent Rules
 
 > 本文件是 OpenCode AI agent 的仓库级规则。所有 AI 会话自动加载此文件。
 > 优先级：用户指令 > 本文件 > 默认系统提示。
@@ -27,11 +27,11 @@ npm run format        # Prettier 格式化
 
 三层分离，详见 [docs/architecture.md](docs/architecture.md)：
 
-| 层 | 路径 | 职责 | 约束 |
-|---|---|---|---|
+| 层        | 路径                        | 职责         | 约束                          |
+| --------- | --------------------------- | ------------ | ----------------------------- |
 | Framework | `assets/scripts/framework/` | 纯 TS 框架层 | **禁止** `import` cc 命名空间 |
-| Runtime | `assets/scripts/runtime/` | 桥接引擎 API | 唯一允许依赖 cc 的层 |
-| Game | `assets/scripts/game/` | Demo 业务层 | 依赖接口，不依赖实现 |
+| Runtime   | `assets/scripts/runtime/`   | 桥接引擎 API | 唯一允许依赖 cc 的层          |
+| Game      | `assets/scripts/game/`      | Demo 业务层  | 依赖接口，不依赖实现          |
 
 ### 硬性规则
 
@@ -40,7 +40,7 @@ npm run format        # Prettier 格式化
 3. 频繁创建销毁的对象 **必须** 走 `ObjectPool`
 4. 每个模块先在 `framework/interfaces/` 定义接口，业务层依赖接口
 5. `GameModule.register()` 支持 `allowReplace`，第三方插件可替换默认实现
-6. 插件命名：`gfc-{plugin-name}`，peerDependency 指向 `@gfc/core`
+6. 插件命名：`fbi-{plugin-name}`，peerDependency 指向 `@fbi/core`
 7. Priority 分配：0-99 基础设施 / 100-199 核心服务 / 200-299 业务模块（详见 [docs/module-registry.md](docs/module-registry.md)）
 
 ### 生命周期
@@ -59,10 +59,10 @@ npm run format        # Prettier 格式化
 - 所有 public API 必须有 **中文 JSDoc**
 - **禁止** `any` 类型
 - **必须** 用 `Logger` 代替 `console.log` / `console.warn` / `console.error` / `console.info` / `console.debug`
-  - Logger 已实现，位于 `assets/scripts/framework/debug/Logger.ts`
-  - 用法：`Logger.debug('Tag', '消息', ...args)` / `Logger.info('Tag', ...)` / `Logger.warn('Tag', ...)` / `Logger.error('Tag', ...)`
-  - Tag 使用模块名，如 `'ResourceManager'`、`'UIManager'`
-  - 框架层已有 Logger，**任何模块代码中不得出现 console 调用**
+    - Logger 已实现，位于 `assets/scripts/framework/debug/Logger.ts`
+    - 用法：`Logger.debug('Tag', '消息', ...args)` / `Logger.info('Tag', ...)` / `Logger.warn('Tag', ...)` / `Logger.error('Tag', ...)`
+    - Tag 使用模块名，如 `'ResourceManager'`、`'UIManager'`
+    - 框架层已有 Logger，**任何模块代码中不得出现 console 调用**
 - 优先组合而非继承
 - 泛型用于类型安全收益明确的场景
 - Commit 遵循 Conventional Commits（commitlint 已配置）
@@ -81,27 +81,27 @@ npm run format        # Prettier 格式化
 
 > 编写代码前必须先读 [docs/module-registry.md](docs/module-registry.md) 了解全局依赖关系。
 
-| 模块 | 状态 | 关键文件 |
-|------|------|----------|
-| Core | ✅ | `framework/core/GameEntry.ts`, `GameModule.ts`, `ModuleBase.ts` |
-| Event | ✅ | `framework/event/EventManager.ts`, `EventDefs.ts` |
-| ObjectPool | ✅ | `framework/objectpool/ObjectPool.ts` |
-| DI/IoC | ✅ | `framework/di/Container.ts`, 装饰器 |
-| FSM | ✅ | `framework/fsm/FsmManager.ts`, `Fsm.ts`, `FsmState.ts` |
-| Procedure | ✅ | `framework/procedure/ProcedureManager.ts`, `ProcedureBase.ts` |
-| Resource | ✅ | `framework/resource/ResourceManager.ts` |
-| UI | ✅ | `framework/ui/UIManager.ts`, `UIFormBase.ts` |
-| Network | ✅ | `framework/network/NetworkManager.ts`, `NetworkChannel.ts` |
-| Audio | ✅ | `framework/audio/AudioManager.ts` |
-| Scene | ✅ | `framework/scene/SceneManager.ts` |
-| Timer | ✅ | `framework/timer/TimerManager.ts` |
-| DataTable | ✅ | `framework/datatable/DataTableManager.ts` |
-| i18n | ✅ | `framework/i18n/LocalizationManager.ts`, `LocalizationDefs.ts` |
-| Logger | ✅ | `framework/debug/Logger.ts`, `LoggerDefs.ts` |
-| Entity | ⬜ | 待开发 |
-| Data | ⬜ | 待开发 |
-| HotUpdate | ✅ | `framework/hotupdate/HotUpdateManager.ts`, `HotUpdateDefs.ts`, `interfaces/IHotUpdateManager.ts` |
-| DebugPanel | ✅ | `framework/debug/DebugManager.ts`, `DebugDefs.ts`, `datasources/ModuleDataSource.ts`, `datasources/EventDataSource.ts` |
+| 模块       | 状态 | 关键文件                                                                                                               |
+| ---------- | ---- | ---------------------------------------------------------------------------------------------------------------------- |
+| Core       | ✅   | `framework/core/GameEntry.ts`, `GameModule.ts`, `ModuleBase.ts`                                                        |
+| Event      | ✅   | `framework/event/EventManager.ts`, `EventDefs.ts`                                                                      |
+| ObjectPool | ✅   | `framework/objectpool/ObjectPool.ts`                                                                                   |
+| DI/IoC     | ✅   | `framework/di/Container.ts`, 装饰器                                                                                    |
+| FSM        | ✅   | `framework/fsm/FsmManager.ts`, `Fsm.ts`, `FsmState.ts`                                                                 |
+| Procedure  | ✅   | `framework/procedure/ProcedureManager.ts`, `ProcedureBase.ts`                                                          |
+| Resource   | ✅   | `framework/resource/ResourceManager.ts`                                                                                |
+| UI         | ✅   | `framework/ui/UIManager.ts`, `UIFormBase.ts`                                                                           |
+| Network    | ✅   | `framework/network/NetworkManager.ts`, `NetworkChannel.ts`                                                             |
+| Audio      | ✅   | `framework/audio/AudioManager.ts`                                                                                      |
+| Scene      | ✅   | `framework/scene/SceneManager.ts`                                                                                      |
+| Timer      | ✅   | `framework/timer/TimerManager.ts`                                                                                      |
+| DataTable  | ✅   | `framework/datatable/DataTableManager.ts`                                                                              |
+| i18n       | ✅   | `framework/i18n/LocalizationManager.ts`, `LocalizationDefs.ts`                                                         |
+| Logger     | ✅   | `framework/debug/Logger.ts`, `LoggerDefs.ts`                                                                           |
+| Entity     | ⬜   | 待开发                                                                                                                 |
+| Data       | ⬜   | 待开发                                                                                                                 |
+| HotUpdate  | ✅   | `framework/hotupdate/HotUpdateManager.ts`, `HotUpdateDefs.ts`, `interfaces/IHotUpdateManager.ts`                       |
+| DebugPanel | ✅   | `framework/debug/DebugManager.ts`, `DebugDefs.ts`, `datasources/ModuleDataSource.ts`, `datasources/EventDataSource.ts` |
 
 ---
 
@@ -119,13 +119,13 @@ npm run format        # Prettier 格式化
 
 ### 代码审查标准（满分 100）
 
-| 维度 | 权重 |
-|------|------|
-| 正确性 | 30% |
-| 架构 | 25% |
-| 类型安全 | 20% |
-| 性能 | 15% |
-| 代码风格 | 10% |
+| 维度     | 权重 |
+| -------- | ---- |
+| 正确性   | 30%  |
+| 架构     | 25%  |
+| 类型安全 | 20%  |
+| 性能     | 15%  |
+| 代码风格 | 10%  |
 
 ---
 
@@ -172,6 +172,7 @@ npm run format        # Prettier 格式化
 ## Session 连续性
 
 本项目跨 session 开发。当用户说"继续培训"或开始新任务时，**必须先读**：
+
 - `training/progress.md` — 当前进度和会话断点
 - `docs/module-registry.md` — 模块依赖关系
 - 当前模块的 `README.md`（如存在）
