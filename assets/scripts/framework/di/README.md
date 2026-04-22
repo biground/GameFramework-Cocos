@@ -43,14 +43,14 @@ BindingBuilder<T>.onDispose(dispose: () => void): this     // 设置释放回调
 
 ## 设计决策
 
-| 决策 | 选择 | 原因 |
-|------|------|------|
-| 类型安全 | `ServiceKey<T>` 幻影类型 | 编译期保证 bind/resolve 类型一致，无需运行时转换 |
-| 生命周期 | Singleton + Transient | 覆盖绝大多数游戏场景，不引入复杂的 Scoped 作用域 |
-| 循环依赖检测 | `_resolutionStack` 栈检测 | 在 resolve 递归时检测环，提供清晰的依赖链错误信息 |
-| 层级容器 | 子容器向父容器查找 | 支持测试替换和模块隔离，子容器可覆盖父容器绑定 |
-| 装饰器注入 | reflect-metadata + `@Inject` | 减少手动接线代码，构造函数参数自动解析依赖 |
-| 链式 API | BindingBuilder 模式 | `.bind(key).to(Impl).inSingletonScope()` 可读性好 |
+| 决策         | 选择                         | 原因                                              |
+| ------------ | ---------------------------- | ------------------------------------------------- |
+| 类型安全     | `ServiceKey<T>` 幻影类型     | 编译期保证 bind/resolve 类型一致，无需运行时转换  |
+| 生命周期     | Singleton + Transient        | 覆盖绝大多数游戏场景，不引入复杂的 Scoped 作用域  |
+| 循环依赖检测 | `_resolutionStack` 栈检测    | 在 resolve 递归时检测环，提供清晰的依赖链错误信息 |
+| 层级容器     | 子容器向父容器查找           | 支持测试替换和模块隔离，子容器可覆盖父容器绑定    |
+| 装饰器注入   | reflect-metadata + `@Inject` | 减少手动接线代码，构造函数参数自动解析依赖        |
+| 链式 API     | BindingBuilder 模式          | `.bind(key).to(Impl).inSingletonScope()` 可读性好 |
 
 ## 依赖
 

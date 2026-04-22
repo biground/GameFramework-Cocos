@@ -15,6 +15,7 @@
 确保每个模块都遵循相同的架构模式。
 
 **检查点**：
+
 - [ ] 模块是否继承了 `ModuleBase`？
 - [ ] 模块是否通过 `GameModule` 注册？
 - [ ] framework/ 层是否引用了 `cc` 命名空间？（必须为否）
@@ -26,6 +27,7 @@
 确保所有代码遵循统一的编码规范。
 
 **检查点**：
+
 - [ ] 命名规范：PascalCase(类) / camelCase(方法)
 - [ ] 所有 public API 有中文 JSDoc 注释
 - [ ] 无 `any` 类型
@@ -37,11 +39,13 @@
 确保各模块的 API 设计遵循统一的范式。
 
 **统一的模块生命周期**：
+
 ```typescript
 onInit() → onUpdate(dt) → onShutdown()
 ```
 
 **统一的资源获取模式**：
+
 ```typescript
 // ✅ 正确：通过 GameEntry 获取模块
 const uiMgr = GameEntry.getModule<UIManager>('UIManager');
@@ -52,6 +56,7 @@ UIManager.getInstance().openUI(...);
 ```
 
 **统一的错误处理模式**：
+
 ```typescript
 // ✅ 正确：描述性错误消息
 throw new Error(`[UIManager] 找不到 UI 面板：${formName}，请检查是否已注册`);
@@ -65,8 +70,9 @@ throw new Error('not found');
 当在新的 Copilot Chat session 中开始工作时，按以下流程对齐上下文：
 
 ### 第一步：告知 Agent 读取上下文
+
 ```
-我是用户，继续 GameForge Cinder 的开发。
+我是用户，继续 Forge Blaze Ignite 的开发。
 请先读取以下文件：
 1. .github/copilot-instructions.md
 2. docs/module-registry.md
@@ -75,12 +81,15 @@ throw new Error('not found');
 ```
 
 ### 第二步：开发过程中的一致性检查
+
 每完成一个功能点，自查：
+
 - 是否符合 `docs/consistency-guide.md` 的三个检查维度？
 - 是否需要更新 `docs/module-registry.md`？
 - 是否需要更新模块的 `README.md`？
 
 ### 第三步：Session 结束时的收尾
+
 ```
 今天的开发结束了，请帮我：
 1. 更新 training/progress.md 的"上次会话断点"
@@ -105,6 +114,6 @@ throw new Error('not found');
 
 记录发现的一致性违规问题和修复方案：
 
-| 日期 | 违规描述 | 所在文件 | 修复状态 |
-|------|---------|---------|---------|
-| （待记录） | | | |
+| 日期       | 违规描述 | 所在文件 | 修复状态 |
+| ---------- | -------- | -------- | -------- |
+| （待记录） |          |          |          |

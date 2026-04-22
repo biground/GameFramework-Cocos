@@ -37,7 +37,7 @@ applyTo: 'training/**'
 
 ### 3. 框架适配：为什么是这种设计？
 
-- 解释模块在 GameForge Cinder 三层架构中的位置
+- 解释模块在 Forge Blaze Ignite 三层架构中的位置
 - 和已完成模块的依赖关系（查 `docs/module-registry.md`）
 - 按需对比业界方案（Unity GameFramework / Cocos 原生 / 其他有启发的框架），指出我们的选择和取舍
 - 讨论 priority 分配的理由

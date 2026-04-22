@@ -1,330 +1,330 @@
 plan_id: wechat-websocket-research
-objective: "调研 GameForge Cinder 网络模块多通道架构 & 微信小游戏 WebSocket 限制，评估可行性"
+objective: '调研 Forge Blaze Ignite 网络模块多通道架构 & 微信小游戏 WebSocket 限制，评估可行性'
 focus_area: network-module-and-wechat-websocket
-created_at: "2026-04-13"
+created_at: '2026-04-13'
 created_by: gem-researcher
 status: completed
 
 tldr: |
-  - 网络模块采用 Map<name, NetworkChannel> 多通道设计，每条通道独立拥有 Socket + 协议处理器 + 心跳 + 重连
-  - 微信小游戏（基础库 ≥1.7.0）最多支持 5 条并发 WebSocket 连接，使用 SocketTask 管理
-  - 多通道设计在微信小游戏上完全可行（5 条上限足够游戏服/聊天服/推送服场景），需注意 wss 域名预配置、INetworkSocket 适配 wx.connectSocket API
-  - 关键适配点：Runtime 层实现 WxSocketAdapter（适配 SocketTask 回调模型），无需修改 Framework 层代码
+    - 网络模块采用 Map<name, NetworkChannel> 多通道设计，每条通道独立拥有 Socket + 协议处理器 + 心跳 + 重连
+    - 微信小游戏（基础库 ≥1.7.0）最多支持 5 条并发 WebSocket 连接，使用 SocketTask 管理
+    - 多通道设计在微信小游戏上完全可行（5 条上限足够游戏服/聊天服/推送服场景），需注意 wss 域名预配置、INetworkSocket 适配 wx.connectSocket API
+    - 关键适配点：Runtime 层实现 WxSocketAdapter（适配 SocketTask 回调模型），无需修改 Framework 层代码
 
 research_metadata:
-  methodology: "read_file 读取全部网络模块源码 + fetch_webpage 抓取微信官方文档（小程序 & 小游戏两版）"
-  scope: "Framework 层 network/ 目录全部 4 个文件 + 接口定义 + 测试文件 + 微信官方 3 个页面"
-  confidence: high
-  coverage: 100 # network/ 相关文件全部读取
-  decision_blockers: 0
-  research_blockers: 0
+    methodology: 'read_file 读取全部网络模块源码 + fetch_webpage 抓取微信官方文档（小程序 & 小游戏两版）'
+    scope: 'Framework 层 network/ 目录全部 4 个文件 + 接口定义 + 测试文件 + 微信官方 3 个页面'
+    confidence: high
+    coverage: 100 # network/ 相关文件全部读取
+    decision_blockers: 0
+    research_blockers: 0
 
 # ════════════════════════════════════════════════════════
 # Part 1: 网络模块多通道架构
 # ════════════════════════════════════════════════════════
 
 files_analyzed:
-  - file: NetworkDefs.ts
-    path: assets/scripts/framework/network/NetworkDefs.ts
-    purpose: "网络模块的所有类型定义、枚举、策略接口、事件数据结构"
-    key_elements:
-      - element: NetworkState
-        type: enum
-        location: "NetworkDefs.ts:7-16"
-        description: "通道状态枚举：Disconnected(0) / Connecting(1) / Connected(2) / Reconnecting(3)"
-      - element: NetworkPacket
-        type: interface
-        location: "NetworkDefs.ts:23-28"
-        description: "最小通信单元，包含 id(命令号) + data(Uint8Array 二进制体)"
-      - element: NetworkChannelConfig
-        type: interface
-        location: "NetworkDefs.ts:33-48"
-        description: "通道配置：heartbeatInterval / missHeartbeatCountToClose / autoReconnect / maxReconnectAttempts / reconnectBaseDelay"
-      - element: INetworkSocket
-        type: interface
-        location: "NetworkDefs.ts:72-93"
-        description: "传输层策略接口：connect(url) / send(data) / close() + 4 个事件回调。Framework 层定义契约，Runtime 层提供平台实现"
-      - element: IPacketHandler
-        type: interface
-        location: "NetworkDefs.ts:114-119"
-        description: "协议层策略接口：encode(packet→ArrayBuffer) / decode(ArrayBuffer→packet)"
-      - element: IHeartbeatHandler
-        type: interface
-        location: "NetworkDefs.ts:125-130"
-        description: "心跳策略接口（可选）：createHeartbeatPacket() / isHeartbeatResponse(packet)"
-      - element: "NETWORK_* 事件键"
-        type: variable
-        location: "NetworkDefs.ts:170-190"
-        description: "5 个类型安全的 EventKey：CONNECTED / CLOSED / ERROR / MESSAGE / RECONNECTING"
-    language: TypeScript
-    lines: 195
+    - file: NetworkDefs.ts
+      path: assets/scripts/framework/network/NetworkDefs.ts
+      purpose: '网络模块的所有类型定义、枚举、策略接口、事件数据结构'
+      key_elements:
+          - element: NetworkState
+            type: enum
+            location: 'NetworkDefs.ts:7-16'
+            description: '通道状态枚举：Disconnected(0) / Connecting(1) / Connected(2) / Reconnecting(3)'
+          - element: NetworkPacket
+            type: interface
+            location: 'NetworkDefs.ts:23-28'
+            description: '最小通信单元，包含 id(命令号) + data(Uint8Array 二进制体)'
+          - element: NetworkChannelConfig
+            type: interface
+            location: 'NetworkDefs.ts:33-48'
+            description: '通道配置：heartbeatInterval / missHeartbeatCountToClose / autoReconnect / maxReconnectAttempts / reconnectBaseDelay'
+          - element: INetworkSocket
+            type: interface
+            location: 'NetworkDefs.ts:72-93'
+            description: '传输层策略接口：connect(url) / send(data) / close() + 4 个事件回调。Framework 层定义契约，Runtime 层提供平台实现'
+          - element: IPacketHandler
+            type: interface
+            location: 'NetworkDefs.ts:114-119'
+            description: '协议层策略接口：encode(packet→ArrayBuffer) / decode(ArrayBuffer→packet)'
+          - element: IHeartbeatHandler
+            type: interface
+            location: 'NetworkDefs.ts:125-130'
+            description: '心跳策略接口（可选）：createHeartbeatPacket() / isHeartbeatResponse(packet)'
+          - element: 'NETWORK_* 事件键'
+            type: variable
+            location: 'NetworkDefs.ts:170-190'
+            description: '5 个类型安全的 EventKey：CONNECTED / CLOSED / ERROR / MESSAGE / RECONNECTING'
+      language: TypeScript
+      lines: 195
 
-  - file: NetworkChannel.ts
-    path: assets/scripts/framework/network/NetworkChannel.ts
-    purpose: "单条网络通道的完整生命周期管理（连接/收发/心跳/重连）"
-    key_elements:
-      - element: NetworkChannel
-        type: class
-        location: "NetworkChannel.ts:34-370"
-        description: "核心类，封装一条连接。构造时注入 socket + packetHandler + callbacks + config"
-      - element: NetworkChannelCallbacks
-        type: interface
-        location: "NetworkChannel.ts:14-22"
-        description: "通道→管理器的内部回调接口：onConnected / onClosed / onError / onMessage / onReconnecting"
-      - element: connect / send / close
-        type: function
-        location: "NetworkChannel.ts:130-175"
-        description: "核心公共 API。connect 记录 url 用于重连；send 先编码再调 socket.send；close 设 _userClosed 标记"
-      - element: update(deltaTime)
-        type: function
-        location: "NetworkChannel.ts:195-202"
-        description: "帧驱动：Connected 状态下驱动心跳，Reconnecting 状态下驱动重连倒计时"
-      - element: _updateHeartbeat
-        type: function
-        location: "NetworkChannel.ts:300-320"
-        description: "累加 dt，到心跳间隔后发心跳包；missedHeartbeats 超阈值则 close 触发断线重连"
-      - element: _startReconnect / _updateReconnect
-        type: function
-        location: "NetworkChannel.ts:340-370"
-        description: "指数退避重连：delay = base * 2^(n-1)。重连时重新调 socket.connect(url)"
-    language: TypeScript
-    lines: 370
+    - file: NetworkChannel.ts
+      path: assets/scripts/framework/network/NetworkChannel.ts
+      purpose: '单条网络通道的完整生命周期管理（连接/收发/心跳/重连）'
+      key_elements:
+          - element: NetworkChannel
+            type: class
+            location: 'NetworkChannel.ts:34-370'
+            description: '核心类，封装一条连接。构造时注入 socket + packetHandler + callbacks + config'
+          - element: NetworkChannelCallbacks
+            type: interface
+            location: 'NetworkChannel.ts:14-22'
+            description: '通道→管理器的内部回调接口：onConnected / onClosed / onError / onMessage / onReconnecting'
+          - element: connect / send / close
+            type: function
+            location: 'NetworkChannel.ts:130-175'
+            description: '核心公共 API。connect 记录 url 用于重连；send 先编码再调 socket.send；close 设 _userClosed 标记'
+          - element: update(deltaTime)
+            type: function
+            location: 'NetworkChannel.ts:195-202'
+            description: '帧驱动：Connected 状态下驱动心跳，Reconnecting 状态下驱动重连倒计时'
+          - element: _updateHeartbeat
+            type: function
+            location: 'NetworkChannel.ts:300-320'
+            description: '累加 dt，到心跳间隔后发心跳包；missedHeartbeats 超阈值则 close 触发断线重连'
+          - element: _startReconnect / _updateReconnect
+            type: function
+            location: 'NetworkChannel.ts:340-370'
+            description: '指数退避重连：delay = base * 2^(n-1)。重连时重新调 socket.connect(url)'
+      language: TypeScript
+      lines: 370
 
-  - file: NetworkManager.ts
-    path: assets/scripts/framework/network/NetworkManager.ts
-    purpose: "多通道统一管理器，实现 INetworkManager + NetworkChannelCallbacks"
-    key_elements:
-      - element: NetworkManager
-        type: class
-        location: "NetworkManager.ts:27-245"
-        description: "ModuleBase 子类，priority=110。核心是 _channels: Map<string, NetworkChannel>"
-      - element: createChannel / destroyChannel / getChannel
-        type: function
-        location: "NetworkManager.ts:90-150"
-        description: "通道 CRUD。createChannel 注入 socket+handler+this(callbacks)，注册到 Map"
-      - element: onUpdate(deltaTime)
-        type: function
-        location: "NetworkManager.ts:58-62"
-        description: "遍历所有通道调 channel.update(dt)，驱动心跳和重连"
-      - element: "onConnected/onClosed/onError/onMessage/onReconnecting"
-        type: function
-        location: "NetworkManager.ts:170-245"
-        description: "NetworkChannelCallbacks 实现，将通道事件转发为 EventManager.emit"
-    language: TypeScript
-    lines: 245
+    - file: NetworkManager.ts
+      path: assets/scripts/framework/network/NetworkManager.ts
+      purpose: '多通道统一管理器，实现 INetworkManager + NetworkChannelCallbacks'
+      key_elements:
+          - element: NetworkManager
+            type: class
+            location: 'NetworkManager.ts:27-245'
+            description: 'ModuleBase 子类，priority=110。核心是 _channels: Map<string, NetworkChannel>'
+          - element: createChannel / destroyChannel / getChannel
+            type: function
+            location: 'NetworkManager.ts:90-150'
+            description: '通道 CRUD。createChannel 注入 socket+handler+this(callbacks)，注册到 Map'
+          - element: onUpdate(deltaTime)
+            type: function
+            location: 'NetworkManager.ts:58-62'
+            description: '遍历所有通道调 channel.update(dt)，驱动心跳和重连'
+          - element: 'onConnected/onClosed/onError/onMessage/onReconnecting'
+            type: function
+            location: 'NetworkManager.ts:170-245'
+            description: 'NetworkChannelCallbacks 实现，将通道事件转发为 EventManager.emit'
+      language: TypeScript
+      lines: 245
 
-  - file: INetworkManager.ts
-    path: assets/scripts/framework/interfaces/INetworkManager.ts
-    purpose: "网络管理器的公共接口定义，业务层依赖此接口"
-    key_elements:
-      - element: INetworkManager
-        type: interface
-        location: "INetworkManager.ts:18-75"
-        description: "6 个方法签名：createChannel / destroyChannel / getChannel / hasChannel / getChannelCount / setHeartbeatHandler"
-    language: TypeScript
-    lines: 75
+    - file: INetworkManager.ts
+      path: assets/scripts/framework/interfaces/INetworkManager.ts
+      purpose: '网络管理器的公共接口定义，业务层依赖此接口'
+      key_elements:
+          - element: INetworkManager
+            type: interface
+            location: 'INetworkManager.ts:18-75'
+            description: '6 个方法签名：createChannel / destroyChannel / getChannel / hasChannel / getChannelCount / setHeartbeatHandler'
+      language: TypeScript
+      lines: 75
 
-  - file: network-manager.test.ts
-    path: tests/network/network-manager.test.ts
-    purpose: "网络模块测试套件，41 个用例"
-    key_elements:
-      - element: MockSocket / AutoConnectSocket
-        type: class
-        location: "network-manager.test.ts:30-95"
-        description: "实现 INetworkSocket 的 Mock，分别支持手动触发和自动触发连接"
-      - element: MockPacketHandler / MockHeartbeatHandler
-        type: class
-        location: "network-manager.test.ts:100-140"
-        description: "协议层和心跳策略的 Mock 实现"
-    language: TypeScript
-    lines: 800+
+    - file: network-manager.test.ts
+      path: tests/network/network-manager.test.ts
+      purpose: '网络模块测试套件，41 个用例'
+      key_elements:
+          - element: MockSocket / AutoConnectSocket
+            type: class
+            location: 'network-manager.test.ts:30-95'
+            description: '实现 INetworkSocket 的 Mock，分别支持手动触发和自动触发连接'
+          - element: MockPacketHandler / MockHeartbeatHandler
+            type: class
+            location: 'network-manager.test.ts:100-140'
+            description: '协议层和心跳策略的 Mock 实现'
+      language: TypeScript
+      lines: 800+
 
 # ════════════════════════════════════════════════════════
 # Part 1 架构总结
 # ════════════════════════════════════════════════════════
 
 patterns_found:
-  - category: architecture
-    pattern: "多通道管理器模式 (Multi-Channel Manager)"
-    description: |
-      NetworkManager 持有 Map<string, NetworkChannel>，每条通道完全独立。
-      典型使用场景：
-        manager.createChannel('game', gameSocket, protoHandler)   // 游戏服
-        manager.createChannel('chat', chatSocket, jsonHandler)    // 聊天服
-        manager.createChannel('push', pushSocket, pushHandler)    // 推送服
-      每条通道可使用不同的 Socket 实现 + 不同的协议处理器。
-    examples:
-      - file: NetworkManager.ts
-        location: "NetworkManager.ts:37"
-        snippet: "private readonly _channels: Map<string, NetworkChannel> = new Map();"
-    prevalence: common
+    - category: architecture
+      pattern: '多通道管理器模式 (Multi-Channel Manager)'
+      description: |
+          NetworkManager 持有 Map<string, NetworkChannel>，每条通道完全独立。
+          典型使用场景：
+            manager.createChannel('game', gameSocket, protoHandler)   // 游戏服
+            manager.createChannel('chat', chatSocket, jsonHandler)    // 聊天服
+            manager.createChannel('push', pushSocket, pushHandler)    // 推送服
+          每条通道可使用不同的 Socket 实现 + 不同的协议处理器。
+      examples:
+          - file: NetworkManager.ts
+            location: 'NetworkManager.ts:37'
+            snippet: 'private readonly _channels: Map<string, NetworkChannel> = new Map();'
+      prevalence: common
 
-  - category: architecture
-    pattern: "双策略注入 (INetworkSocket + IPacketHandler)"
-    description: |
-      传输层和协议层正交分离：
-      - INetworkSocket：抽象 connect/send/close + 4 个回调，Runtime 层提供 WebSocket/wx适配
-      - IPacketHandler：抽象 encode/decode，可以是 JSON、Protobuf、自定义二进制
-      避免了 M×N 笛卡尔积类爆炸，只需 M+N 个实现。
-    examples:
-      - file: NetworkDefs.ts
-        location: "NetworkDefs.ts:72"
-        snippet: "export interface INetworkSocket { connect(url: string): void; send(data: ArrayBuffer | Uint8Array): void; close(): void; ... }"
-    prevalence: common
+    - category: architecture
+      pattern: '双策略注入 (INetworkSocket + IPacketHandler)'
+      description: |
+          传输层和协议层正交分离：
+          - INetworkSocket：抽象 connect/send/close + 4 个回调，Runtime 层提供 WebSocket/wx适配
+          - IPacketHandler：抽象 encode/decode，可以是 JSON、Protobuf、自定义二进制
+          避免了 M×N 笛卡尔积类爆炸，只需 M+N 个实现。
+      examples:
+          - file: NetworkDefs.ts
+            location: 'NetworkDefs.ts:72'
+            snippet: 'export interface INetworkSocket { connect(url: string): void; send(data: ArrayBuffer | Uint8Array): void; close(): void; ... }'
+      prevalence: common
 
-  - category: architecture
-    pattern: "帧驱动心跳/重连 (Frame-driven)"
-    description: |
-      不使用 setInterval/setTimeout，而是通过 ModuleBase.onUpdate(dt) 累加时间。
-      优势：游戏暂停时自动暂停心跳，不会出现后台累积大量超时回调的问题。
-    examples:
-      - file: NetworkChannel.ts
-        location: "NetworkChannel.ts:195"
-        snippet: "public update(deltaTime: number): void { if (this._state === NetworkState.Connected) this._updateHeartbeat(deltaTime); }"
-    prevalence: common
+    - category: architecture
+      pattern: '帧驱动心跳/重连 (Frame-driven)'
+      description: |
+          不使用 setInterval/setTimeout，而是通过 ModuleBase.onUpdate(dt) 累加时间。
+          优势：游戏暂停时自动暂停心跳，不会出现后台累积大量超时回调的问题。
+      examples:
+          - file: NetworkChannel.ts
+            location: 'NetworkChannel.ts:195'
+            snippet: 'public update(deltaTime: number): void { if (this._state === NetworkState.Connected) this._updateHeartbeat(deltaTime); }'
+      prevalence: common
 
-  - category: architecture
-    pattern: "Callbacks 委托模式"
-    description: |
-      Channel 不直接依赖 EventManager，而是通过 NetworkChannelCallbacks 接口上报事件。
-      NetworkManager implements NetworkChannelCallbacks，收到回调后 emit 到 EventManager。
-      这使得 Channel 可以独立测试，不需要 EventManager。
-    examples:
-      - file: NetworkChannel.ts
-        location: "NetworkChannel.ts:14-22"
-        snippet: "export interface NetworkChannelCallbacks { onConnected(channelName: string): void; ... }"
-    prevalence: common
+    - category: architecture
+      pattern: 'Callbacks 委托模式'
+      description: |
+          Channel 不直接依赖 EventManager，而是通过 NetworkChannelCallbacks 接口上报事件。
+          NetworkManager implements NetworkChannelCallbacks，收到回调后 emit 到 EventManager。
+          这使得 Channel 可以独立测试，不需要 EventManager。
+      examples:
+          - file: NetworkChannel.ts
+            location: 'NetworkChannel.ts:14-22'
+            snippet: 'export interface NetworkChannelCallbacks { onConnected(channelName: string): void; ... }'
+      prevalence: common
 
-  - category: architecture
-    pattern: "指数退避重连"
-    description: "重连延迟 = baseDelay * 2^(attempt-1)，默认 base=1s，最多 5 次。避免雷鸣群效应。"
-    examples:
-      - file: NetworkChannel.ts
-        location: "NetworkChannel.ts:345"
-        snippet: "this._currentReconnectDelay = this._config.reconnectBaseDelay * Math.pow(2, this._reconnectAttempts - 1);"
-    prevalence: common
+    - category: architecture
+      pattern: '指数退避重连'
+      description: '重连延迟 = baseDelay * 2^(attempt-1)，默认 base=1s，最多 5 次。避免雷鸣群效应。'
+      examples:
+          - file: NetworkChannel.ts
+            location: 'NetworkChannel.ts:345'
+            snippet: 'this._currentReconnectDelay = this._config.reconnectBaseDelay * Math.pow(2, this._reconnectAttempts - 1);'
+      prevalence: common
 
 # ════════════════════════════════════════════════════════
 # Part 2: 微信小游戏 WebSocket 限制（官方文档实查）
 # ════════════════════════════════════════════════════════
 
 wechat_minigame_websocket:
-  source_urls:
-    - https://developers.weixin.qq.com/minigame/dev/api/network/websocket/wx.connectSocket.html
-    - https://developers.weixin.qq.com/minigame/dev/guide/base-ability/network.html
-    - https://developers.weixin.qq.com/miniprogram/dev/api/network/websocket/wx.connectSocket.html
+    source_urls:
+        - https://developers.weixin.qq.com/minigame/dev/api/network/websocket/wx.connectSocket.html
+        - https://developers.weixin.qq.com/minigame/dev/guide/base-ability/network.html
+        - https://developers.weixin.qq.com/miniprogram/dev/api/network/websocket/wx.connectSocket.html
 
-  api_overview: |
-    wx.connectSocket(Object) 返回 SocketTask 对象。
-    官方推荐使用 SocketTask 管理连接（而非 wx.onSocketOpen 等全局方法），
-    因为多连接场景下全局方法会导致预期不一致。
+    api_overview: |
+        wx.connectSocket(Object) 返回 SocketTask 对象。
+        官方推荐使用 SocketTask 管理连接（而非 wx.onSocketOpen 等全局方法），
+        因为多连接场景下全局方法会导致预期不一致。
 
-  concurrent_limit: |
-    【官方原文】并发数：
-    • 基础库 1.7.0 及以上版本，最多可以同时存在 5 个 WebSocket 连接。
-    • 基础库 1.7.0 以下版本，同时只能有 1 个 WebSocket 连接（新建会自动关闭旧的）。
-    
-    注意：小程序和小游戏的文档内容完全一致，限制相同（均为 5 个）。
-    1.7.0 发布于 2017 年底，当前（2026 年）几乎所有设备基础库均已远超此版本。
+    concurrent_limit: |
+        【官方原文】并发数：
+        • 基础库 1.7.0 及以上版本，最多可以同时存在 5 个 WebSocket 连接。
+        • 基础库 1.7.0 以下版本，同时只能有 1 个 WebSocket 连接（新建会自动关闭旧的）。
 
-  additional_constraints:
-    - "必须使用 wss:// 协议（不支持 ws://）"
-    - "域名需在小程序/小游戏后台「服务器域名」中预配置（支持域名所有端口）"
-    - "域名必须经过 ICP 备案，不能使用 IP 地址或 localhost"
-    - "不能设置 Referer header"
-    - "小程序进入后台 5s 内未完成的网络请求会 fail interrupted"
-    - "支持 TCP_NODELAY 配置（基础库 2.4.0+）"
-    - "支持 perMessageDeflate 压缩扩展（基础库 2.8.0+）"
-    - "支持超时设置 timeout（基础库 2.10.0+）"
-    - "SocketTask 支持 Windows/Mac/鸿蒙OS 版微信"
+        注意：小程序和小游戏的文档内容完全一致，限制相同（均为 5 个）。
+        1.7.0 发布于 2017 年底，当前（2026 年）几乎所有设备基础库均已远超此版本。
 
-  socket_task_api: |
-    SocketTask 对象方法（独立实例，每条连接单独管理）：
-    - SocketTask.send(Object)
-    - SocketTask.close(Object)
-    - SocketTask.onOpen(callback)
-    - SocketTask.onClose(callback)
-    - SocketTask.onMessage(callback)
-    - SocketTask.onError(callback)
-    回调模型与标准 WebSocket 的事件模型高度类似，可以直接映射到 INetworkSocket。
+    additional_constraints:
+        - '必须使用 wss:// 协议（不支持 ws://）'
+        - '域名需在小程序/小游戏后台「服务器域名」中预配置（支持域名所有端口）'
+        - '域名必须经过 ICP 备案，不能使用 IP 地址或 localhost'
+        - '不能设置 Referer header'
+        - '小程序进入后台 5s 内未完成的网络请求会 fail interrupted'
+        - '支持 TCP_NODELAY 配置（基础库 2.4.0+）'
+        - '支持 perMessageDeflate 压缩扩展（基础库 2.8.0+）'
+        - '支持超时设置 timeout（基础库 2.10.0+）'
+        - 'SocketTask 支持 Windows/Mac/鸿蒙OS 版微信'
+
+    socket_task_api: |
+        SocketTask 对象方法（独立实例，每条连接单独管理）：
+        - SocketTask.send(Object)
+        - SocketTask.close(Object)
+        - SocketTask.onOpen(callback)
+        - SocketTask.onClose(callback)
+        - SocketTask.onMessage(callback)
+        - SocketTask.onError(callback)
+        回调模型与标准 WebSocket 的事件模型高度类似，可以直接映射到 INetworkSocket。
 
 # ════════════════════════════════════════════════════════
 # Part 3: 可行性分析
 # ════════════════════════════════════════════════════════
 
 feasibility_analysis:
-  verdict: "完全可行"
-  confidence: high
+    verdict: '完全可行'
+    confidence: high
 
-  compatibility_summary: |
-    GameForge Cinder 的多通道设计（最多同时持有 N 条 NetworkChannel）
-    与微信小游戏的 5 条并发 WebSocket 上限天然兼容。
-    典型游戏场景（游戏服 + 聊天服 + 推送服 = 3 条）远未触及 5 条上限。
+    compatibility_summary: |
+        Forge Blaze Ignite 的多通道设计（最多同时持有 N 条 NetworkChannel）
+        与微信小游戏的 5 条并发 WebSocket 上限天然兼容。
+        典型游戏场景（游戏服 + 聊天服 + 推送服 = 3 条）远未触及 5 条上限。
 
-  adaptations_needed:
-    - area: "Runtime 层：WxSocketAdapter"
-      description: |
-        需要在 Runtime 层实现 INetworkSocket 的微信适配：
-        ```typescript
-        class WxSocketAdapter implements INetworkSocket {
-            private _task: WechatMinigame.SocketTask | null = null;
-            onOpen / onClose / onMessage / onError: callbacks
-            
-            connect(url: string): void {
-                this._task = wx.connectSocket({ url });
-                this._task.onOpen(() => this.onOpen?.());
-                this._task.onClose((res) => this.onClose?.(res.code, res.reason));
-                this._task.onMessage((res) => this.onMessage?.(res.data));
-                this._task.onError((res) => this.onError?.(new Error(res.errMsg)));
-            }
-            send(data): void { this._task?.send({ data }); }
-            close(): void { this._task?.close({}); }
-        }
-        ```
-      impact: "纯新增代码，Framework 层零修改"
-      effort: "低（~50 行代码）"
+    adaptations_needed:
+        - area: 'Runtime 层：WxSocketAdapter'
+          description: |
+              需要在 Runtime 层实现 INetworkSocket 的微信适配：
+              ```typescript
+              class WxSocketAdapter implements INetworkSocket {
+                  private _task: WechatMinigame.SocketTask | null = null;
+                  onOpen / onClose / onMessage / onError: callbacks
+                  
+                  connect(url: string): void {
+                      this._task = wx.connectSocket({ url });
+                      this._task.onOpen(() => this.onOpen?.());
+                      this._task.onClose((res) => this.onClose?.(res.code, res.reason));
+                      this._task.onMessage((res) => this.onMessage?.(res.data));
+                      this._task.onError((res) => this.onError?.(new Error(res.errMsg)));
+                  }
+                  send(data): void { this._task?.send({ data }); }
+                  close(): void { this._task?.close({}); }
+              }
+              ```
+          impact: '纯新增代码，Framework 层零修改'
+          effort: '低（~50 行代码）'
 
-    - area: "wss 域名预配置"
-      description: "所有 WebSocket 服务器域名需提前在微信后台配置，不能运行时动态切换未知域名"
-      impact: "运维/发布流程约束，不影响代码架构"
-      effort: "无代码改动"
+        - area: 'wss 域名预配置'
+          description: '所有 WebSocket 服务器域名需提前在微信后台配置，不能运行时动态切换未知域名'
+          impact: '运维/发布流程约束，不影响代码架构'
+          effort: '无代码改动'
 
-    - area: "后台挂起处理"
-      description: |
-        微信小游戏进后台 5s 后网络请求会被中断。
-        当前 NetworkChannel 的自动重连机制（指数退避）可以自然处理此情况：
-        onClose 触发 → 自动重连 → 回前台后网络恢复 → 重连成功。
-        但需注意：重连计时器基于 onUpdate(dt)，后台时 dt 可能停止累积，
-        需要确认 Cocos 在后台时是否仍调用 update。如果不调用，回前台后的首帧 dt 会很大，
-        重连会立即触发（这是期望行为）。
-      impact: "可能需要在 onShow 时手动检查连接状态并触发重连"
-      effort: "低"
+        - area: '后台挂起处理'
+          description: |
+              微信小游戏进后台 5s 后网络请求会被中断。
+              当前 NetworkChannel 的自动重连机制（指数退避）可以自然处理此情况：
+              onClose 触发 → 自动重连 → 回前台后网络恢复 → 重连成功。
+              但需注意：重连计时器基于 onUpdate(dt)，后台时 dt 可能停止累积，
+              需要确认 Cocos 在后台时是否仍调用 update。如果不调用，回前台后的首帧 dt 会很大，
+              重连会立即触发（这是期望行为）。
+          impact: '可能需要在 onShow 时手动检查连接状态并触发重连'
+          effort: '低'
 
-    - area: "并发通道数量守卫"
-      description: |
-        当前 NetworkManager.createChannel 不限制通道数量。
-        为防止超过微信 5 条上限，可在 Runtime 层或 createChannel 中添加：
-        if (this._channels.size >= 5) throw new Error('超过微信 WebSocket 并发上限');
-        或通过配置注入最大通道数。
-      impact: "安全防护，可选实现"
-      effort: "极低（1-2 行）"
+        - area: '并发通道数量守卫'
+          description: |
+              当前 NetworkManager.createChannel 不限制通道数量。
+              为防止超过微信 5 条上限，可在 Runtime 层或 createChannel 中添加：
+              if (this._channels.size >= 5) throw new Error('超过微信 WebSocket 并发上限');
+              或通过配置注入最大通道数。
+          impact: '安全防护，可选实现'
+          effort: '极低（1-2 行）'
 
-  no_changes_needed_in:
-    - "Framework 层所有代码（NetworkDefs / NetworkChannel / NetworkManager / INetworkManager）"
-    - "协议处理器（IPacketHandler 实现）"
-    - "心跳处理器（IHeartbeatHandler 实现）"
-    - "事件系统集成（EventManager emit/on）"
-    - "测试代码"
+    no_changes_needed_in:
+        - 'Framework 层所有代码（NetworkDefs / NetworkChannel / NetworkManager / INetworkManager）'
+        - '协议处理器（IPacketHandler 实现）'
+        - '心跳处理器（IHeartbeatHandler 实现）'
+        - '事件系统集成（EventManager emit/on）'
+        - '测试代码'
 
 open_questions:
-  - question: "Cocos 在微信小游戏后台时是否仍调用 game.update()？"
-    context: "影响后台断线后重连计时器是否能正常工作"
-    type: nice_to_know
-    affects: ["background-reconnect"]
+    - question: 'Cocos 在微信小游戏后台时是否仍调用 game.update()？'
+      context: '影响后台断线后重连计时器是否能正常工作'
+      type: nice_to_know
+      affects: ['background-reconnect']
 
-  - question: "是否需要支持 UDP（wx.createUDPSocket）用于实时性要求更高的场景？"
-    context: "微信基础库 2.7.0 开始支持 UDP，游戏实时对战可能需要"
-    type: nice_to_know
-    affects: ["realtime-gameplay"]
+    - question: '是否需要支持 UDP（wx.createUDPSocket）用于实时性要求更高的场景？'
+      context: '微信基础库 2.7.0 开始支持 UDP，游戏实时对战可能需要'
+      type: nice_to_know
+      affects: ['realtime-gameplay']
 
 gaps: []

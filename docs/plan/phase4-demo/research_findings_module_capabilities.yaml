@@ -1,469 +1,483 @@
 plan_id: phase4-demo
-objective: "分析 GameForge Cinder 全部已完成模块的能力边界，为 Phase 4 综合 Demo 设计提供模块-游戏类型匹配矩阵"
+objective: '分析 Forge Blaze Ignite 全部已完成模块的能力边界，为 Phase 4 综合 Demo 设计提供模块-游戏类型匹配矩阵'
 focus_area: module_capabilities
-created_at: "2026-04-20"
+created_at: '2026-04-20'
 created_by: gem-researcher
 status: completed
 
 tldr: |
-  - 框架共 17 个已完成模块（含 2 个 Timer 插件），覆盖核心基础设施、资源管理、UI、实体、网络、音频、场景、定时器、数据表、多语言、热更新、调试全链路
-  - 模块间通过 EventManager 解耦通信，所有策略接口（IResourceLoader、IAudioPlayer、ISceneLoader、IEntityFactory、IUIFormFactory、INetworkSocket、IPacketHandler、IDataTableParser）支持 Mock 注入，适合纯逻辑 Demo
-  - Procedure（流程管理）+ FSM（状态机）组合是游戏流程驱动的核心骨架，几乎所有 Demo 都会依赖
-  - Entity 模块虽标记"待开发"于 architecture.md，但实际已完成（31 个测试），具备 EntityGroup 双池 + IEntityFactory 策略注入
-  - 薄弱验证区域：模块间协作的集成场景（如 Resource→Entity→ObjectPool 联动）、Procedure 流程驱动完整游戏循环、DataTable 驱动游戏配置、i18n 运行时切换、HotUpdate 完整流程、DebugPanel 实战采集
+    - 框架共 17 个已完成模块（含 2 个 Timer 插件），覆盖核心基础设施、资源管理、UI、实体、网络、音频、场景、定时器、数据表、多语言、热更新、调试全链路
+    - 模块间通过 EventManager 解耦通信，所有策略接口（IResourceLoader、IAudioPlayer、ISceneLoader、IEntityFactory、IUIFormFactory、INetworkSocket、IPacketHandler、IDataTableParser）支持 Mock 注入，适合纯逻辑 Demo
+    - Procedure（流程管理）+ FSM（状态机）组合是游戏流程驱动的核心骨架，几乎所有 Demo 都会依赖
+    - Entity 模块虽标记"待开发"于 architecture.md，但实际已完成（31 个测试），具备 EntityGroup 双池 + IEntityFactory 策略注入
+    - 薄弱验证区域：模块间协作的集成场景（如 Resource→Entity→ObjectPool 联动）、Procedure 流程驱动完整游戏循环、DataTable 驱动游戏配置、i18n 运行时切换、HotUpdate 完整流程、DebugPanel 实战采集
 
 research_metadata:
-  methodology: "hybrid retrieval: semantic_search + grep_search + file_search + read_file，逐模块分析 Defs/Interface/Manager/Test"
-  scope: "全部 17 个已完成模块 + 2 个 Timer 插件，覆盖接口定义、核心实现、测试文件"
-  confidence: high
-  coverage: 95
-  decision_blockers: 0
-  research_blockers: 0
+    methodology: 'hybrid retrieval: semantic_search + grep_search + file_search + read_file，逐模块分析 Defs/Interface/Manager/Test'
+    scope: '全部 17 个已完成模块 + 2 个 Timer 插件，覆盖接口定义、核心实现、测试文件'
+    confidence: high
+    coverage: 95
+    decision_blockers: 0
+    research_blockers: 0
 
 # ═══════════════════════════════════════════════════════
 # 模块能力详细分析
 # ═══════════════════════════════════════════════════════
 
 module_capabilities:
+    - module: Core (GameEntry / ModuleBase / GameModule)
+      priority: 0
+      capability_summary: '框架入口，模块注册/获取/生命周期管理，priority 排序，脏标记优化'
+      key_apis:
+          - 'GameEntry.registerModule() / getModule<T>() / update() / shutdown()'
+          - 'GameModule.register() — 支持 allowReplace 插件替换'
+      game_relevance: '所有 Demo 的基础骨架，负责初始化和主循环驱动'
+      test_depth: '143 行，覆盖注册/获取/生命周期/priority 排序'
 
-  - module: Core (GameEntry / ModuleBase / GameModule)
-    priority: 0
-    capability_summary: "框架入口，模块注册/获取/生命周期管理，priority 排序，脏标记优化"
-    key_apis:
-      - "GameEntry.registerModule() / getModule<T>() / update() / shutdown()"
-      - "GameModule.register() — 支持 allowReplace 插件替换"
-    game_relevance: "所有 Demo 的基础骨架，负责初始化和主循环驱动"
-    test_depth: "143 行，覆盖注册/获取/生命周期/priority 排序"
+    - module: EventManager
+      priority: 10
+      capability_summary: '强类型事件系统，EventKey<T> phantom type，on/once/off/offAll/offByCaller/emit，快照遍历安全'
+      key_apis:
+          - 'EventKey<T> — 编译期类型安全'
+          - 'on() / once() / off() / offByCaller() / emit()'
+          - 'emit 采用 emitDepth + _removed 延迟清理（已优化无 slice 拷贝）'
+      game_relevance: '所有模块间通信的中枢，事件驱动架构的基石。适用于：游戏事件广播、UI 通知、网络消息分发'
+      test_depth: '144 行，覆盖基础订阅/取消/once/批量/遍历安全'
 
-  - module: EventManager
-    priority: 10
-    capability_summary: "强类型事件系统，EventKey<T> phantom type，on/once/off/offAll/offByCaller/emit，快照遍历安全"
-    key_apis:
-      - "EventKey<T> — 编译期类型安全"
-      - "on() / once() / off() / offByCaller() / emit()"
-      - "emit 采用 emitDepth + _removed 延迟清理（已优化无 slice 拷贝）"
-    game_relevance: "所有模块间通信的中枢，事件驱动架构的基石。适用于：游戏事件广播、UI 通知、网络消息分发"
-    test_depth: "144 行，覆盖基础订阅/取消/once/批量/遍历安全"
+    - module: ObjectPool
+      priority: 20
+      capability_summary: '泛型对象池，IPoolable 接口，acquire/release，Set O(1) 防重复入池，池统计'
+      key_apis:
+          - 'acquire<T>() / release() / clearPool() / clearAll() / getStats() / setMaxSize()'
+          - 'IPoolable: onSpawn() / onRecycle()'
+      game_relevance: '子弹、特效、敌人等频繁创建销毁对象的性能优化。几乎所有游戏类型都需要'
+      test_depth: '181 行，覆盖创建/回收/防重复/统计/最大容量'
 
-  - module: ObjectPool
-    priority: 20
-    capability_summary: "泛型对象池，IPoolable 接口，acquire/release，Set O(1) 防重复入池，池统计"
-    key_apis:
-      - "acquire<T>() / release() / clearPool() / clearAll() / getStats() / setMaxSize()"
-      - "IPoolable: onSpawn() / onRecycle()"
-    game_relevance: "子弹、特效、敌人等频繁创建销毁对象的性能优化。几乎所有游戏类型都需要"
-    test_depth: "181 行，覆盖创建/回收/防重复/统计/最大容量"
+    - module: DI/IoC Container
+      priority: N/A (工具模块)
+      capability_summary: '装饰器依赖注入，@Injectable/@Inject，Container.resolve()，ServiceKey<T> phantom type，循环依赖检测'
+      key_apis:
+          - '@Injectable / @Inject / Container.resolve()'
+          - '支持 singleton / transient 生命周期'
+      game_relevance: '游戏服务层解耦，如战斗计算器、AI 决策器的依赖注入'
+      test_depth: '436 行（container 292 + decorators 144），覆盖深度最高的模块之一'
 
-  - module: DI/IoC Container
-    priority: N/A (工具模块)
-    capability_summary: "装饰器依赖注入，@Injectable/@Inject，Container.resolve()，ServiceKey<T> phantom type，循环依赖检测"
-    key_apis:
-      - "@Injectable / @Inject / Container.resolve()"
-      - "支持 singleton / transient 生命周期"
-    game_relevance: "游戏服务层解耦，如战斗计算器、AI 决策器的依赖注入"
-    test_depth: "436 行（container 292 + decorators 144），覆盖深度最高的模块之一"
+    - module: FSM (有限状态机)
+      priority: 100
+      capability_summary: '泛型状态机，IFsmState<T> 生命周期（onInit/onEnter/onUpdate/onLeave/onDestroy），Blackboard 数据共享，Constructor 类型映射'
+      key_apis:
+          - 'createFsm<T>() / destroyFsm() / getFsm() / hasFsm()'
+          - 'IFsm.changeState<TState>() / getData<V>() / setData()'
+          - 'IFsm.start() — 启动状态机'
+      game_relevance: '角色状态（Idle/Run/Attack/Die）、AI 行为、游戏流程。核心游戏逻辑模块'
+      test_depth: '593 行（fsm 328 + fsm-manager 265），测试最充分的模块'
 
-  - module: FSM (有限状态机)
-    priority: 100
-    capability_summary: "泛型状态机，IFsmState<T> 生命周期（onInit/onEnter/onUpdate/onLeave/onDestroy），Blackboard 数据共享，Constructor 类型映射"
-    key_apis:
-      - "createFsm<T>() / destroyFsm() / getFsm() / hasFsm()"
-      - "IFsm.changeState<TState>() / getData<V>() / setData()"
-      - "IFsm.start() — 启动状态机"
-    game_relevance: "角色状态（Idle/Run/Attack/Die）、AI 行为、游戏流程。核心游戏逻辑模块"
-    test_depth: "593 行（fsm 328 + fsm-manager 265），测试最充分的模块"
+    - module: ProcedureManager (流程管理器)
+      priority: 300
+      capability_summary: '基于 FSM 的游戏流程驱动，ProcedureBase 继承 FsmState，changeProcedure() 流程切换'
+      key_apis:
+          - 'initialize() / startProcedure() / hasProcedure() / currentProcedure'
+          - 'ProcedureBase.changeProcedure(fsm, TargetProcedure)'
+      game_relevance: '游戏主流程骨架：Launch→CheckVersion→Preload→Menu→Game→GameOver→Settlement'
+      test_depth: '134 行，覆盖基础流程切换，但未验证复杂多流程场景'
 
-  - module: ProcedureManager (流程管理器)
-    priority: 300
-    capability_summary: "基于 FSM 的游戏流程驱动，ProcedureBase 继承 FsmState，changeProcedure() 流程切换"
-    key_apis:
-      - "initialize() / startProcedure() / hasProcedure() / currentProcedure"
-      - "ProcedureBase.changeProcedure(fsm, TargetProcedure)"
-    game_relevance: "游戏主流程骨架：Launch→CheckVersion→Preload→Menu→Game→GameOver→Settlement"
-    test_depth: "134 行，覆盖基础流程切换，但未验证复杂多流程场景"
+    - module: ResourceManager
+      priority: 110
+      capability_summary: '资源加载/释放/引用计数，owner 粒度去重，加载去重，IResourceLoader 策略注入，预加载'
+      key_apis:
+          - 'setResourceLoader() / loadAsset() / releaseAsset() / releaseByOwner()'
+          - 'preload() / hasAsset() / getAssetRefCount() / getAssetInfo()'
+      game_relevance: '所有需要加载资源的场景：预制体、音频、数据表、场景。Demo 中通过 Mock IResourceLoader 模拟'
+      test_depth: '394 行，覆盖加载/释放/引用计数/去重/预加载'
 
-  - module: ResourceManager
-    priority: 110
-    capability_summary: "资源加载/释放/引用计数，owner 粒度去重，加载去重，IResourceLoader 策略注入，预加载"
-    key_apis:
-      - "setResourceLoader() / loadAsset() / releaseAsset() / releaseByOwner()"
-      - "preload() / hasAsset() / getAssetRefCount() / getAssetInfo()"
-    game_relevance: "所有需要加载资源的场景：预制体、音频、数据表、场景。Demo 中通过 Mock IResourceLoader 模拟"
-    test_depth: "394 行，覆盖加载/释放/引用计数/去重/预加载"
+    - module: UIManager
+      priority: 200
+      capability_summary: 'UI 分层管理（5 层），表单栈 + Cover/Reveal 生命周期，allowMultiple 多实例，IUIFormFactory 策略注入'
+      key_apis:
+          - 'registerForm() / openForm() / closeForm() / closeAllForms()'
+          - 'UILayer: Background/Normal/Fixed/Popup/Toast'
+          - 'UIFormBase 生命周期: onOpen/onClose/onCover/onReveal/onUpdate'
+      game_relevance: '菜单系统、背包、设置面板、弹窗。HTML Demo 中可简化为 div 层级模拟'
+      test_depth: '425 行，覆盖分层/栈管理/Cover-Reveal/多实例'
 
-  - module: UIManager
-    priority: 200
-    capability_summary: "UI 分层管理（5 层），表单栈 + Cover/Reveal 生命周期，allowMultiple 多实例，IUIFormFactory 策略注入"
-    key_apis:
-      - "registerForm() / openForm() / closeForm() / closeAllForms()"
-      - "UILayer: Background/Normal/Fixed/Popup/Toast"
-      - "UIFormBase 生命周期: onOpen/onClose/onCover/onReveal/onUpdate"
-    game_relevance: "菜单系统、背包、设置面板、弹窗。HTML Demo 中可简化为 div 层级模拟"
-    test_depth: "425 行，覆盖分层/栈管理/Cover-Reveal/多实例"
+    - module: EntityManager
+      priority: 220
+      capability_summary: '实体管理 + EntityGroup 双池（活跃池/等待池），_entityGroupMap O(1) 反查，IEntityFactory 策略注入'
+      key_apis:
+          - 'showEntity() / hideEntity() / getEntity()'
+          - 'EntityGroup: 按分组管理实体生命周期'
+          - 'EntityBase: onInit/onShow/onHide/onUpdate'
+      game_relevance: '游戏实体（玩家、敌人、子弹、道具、NPC）的生命周期管理。核心游戏逻辑模块'
+      test_depth: '252 行，覆盖显示/隐藏/分组/双池/反查'
 
-  - module: EntityManager
-    priority: 220
-    capability_summary: "实体管理 + EntityGroup 双池（活跃池/等待池），_entityGroupMap O(1) 反查，IEntityFactory 策略注入"
-    key_apis:
-      - "showEntity() / hideEntity() / getEntity()"
-      - "EntityGroup: 按分组管理实体生命周期"
-      - "EntityBase: onInit/onShow/onHide/onUpdate"
-    game_relevance: "游戏实体（玩家、敌人、子弹、道具、NPC）的生命周期管理。核心游戏逻辑模块"
-    test_depth: "252 行，覆盖显示/隐藏/分组/双池/反查"
+    - module: NetworkManager
+      priority: 120
+      capability_summary: '多通道 WebSocket 管理，双策略注入（INetworkSocket + IPacketHandler），心跳检测，指数退避重连'
+      key_apis:
+          - 'createChannel() / destroyChannel() / getChannel()'
+          - 'Channel: connect() / send() / close()'
+          - 'setHeartbeatHandler() / setEventManager()'
+          - '自动重连：baseDelay * 2^(n-1)'
+      game_relevance: '多人在线游戏、实时对战、聊天系统、排行榜同步'
+      test_depth: '895 行，测试最多的模块，覆盖连接/断开/重连/心跳/编解码'
 
-  - module: NetworkManager
-    priority: 120
-    capability_summary: "多通道 WebSocket 管理，双策略注入（INetworkSocket + IPacketHandler），心跳检测，指数退避重连"
-    key_apis:
-      - "createChannel() / destroyChannel() / getChannel()"
-      - "Channel: connect() / send() / close()"
-      - "setHeartbeatHandler() / setEventManager()"
-      - "自动重连：baseDelay * 2^(n-1)"
-    game_relevance: "多人在线游戏、实时对战、聊天系统、排行榜同步"
-    test_depth: "895 行，测试最多的模块，覆盖连接/断开/重连/心跳/编解码"
+    - module: AudioManager
+      priority: 210
+      capability_summary: 'Music 单实例 + Sound 多实例叠加，三级音量乘法链（Master×Music/Sound×Individual），静音不改属性，IAudioPlayer 策略注入'
+      key_apis:
+          - 'playMusic() / stopMusic() / pauseMusic() / resumeMusic()'
+          - 'playSound() / stopSound() / stopAllSounds()'
+          - 'setMasterVolume() / setMusicVolume() / setSoundVolume() / setMuted()'
+      game_relevance: '所有游戏的音频管理。Demo 中通过 Mock IAudioPlayer 输出日志模拟'
+      test_depth: '445 行，覆盖播放/停止/暂停/音量链/静音'
 
-  - module: AudioManager
-    priority: 210
-    capability_summary: "Music 单实例 + Sound 多实例叠加，三级音量乘法链（Master×Music/Sound×Individual），静音不改属性，IAudioPlayer 策略注入"
-    key_apis:
-      - "playMusic() / stopMusic() / pauseMusic() / resumeMusic()"
-      - "playSound() / stopSound() / stopAllSounds()"
-      - "setMasterVolume() / setMusicVolume() / setSoundVolume() / setMuted()"
-    game_relevance: "所有游戏的音频管理。Demo 中通过 Mock IAudioPlayer 输出日志模拟"
-    test_depth: "445 行，覆盖播放/停止/暂停/音量链/静音"
+    - module: SceneManager
+      priority: 230
+      capability_summary: '场景加载/卸载，三层加载去重，ISceneLoader 策略注入，异步回调 + 事件预留'
+      key_apis:
+          - 'setSceneLoader() / loadScene() / currentScene / isLoading'
+          - 'LoadSceneCallbacks: onProgress / onSuccess / onFailure'
+      game_relevance: '场景切换：主菜单→游戏场景→结算场景。Demo 中模拟场景切换逻辑'
+      test_depth: '216 行，覆盖加载/去重/回调/错误处理'
 
-  - module: SceneManager
-    priority: 230
-    capability_summary: "场景加载/卸载，三层加载去重，ISceneLoader 策略注入，异步回调 + 事件预留"
-    key_apis:
-      - "setSceneLoader() / loadScene() / currentScene / isLoading"
-      - "LoadSceneCallbacks: onProgress / onSuccess / onFailure"
-    game_relevance: "场景切换：主菜单→游戏场景→结算场景。Demo 中模拟场景切换逻辑"
-    test_depth: "216 行，覆盖加载/去重/回调/错误处理"
+    - module: TimerManager
+      priority: 30
+      capability_summary: '定时器管理，mark-delete 遍历安全，repeat/initialDelay/useTimeScale/tag，timeScale 时间缩放'
+      key_apis:
+          - 'addTimer() / removeTimer() / removeAllTimers() / removeTimersByTag()'
+          - 'pauseTimer() / resumeTimer() / pauseTimersByTag() / resumeTimersByTag()'
+          - 'timeScale — 全局时间缩放（子弹时间效果）'
+          - "tag 分组 — 如 'combat' / 'ui-anim' / 'buff'"
+      game_relevance: '技能冷却、Buff 持续时间、波次生成、倒计时、自动保存。几乎所有游戏类型核心'
+      test_depth: '428 行，覆盖添加/删除/暂停/tag/timeScale/溢出精度'
 
-  - module: TimerManager
-    priority: 30
-    capability_summary: "定时器管理，mark-delete 遍历安全，repeat/initialDelay/useTimeScale/tag，timeScale 时间缩放"
-    key_apis:
-      - "addTimer() / removeTimer() / removeAllTimers() / removeTimersByTag()"
-      - "pauseTimer() / resumeTimer() / pauseTimersByTag() / resumeTimersByTag()"
-      - "timeScale — 全局时间缩放（子弹时间效果）"
-      - "tag 分组 — 如 'combat' / 'ui-anim' / 'buff'"
-    game_relevance: "技能冷却、Buff 持续时间、波次生成、倒计时、自动保存。几乎所有游戏类型核心"
-    test_depth: "428 行，覆盖添加/删除/暂停/tag/timeScale/溢出精度"
+    - module: fbi-timer-heap (最小堆定时器插件)
+      priority: 30 (替换 TimerManager)
+      capability_summary: 'MinHeap 数据结构实现 ITimerManager，绝对到期时间 expireTime，触发 O(k log n)'
+      game_relevance: '大量定时器场景（如 MMO 千级 Buff）的性能优化替代'
+      test_depth: '47 个测试（独立包）'
 
-  - module: gfc-timer-heap (最小堆定时器插件)
-    priority: 30 (替换 TimerManager)
-    capability_summary: "MinHeap 数据结构实现 ITimerManager，绝对到期时间 expireTime，触发 O(k log n)"
-    game_relevance: "大量定时器场景（如 MMO 千级 Buff）的性能优化替代"
-    test_depth: "47 个测试（独立包）"
+    - module: fbi-timer-wheel (时间轮定时器插件)
+      priority: 30 (替换 TimerManager)
+      capability_summary: '时间轮实现 ITimerManager，slot 数组 + 整数 tick + 多圈 remainingRounds，添加/触发 O(1)'
+      game_relevance: '海量定时器场景的性能优化替代，与 heap 互为备选'
+      test_depth: '39 个测试（独立包）'
 
-  - module: gfc-timer-wheel (时间轮定时器插件)
-    priority: 30 (替换 TimerManager)
-    capability_summary: "时间轮实现 ITimerManager，slot 数组 + 整数 tick + 多圈 remainingRounds，添加/触发 O(1)"
-    game_relevance: "海量定时器场景的性能优化替代，与 heap 互为备选"
-    test_depth: "39 个测试（独立包）"
+    - module: DataTableManager
+      priority: 310
+      capability_summary: '泛型数据表容器，双存储模式（Map O(1) 随机查询 / Array 顺序遍历），indexMap 空间换时间，IDataTableParser 策略注入'
+      key_apis:
+          - 'createTable<T>() / destroyTable() / getTable() / hasTable()'
+          - 'DataTable<T>: getRow() / getAllRows() / getRowCount()'
+          - 'IDataTableParser: parse<T>(rawData) — 支持 CSV/JSON/二进制'
+      game_relevance: '怪物属性表、装备表、关卡配置表、技能表。配置驱动的游戏逻辑核心'
+      test_depth: '393 行，覆盖双存储模式/indexMap/解析器注入/增删查'
 
-  - module: DataTableManager
-    priority: 310
-    capability_summary: "泛型数据表容器，双存储模式（Map O(1) 随机查询 / Array 顺序遍历），indexMap 空间换时间，IDataTableParser 策略注入"
-    key_apis:
-      - "createTable<T>() / destroyTable() / getTable() / hasTable()"
-      - "DataTable<T>: getRow() / getAllRows() / getRowCount()"
-      - "IDataTableParser: parse<T>(rawData) — 支持 CSV/JSON/二进制"
-    game_relevance: "怪物属性表、装备表、关卡配置表、技能表。配置驱动的游戏逻辑核心"
-    test_depth: "393 行，覆盖双存储模式/indexMap/解析器注入/增删查"
+    - module: LocalizationManager (i18n)
+      priority: 320
+      capability_summary: '多语言管理，ILocalizationLoader 策略注入，动态语言切换 + 占位符替换 + 事件广播'
+      key_apis:
+          - 'setLanguage() / getLanguage() / t(key, params?) — 翻译键值'
+          - 'LocalizationEvent.LANGUAGE_CHANGED — 语言切换事件'
+      game_relevance: '多语言游戏支持。Demo 中验证运行时语言切换'
+      test_depth: '489 行（manager 371 + defs 118），覆盖翻译/占位符/切换/事件'
 
-  - module: LocalizationManager (i18n)
-    priority: 320
-    capability_summary: "多语言管理，ILocalizationLoader 策略注入，动态语言切换 + 占位符替换 + 事件广播"
-    key_apis:
-      - "setLanguage() / getLanguage() / t(key, params?) — 翻译键值"
-      - "LocalizationEvent.LANGUAGE_CHANGED — 语言切换事件"
-    game_relevance: "多语言游戏支持。Demo 中验证运行时语言切换"
-    test_depth: "489 行（manager 371 + defs 118），覆盖翻译/占位符/切换/事件"
+    - module: Logger
+      priority: 0
+      capability_summary: '静态 API + ModuleBase 混合方案，ILogOutput 策略注入，Tag 过滤，时间戳，错误自动堆栈，Ring Buffer 历史，颜色编码，time/timeEnd 性能计时'
+      key_apis:
+          - 'Logger.debug/info/warn/error(tag, message, ...args)'
+          - 'Logger.time(label) / Logger.timeEnd(label)'
+          - 'Logger.setLevel() / Logger.addOutput() / Logger.getHistory()'
+      game_relevance: '所有 Demo 的日志输出中枢。HTML Demo 中通过 ILogOutput 将日志渲染到页面'
+      test_depth: '512 行，覆盖级别/Tag/Output/Ring Buffer/time'
 
-  - module: Logger
-    priority: 0
-    capability_summary: "静态 API + ModuleBase 混合方案，ILogOutput 策略注入，Tag 过滤，时间戳，错误自动堆栈，Ring Buffer 历史，颜色编码，time/timeEnd 性能计时"
-    key_apis:
-      - "Logger.debug/info/warn/error(tag, message, ...args)"
-      - "Logger.time(label) / Logger.timeEnd(label)"
-      - "Logger.setLevel() / Logger.addOutput() / Logger.getHistory()"
-    game_relevance: "所有 Demo 的日志输出中枢。HTML Demo 中通过 ILogOutput 将日志渲染到页面"
-    test_depth: "512 行，覆盖级别/Tag/Output/Ring Buffer/time"
+    - module: DebugManager (调试面板)
+      priority: 400
+      capability_summary: 'DataSource 插件化采集，分层采集频率，容错隔离，快照缓存'
+      key_apis:
+          - 'registerDataSource() / unregisterDataSource() / collectAll()'
+          - 'getLastSnapshot() / getSnapshot() / setConfig()'
+          - 'IDebugDataSource: collect() — 自定义数据源'
+          - '内置: ModuleDataSource / EventDataSource'
+      game_relevance: '运行时调试信息采集。Demo 中展示模块状态、事件统计等调试数据'
+      test_depth: '216 行（manager 122 + datasources 94），覆盖注册/采集/快照/容错'
 
-  - module: DebugManager (调试面板)
-    priority: 400
-    capability_summary: "DataSource 插件化采集，分层采集频率，容错隔离，快照缓存"
-    key_apis:
-      - "registerDataSource() / unregisterDataSource() / collectAll()"
-      - "getLastSnapshot() / getSnapshot() / setConfig()"
-      - "IDebugDataSource: collect() — 自定义数据源"
-      - "内置: ModuleDataSource / EventDataSource"
-    game_relevance: "运行时调试信息采集。Demo 中展示模块状态、事件统计等调试数据"
-    test_depth: "216 行（manager 122 + datasources 94），覆盖注册/采集/快照/容错"
-
-  - module: HotUpdateManager
-    priority: 350
-    capability_summary: "两阶段版本检查（轻量版本号 + 完整清单），差量下载，MD5 校验，回退机制，Push+Pull 混合通知"
-    key_apis:
-      - "setAdapter() / setComparator() / setConfig()"
-      - "checkForUpdate() / startUpdate() / applyUpdate()"
-      - "getState() / getProgress() / getLocalVersion() / getRemoteVersion()"
-      - "HotUpdateEvents — Push 事件广播"
-    game_relevance: "版本更新流程。Demo 中模拟完整的版本检查→下载→校验→应用流程"
-    test_depth: "467 行，覆盖两阶段检查/差量计算/MD5/回退/事件"
+    - module: HotUpdateManager
+      priority: 350
+      capability_summary: '两阶段版本检查（轻量版本号 + 完整清单），差量下载，MD5 校验，回退机制，Push+Pull 混合通知'
+      key_apis:
+          - 'setAdapter() / setComparator() / setConfig()'
+          - 'checkForUpdate() / startUpdate() / applyUpdate()'
+          - 'getState() / getProgress() / getLocalVersion() / getRemoteVersion()'
+          - 'HotUpdateEvents — Push 事件广播'
+      game_relevance: '版本更新流程。Demo 中模拟完整的版本检查→下载→校验→应用流程'
+      test_depth: '467 行，覆盖两阶段检查/差量计算/MD5/回退/事件'
 
 # ═══════════════════════════════════════════════════════
 # 模块协作模式分析
 # ═══════════════════════════════════════════════════════
 
 module_collaboration_patterns:
+    - pattern: 'Procedure 流程驱动'
+      description: 'ProcedureManager 通过 FSM 驱动游戏主流程，每个 Procedure 内部协调其他模块'
+      modules: [ProcedureManager, FSM]
+      example: 'Launch→Preload(ResourceManager)→Menu(UIManager)→Game(EntityManager+Timer)→GameOver'
 
-  - pattern: "Procedure 流程驱动"
-    description: "ProcedureManager 通过 FSM 驱动游戏主流程，每个 Procedure 内部协调其他模块"
-    modules: [ProcedureManager, FSM]
-    example: "Launch→Preload(ResourceManager)→Menu(UIManager)→Game(EntityManager+Timer)→GameOver"
+    - pattern: '事件总线解耦'
+      description: '所有模块间通信走 EventManager，EventKey<T> 保证类型安全'
+      modules: [EventManager, '*']
+      example: 'Network 收到消息 → emit(PACKET_RECEIVED) → 业务层 handler 处理'
 
-  - pattern: "事件总线解耦"
-    description: "所有模块间通信走 EventManager，EventKey<T> 保证类型安全"
-    modules: [EventManager, "*"]
-    example: "Network 收到消息 → emit(PACKET_RECEIVED) → 业务层 handler 处理"
+    - pattern: '策略注入（Framework→Runtime 解耦）'
+      description: 'Framework 层定义 I*接口，Runtime/Demo 层注入具体实现'
+      modules:
+          [
+              ResourceManager,
+              AudioManager,
+              SceneManager,
+              UIManager,
+              EntityManager,
+              NetworkManager,
+              DataTableManager,
+              LocalizationManager,
+          ]
+      example: 'ResourceManager.setResourceLoader(mockLoader) — 纯逻辑层可完全 Mock'
 
-  - pattern: "策略注入（Framework→Runtime 解耦）"
-    description: "Framework 层定义 I*接口，Runtime/Demo 层注入具体实现"
-    modules: [ResourceManager, AudioManager, SceneManager, UIManager, EntityManager, NetworkManager, DataTableManager, LocalizationManager]
-    example: "ResourceManager.setResourceLoader(mockLoader) — 纯逻辑层可完全 Mock"
+    - pattern: '对象池复用链'
+      description: 'ObjectPool 为 Entity/UI/Resource 提供底层对象复用'
+      modules: [ObjectPool, EntityManager, UIManager, ResourceManager]
+      example: 'EntityManager 的 EntityGroup 双池 = ObjectPool 思想的业务层体现'
 
-  - pattern: "对象池复用链"
-    description: "ObjectPool 为 Entity/UI/Resource 提供底层对象复用"
-    modules: [ObjectPool, EntityManager, UIManager, ResourceManager]
-    example: "EntityManager 的 EntityGroup 双池 = ObjectPool 思想的业务层体现"
+    - pattern: 'Resource 资源联动'
+      description: '多个上层模块通过 ResourceManager 加载资产，引用计数管理生命周期'
+      modules:
+          [
+              ResourceManager,
+              AudioManager,
+              UIManager,
+              EntityManager,
+              SceneManager,
+              DataTableManager,
+              LocalizationManager,
+          ]
+      example: 'UIManager.openForm → ResourceManager.loadAsset → 创建 UI → 关闭时 releaseAsset'
 
-  - pattern: "Resource 资源联动"
-    description: "多个上层模块通过 ResourceManager 加载资产，引用计数管理生命周期"
-    modules: [ResourceManager, AudioManager, UIManager, EntityManager, SceneManager, DataTableManager, LocalizationManager]
-    example: "UIManager.openForm → ResourceManager.loadAsset → 创建 UI → 关闭时 releaseAsset"
+    - pattern: 'Timer + 游戏逻辑'
+      description: 'TimerManager 驱动各种时间相关的游戏逻辑'
+      modules: [TimerManager, EntityManager, FSM]
+      example: '技能冷却 Timer → 到期 → FSM changeState → 实体行为变化'
 
-  - pattern: "Timer + 游戏逻辑"
-    description: "TimerManager 驱动各种时间相关的游戏逻辑"
-    modules: [TimerManager, EntityManager, FSM]
-    example: "技能冷却 Timer → 到期 → FSM changeState → 实体行为变化"
-
-  - pattern: "DebugPanel 数据采集"
-    description: "DebugManager 通过 DataSource 插件采集各模块运行时数据"
-    modules: [DebugManager, ModuleDataSource, EventDataSource, "*"]
-    example: "ModuleDataSource 采集所有注册模块状态，EventDataSource 采集事件统计"
+    - pattern: 'DebugPanel 数据采集'
+      description: 'DebugManager 通过 DataSource 插件采集各模块运行时数据'
+      modules: [DebugManager, ModuleDataSource, EventDataSource, '*']
+      example: 'ModuleDataSource 采集所有注册模块状态，EventDataSource 采集事件统计'
 
 # ═══════════════════════════════════════════════════════
 # 模块-游戏类型覆盖矩阵
 # ═══════════════════════════════════════════════════════
 
 module_coverage_matrix:
+    - game_type: '回合制 RPG / 文字冒险'
+      description: '流程驱动 + 数据配置 + FSM 战斗状态机'
+      covered_modules:
+          - Core (框架骨架)
+          - EventManager (战斗事件广播)
+          - FSM (战斗状态机：玩家回合→敌人回合→结算)
+          - ProcedureManager (游戏流程：Menu→Battle→Settlement)
+          - DataTableManager (怪物/技能/装备配置表)
+          - TimerManager (回合计时、技能冷却)
+          - Logger (战斗日志)
+          - DebugManager (运行时状态监控)
+          - LocalizationManager (多语言文本)
+      coverage_count: 9
+      unique_validation: 'DataTable 配置驱动战斗数值、FSM 回合切换'
 
-  - game_type: "回合制 RPG / 文字冒险"
-    description: "流程驱动 + 数据配置 + FSM 战斗状态机"
-    covered_modules:
-      - Core (框架骨架)
-      - EventManager (战斗事件广播)
-      - FSM (战斗状态机：玩家回合→敌人回合→结算)
-      - ProcedureManager (游戏流程：Menu→Battle→Settlement)
-      - DataTableManager (怪物/技能/装备配置表)
-      - TimerManager (回合计时、技能冷却)
-      - Logger (战斗日志)
-      - DebugManager (运行时状态监控)
-      - LocalizationManager (多语言文本)
-    coverage_count: 9
-    unique_validation: "DataTable 配置驱动战斗数值、FSM 回合切换"
+    - game_type: '塔防 / 波次生存'
+      description: '实体管理 + 对象池 + 定时器波次 + 路径/状态机'
+      covered_modules:
+          - Core
+          - EventManager (波次事件、击杀事件)
+          - ObjectPool (子弹/敌人/特效复用)
+          - EntityManager (敌人/炮塔/子弹实体管理)
+          - FSM (敌人 AI 状态：移动→攻击→死亡)
+          - TimerManager (波次间隔、攻击速度)
+          - DataTableManager (塔/敌人/波次配置)
+          - ResourceManager (加载塔/敌人资产)
+          - AudioManager (攻击/爆炸音效)
+          - Logger
+          - DebugManager
+      coverage_count: 11
+      unique_validation: 'Entity 双池高频创建销毁、ObjectPool 大量复用、Timer 波次生成'
 
-  - game_type: "塔防 / 波次生存"
-    description: "实体管理 + 对象池 + 定时器波次 + 路径/状态机"
-    covered_modules:
-      - Core
-      - EventManager (波次事件、击杀事件)
-      - ObjectPool (子弹/敌人/特效复用)
-      - EntityManager (敌人/炮塔/子弹实体管理)
-      - FSM (敌人 AI 状态：移动→攻击→死亡)
-      - TimerManager (波次间隔、攻击速度)
-      - DataTableManager (塔/敌人/波次配置)
-      - ResourceManager (加载塔/敌人资产)
-      - AudioManager (攻击/爆炸音效)
-      - Logger
-      - DebugManager
-    coverage_count: 11
-    unique_validation: "Entity 双池高频创建销毁、ObjectPool 大量复用、Timer 波次生成"
+    - game_type: '网络聊天室 / 简单多人游戏'
+      description: '网络通信 + 消息广播 + 多通道管理'
+      covered_modules:
+          - Core
+          - EventManager (消息分发)
+          - NetworkManager (WebSocket 连接、心跳、重连)
+          - TimerManager (心跳定时器)
+          - Logger (网络日志)
+          - DebugManager (网络状态采集)
+          - LocalizationManager (多语言聊天)
+      coverage_count: 7
+      unique_validation: 'Network 多通道、心跳检测、指数退避重连、IPacketHandler 编解码'
 
-  - game_type: "网络聊天室 / 简单多人游戏"
-    description: "网络通信 + 消息广播 + 多通道管理"
-    covered_modules:
-      - Core
-      - EventManager (消息分发)
-      - NetworkManager (WebSocket 连接、心跳、重连)
-      - TimerManager (心跳定时器)
-      - Logger (网络日志)
-      - DebugManager (网络状态采集)
-      - LocalizationManager (多语言聊天)
-    coverage_count: 7
-    unique_validation: "Network 多通道、心跳检测、指数退避重连、IPacketHandler 编解码"
+    - game_type: 'Roguelike / 地牢闯关'
+      description: '流程驱动 + FSM + 实体 + 随机配置 + 场景切换'
+      covered_modules:
+          - Core
+          - EventManager
+          - FSM (角色状态、怪物 AI)
+          - ProcedureManager (关卡流程：Explore→Battle→Boss→NextFloor)
+          - EntityManager (玩家/怪物/道具)
+          - ObjectPool (掉落物/特效)
+          - TimerManager (Buff 持续、技能冷却)
+          - DataTableManager (怪物/装备/Buff 配置)
+          - ResourceManager (关卡资源加载)
+          - SceneManager (楼层切换)
+          - AudioManager (战斗/探索 BGM 切换)
+          - Logger
+          - DebugManager
+      coverage_count: 13
+      unique_validation: 'Procedure 多流程切换、Scene 场景切换、DataTable+随机生成'
 
-  - game_type: "Roguelike / 地牢闯关"
-    description: "流程驱动 + FSM + 实体 + 随机配置 + 场景切换"
-    covered_modules:
-      - Core
-      - EventManager
-      - FSM (角色状态、怪物 AI)
-      - ProcedureManager (关卡流程：Explore→Battle→Boss→NextFloor)
-      - EntityManager (玩家/怪物/道具)
-      - ObjectPool (掉落物/特效)
-      - TimerManager (Buff 持续、技能冷却)
-      - DataTableManager (怪物/装备/Buff 配置)
-      - ResourceManager (关卡资源加载)
-      - SceneManager (楼层切换)
-      - AudioManager (战斗/探索 BGM 切换)
-      - Logger
-      - DebugManager
-    coverage_count: 13
-    unique_validation: "Procedure 多流程切换、Scene 场景切换、DataTable+随机生成"
+    - game_type: '热更新模拟器'
+      description: '完整的版本检查→下载→校验→应用流程'
+      covered_modules:
+          - Core
+          - EventManager (更新进度事件)
+          - HotUpdateManager (两阶段检查、差量下载、MD5 校验、回退)
+          - ProcedureManager (Launch→CheckVersion→Download→Apply→Main)
+          - ResourceManager (资源校验)
+          - Logger
+          - DebugManager
+      coverage_count: 7
+      unique_validation: 'HotUpdate 完整流程实战验证、SemverComparator、IHotUpdateAdapter'
 
-  - game_type: "热更新模拟器"
-    description: "完整的版本检查→下载→校验→应用流程"
-    covered_modules:
-      - Core
-      - EventManager (更新进度事件)
-      - HotUpdateManager (两阶段检查、差量下载、MD5 校验、回退)
-      - ProcedureManager (Launch→CheckVersion→Download→Apply→Main)
-      - ResourceManager (资源校验)
-      - Logger
-      - DebugManager
-    coverage_count: 7
-    unique_validation: "HotUpdate 完整流程实战验证、SemverComparator、IHotUpdateAdapter"
-
-  - game_type: "Idle / 放置游戏"
-    description: "定时器驱动 + 数据配置 + 离线收益"
-    covered_modules:
-      - Core
-      - EventManager (资源变化事件)
-      - TimerManager (生产周期、升级冷却、离线计算)
-      - DataTableManager (建筑/产出/升级配置)
-      - DI/IoC (游戏服务注入)
-      - ObjectPool (数字飘字复用)
-      - Logger
-      - DebugManager
-      - LocalizationManager (多语言)
-    coverage_count: 9
-    unique_validation: "Timer timeScale 加速、大量定时器性能、DI 服务解耦"
+    - game_type: 'Idle / 放置游戏'
+      description: '定时器驱动 + 数据配置 + 离线收益'
+      covered_modules:
+          - Core
+          - EventManager (资源变化事件)
+          - TimerManager (生产周期、升级冷却、离线计算)
+          - DataTableManager (建筑/产出/升级配置)
+          - DI/IoC (游戏服务注入)
+          - ObjectPool (数字飘字复用)
+          - Logger
+          - DebugManager
+          - LocalizationManager (多语言)
+      coverage_count: 9
+      unique_validation: 'Timer timeScale 加速、大量定时器性能、DI 服务解耦'
 
 # ═══════════════════════════════════════════════════════
 # 薄弱验证区域（查缺补漏方向）
 # ═══════════════════════════════════════════════════════
 
 undervalidated_modules:
+    - module: ProcedureManager
+      current_test_lines: 134
+      issue: '仅验证基础流程切换，未验证：多流程串联完整循环、流程内协调多模块、流程错误恢复'
+      demo_validation_target: '在任何 Demo 中实现 4+ 个 Procedure 的完整游戏循环'
 
-  - module: ProcedureManager
-    current_test_lines: 134
-    issue: "仅验证基础流程切换，未验证：多流程串联完整循环、流程内协调多模块、流程错误恢复"
-    demo_validation_target: "在任何 Demo 中实现 4+ 个 Procedure 的完整游戏循环"
+    - module: EntityManager
+      current_test_lines: 252
+      issue: '单元测试已覆盖双池/反查，但未验证：高频创建销毁的性能表现、Entity 与 FSM 的状态协作、Entity 与 ObjectPool 的联动'
+      demo_validation_target: '塔防/射击 Demo 中 Entity 大量创建销毁 + FSM 状态切换'
 
-  - module: EntityManager
-    current_test_lines: 252
-    issue: "单元测试已覆盖双池/反查，但未验证：高频创建销毁的性能表现、Entity 与 FSM 的状态协作、Entity 与 ObjectPool 的联动"
-    demo_validation_target: "塔防/射击 Demo 中 Entity 大量创建销毁 + FSM 状态切换"
+    - module: DataTableManager
+      current_test_lines: 393
+      issue: '测试覆盖了 API，但未验证：配置驱动的完整游戏逻辑、多表联合查询、运行时数据热加载'
+      demo_validation_target: 'RPG/Roguelike Demo 中用 DataTable 配置驱动全部数值'
 
-  - module: DataTableManager
-    current_test_lines: 393
-    issue: "测试覆盖了 API，但未验证：配置驱动的完整游戏逻辑、多表联合查询、运行时数据热加载"
-    demo_validation_target: "RPG/Roguelike Demo 中用 DataTable 配置驱动全部数值"
+    - module: SceneManager
+      current_test_lines: 216
+      issue: '测试了加载去重和回调，但未验证：多场景连续切换、场景切换时资源管理联动（加载/释放）'
+      demo_validation_target: 'Roguelike Demo 中多楼层场景连续切换'
 
-  - module: SceneManager
-    current_test_lines: 216
-    issue: "测试了加载去重和回调，但未验证：多场景连续切换、场景切换时资源管理联动（加载/释放）"
-    demo_validation_target: "Roguelike Demo 中多楼层场景连续切换"
+    - module: UIManager
+      current_test_lines: 425
+      issue: '测试充分但未验证：多层级同时操作的复杂 UI 流程、Cover/Reveal 在实际游戏中的表现'
+      demo_validation_target: '任何 Demo 的 UI 流程（HTML 模拟 div 层级）'
 
-  - module: UIManager
-    current_test_lines: 425
-    issue: "测试充分但未验证：多层级同时操作的复杂 UI 流程、Cover/Reveal 在实际游戏中的表现"
-    demo_validation_target: "任何 Demo 的 UI 流程（HTML 模拟 div 层级）"
+    - module: HotUpdateManager
+      current_test_lines: 467
+      issue: '单元测试覆盖好，但未验证：完整的 Launch→Check→Download→Apply 端到端流程'
+      demo_validation_target: '热更新模拟器 Demo 验证完整流程'
 
-  - module: HotUpdateManager
-    current_test_lines: 467
-    issue: "单元测试覆盖好，但未验证：完整的 Launch→Check→Download→Apply 端到端流程"
-    demo_validation_target: "热更新模拟器 Demo 验证完整流程"
+    - module: LocalizationManager
+      current_test_lines: 489
+      issue: '测试好，但未验证：运行时动态语言切换对所有 UI 文本的联动刷新'
+      demo_validation_target: '任何 Demo 中实现中/英文运行时切换'
 
-  - module: LocalizationManager
-    current_test_lines: 489
-    issue: "测试好，但未验证：运行时动态语言切换对所有 UI 文本的联动刷新"
-    demo_validation_target: "任何 Demo 中实现中/英文运行时切换"
+    - module: DebugManager
+      current_test_lines: 216
+      issue: '基础采集已验证，但未验证：实际游戏运行时的实时数据采集效果、自定义 DataSource 的实战场景'
+      demo_validation_target: '所有 Demo 集成 DebugPanel 实时监控'
 
-  - module: DebugManager
-    current_test_lines: 216
-    issue: "基础采集已验证，但未验证：实际游戏运行时的实时数据采集效果、自定义 DataSource 的实战场景"
-    demo_validation_target: "所有 Demo 集成 DebugPanel 实时监控"
+    - module: AudioManager
+      current_test_lines: 445
+      issue: 'API 充分测试，但未验证：Music/Sound 交叉播放的实际体验、音量渐变'
+      demo_validation_target: '任何 Demo 中 BGM + 多音效叠加'
 
-  - module: AudioManager
-    current_test_lines: 445
-    issue: "API 充分测试，但未验证：Music/Sound 交叉播放的实际体验、音量渐变"
-    demo_validation_target: "任何 Demo 中 BGM + 多音效叠加"
+    - module: DI/IoC Container
+      current_test_lines: 436
+      issue: '测试最充分之一，但未验证：在实际游戏服务层的解耦效果（如战斗计算器、AI 决策注入）'
+      demo_validation_target: 'Idle/RPG Demo 中用 DI 管理游戏服务'
 
-  - module: DI/IoC Container
-    current_test_lines: 436
-    issue: "测试最充分之一，但未验证：在实际游戏服务层的解耦效果（如战斗计算器、AI 决策注入）"
-    demo_validation_target: "Idle/RPG Demo 中用 DI 管理游戏服务"
-
-  - module: "模块间集成（跨模块协作）"
-    current_test_lines: 0
-    issue: "所有测试都是单模块隔离测试，无模块间集成测试。以下协作场景从未被验证：Resource→Entity→ObjectPool 联动、FSM+Timer+Entity 战斗循环、Procedure 协调多模块、Network+Event 消息分发链路"
-    demo_validation_target: "每个 Demo 本质上就是集成测试，验证模块协作"
+    - module: '模块间集成（跨模块协作）'
+      current_test_lines: 0
+      issue: '所有测试都是单模块隔离测试，无模块间集成测试。以下协作场景从未被验证：Resource→Entity→ObjectPool 联动、FSM+Timer+Entity 战斗循环、Procedure 协调多模块、Network+Event 消息分发链路'
+      demo_validation_target: '每个 Demo 本质上就是集成测试，验证模块协作'
 
 # ═══════════════════════════════════════════════════════
 # 未覆盖能力与潜在补充
 # ═══════════════════════════════════════════════════════
 
 uncovered_capabilities:
+    - area: 'Timer 插件对比验证'
+      description: 'fbi-timer-heap 和 fbi-timer-wheel 两个插件各有 40+ 测试，但未在实际游戏场景中对比性能'
+      suggestion_for_demo: 'Idle 游戏 Demo 中切换 3 种 Timer 实现，展示性能差异'
 
-  - area: "Timer 插件对比验证"
-    description: "gfc-timer-heap 和 gfc-timer-wheel 两个插件各有 40+ 测试，但未在实际游戏场景中对比性能"
-    suggestion_for_demo: "Idle 游戏 Demo 中切换 3 种 Timer 实现，展示性能差异"
+    - area: 'ObjectPool 与 EntityGroup 的性能极限'
+      description: 'ObjectPool 已优化 Set O(1) 查重，但未在高并发场景（如弹幕游戏）中验证极限'
+      suggestion_for_demo: '塔防 Demo 压力测试：100+ 实体同时存活'
 
-  - area: "ObjectPool 与 EntityGroup 的性能极限"
-    description: "ObjectPool 已优化 Set O(1) 查重，但未在高并发场景（如弹幕游戏）中验证极限"
-    suggestion_for_demo: "塔防 Demo 压力测试：100+ 实体同时存活"
+    - area: 'Network 实际协议'
+      description: 'NetworkManager 895 行测试覆盖了所有 API，但都是 Mock。未验证真实 WebSocket 连接'
+      suggestion_for_demo: '网络聊天 Demo 用真实 WebSocket（可使用简单 Echo Server）'
 
-  - area: "Network 实际协议"
-    description: "NetworkManager 895 行测试覆盖了所有 API，但都是 Mock。未验证真实 WebSocket 连接"
-    suggestion_for_demo: "网络聊天 Demo 用真实 WebSocket（可使用简单 Echo Server）"
-
-  - area: "gfc-ecs 插件"
-    description: "packages/gfc-ecs/ 目录已存在但未在进度中提及，状态未知"
-    note: "如果已完成可在 Demo 中对比 Entity 与 ECS 模式"
+    - area: 'fbi-ecs 插件'
+      description: 'packages/gfc-ecs/ 目录已存在但未在进度中提及，状态未知'
+      note: '如果已完成可在 Demo 中对比 Entity 与 ECS 模式'
 
 # ═══════════════════════════════════════════════════════
 # 开放问题
 # ═══════════════════════════════════════════════════════
 
 open_questions:
-  - question: "每个 Demo 的开发时间预算是多少？"
-    context: "Phase 4 总共 2 周（Week 7-8），需要合理分配"
-    type: nice_to_know
-    affects: [all_demos]
+    - question: '每个 Demo 的开发时间预算是多少？'
+      context: 'Phase 4 总共 2 周（Week 7-8），需要合理分配'
+      type: nice_to_know
+      affects: [all_demos]
 
-  - question: "HTML Demo 是纯文字日志 + 按钮，还是也可以用简单 canvas 绘制？"
-    context: "用户说'不做 UI 部分'，但简单 canvas 点阵可以增强可视化效果"
-    type: nice_to_know
-    affects: [tower_defense, roguelike]
+    - question: 'HTML Demo 是纯文字日志 + 按钮，还是也可以用简单 canvas 绘制？'
+      context: "用户说'不做 UI 部分'，但简单 canvas 点阵可以增强可视化效果"
+      type: nice_to_know
+      affects: [tower_defense, roguelike]
 
-  - question: "Demo 之间是否需要代码共享基础设施（如通用 HTML 渲染层）？"
-    context: "多个 Demo 都需要日志输出 + 按钮交互，可复用 HTML 框架"
-    type: nice_to_know
-    affects: [all_demos]
+    - question: 'Demo 之间是否需要代码共享基础设施（如通用 HTML 渲染层）？'
+      context: '多个 Demo 都需要日志输出 + 按钮交互，可复用 HTML 框架'
+      type: nice_to_know
+      affects: [all_demos]
 
 gaps:
-  - area: "Entity 模块在 architecture.md 中标记'待开发'但实际已完成"
-    description: "architecture.md 模块状态与实际不一致（Entity 已有 252 行测试）"
-    impact: nice_to_know
-    affects: []
+    - area: "Entity 模块在 architecture.md 中标记'待开发'但实际已完成"
+      description: 'architecture.md 模块状态与实际不一致（Entity 已有 252 行测试）'
+      impact: nice_to_know
+      affects: []
 
-  - area: "gfc-ecs 包状态不明"
-    description: "packages/gfc-ecs/ 目录存在，有 src/ 和 tests/，但 training/progress.md 未提及"
-    impact: nice_to_know
-    affects: []
+    - area: 'fbi-ecs 包状态不明'
+      description: 'packages/gfc-ecs/ 目录存在，有 src/ 和 tests/，但 training/progress.md 未提及'
+      impact: nice_to_know
+      affects: []

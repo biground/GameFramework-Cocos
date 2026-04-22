@@ -1,4 +1,4 @@
-# 🎮 GameForge Cinder — 综合 Demo Series 设计文档
+# 🎮 Forge Blaze Ignite — 综合 Demo Series 设计文档
 
 > **版本**：v1.0 | **创建日期**：2026-04-20
 > **目的**：为 Phase 4 综合 Demo 提供完整设计蓝图，每个 Demo 可由独立 worktree + session 开发
@@ -9,7 +9,7 @@
 
 ### 1.1 目标
 
-通过 **6 个完整游戏 Demo + 1 套共享基础设施**，验证 GameForge Cinder 全部 17 个框架模块在真实游戏场景下的协作能力，同时为面试积累深度项目经验。
+通过 **6 个完整游戏 Demo + 1 套共享基础设施**，验证 Forge Blaze Ignite 全部 17 个框架模块在真实游戏场景下的协作能力，同时为面试积累深度项目经验。
 
 ### 1.2 设计原则
 
@@ -22,15 +22,15 @@
 
 ### 1.3 Demo 列表
 
-| #   | 名称              | 类型       | 核心验证点                               |
-| --- | ----------------- | ---------- | ---------------------------------------- |
+| #   | 名称                | 类型         | 核心验证点                               |
+| --- | ------------------- | ------------ | ---------------------------------------- |
 | 0   | Demo Infrastructure | 共享基础设施 | Mock 策略、HtmlRenderer、DemoBase        |
-| 1   | Idle Clicker      | 挂机放置   | Timer 深度、DataTable 配置驱动、数值成长 |
-| 2   | Turn-based RPG    | 回合制 RPG | FSM 战斗、Procedure 流程、Entity 管理    |
-| 3   | Auto-chess Lite   | 自走棋     | Entity 大量管理、ObjectPool 复用、AI FSM |
-| 4   | Tactics Grid      | 战棋       | FSM 多层嵌套、网格地图、地形系统         |
-| 5   | Multiplayer Arena | 多人对战   | Network 深度、状态同步、重连恢复         |
-| 6   | Game Launcher     | 游戏启动器 | HotUpdate、Scene 切换、i18n、全模块串联  |
+| 1   | Idle Clicker        | 挂机放置     | Timer 深度、DataTable 配置驱动、数值成长 |
+| 2   | Turn-based RPG      | 回合制 RPG   | FSM 战斗、Procedure 流程、Entity 管理    |
+| 3   | Auto-chess Lite     | 自走棋       | Entity 大量管理、ObjectPool 复用、AI FSM |
+| 4   | Tactics Grid        | 战棋         | FSM 多层嵌套、网格地图、地形系统         |
+| 5   | Multiplayer Arena   | 多人对战     | Network 深度、状态同步、重连恢复         |
+| 6   | Game Launcher       | 游戏启动器   | HotUpdate、Scene 切换、i18n、全模块串联  |
 
 ### 1.4 共用约定
 
@@ -75,63 +75,63 @@ tests/integration/
 
 ```typescript
 // DemoBase.bootstrap() 内部执行：
-GameEntry.registerModule(eventManager);       // priority: 10
-GameEntry.registerModule(objectPool);         // priority: 20
-GameEntry.registerModule(timerManager);       // priority: 30
-GameEntry.registerModule(logger);             // priority: 0
-GameEntry.registerModule(fsmManager);         // priority: 100
-GameEntry.registerModule(procedureManager);   // priority: 300
-GameEntry.registerModule(resourceManager);    // priority: 110
-GameEntry.registerModule(audioManager);       // priority: 200
-GameEntry.registerModule(sceneManager);       // priority: 210
-GameEntry.registerModule(uiManager);          // priority: 220
-GameEntry.registerModule(entityManager);      // priority: 230
-GameEntry.registerModule(networkManager);     // priority: 120
-GameEntry.registerModule(dataTableManager);   // priority: 310
+GameEntry.registerModule(eventManager); // priority: 10
+GameEntry.registerModule(objectPool); // priority: 20
+GameEntry.registerModule(timerManager); // priority: 30
+GameEntry.registerModule(logger); // priority: 0
+GameEntry.registerModule(fsmManager); // priority: 100
+GameEntry.registerModule(procedureManager); // priority: 300
+GameEntry.registerModule(resourceManager); // priority: 110
+GameEntry.registerModule(audioManager); // priority: 200
+GameEntry.registerModule(sceneManager); // priority: 210
+GameEntry.registerModule(uiManager); // priority: 220
+GameEntry.registerModule(entityManager); // priority: 230
+GameEntry.registerModule(networkManager); // priority: 120
+GameEntry.registerModule(dataTableManager); // priority: 310
 GameEntry.registerModule(localizationManager); // priority: 320
-GameEntry.registerModule(debugManager);       // priority: 400
-GameEntry.registerModule(hotUpdateManager);   // priority: 130
+GameEntry.registerModule(debugManager); // priority: 400
+GameEntry.registerModule(hotUpdateManager); // priority: 130
 ```
 
 #### 日志颜色规范
 
-| 颜色   | 用途               | CSS               |
-| ------ | ------------------ | ----------------- |
-| 🟢 绿 | 成功 / 初始化完成  | `color: #4CAF50`  |
-| 🔵 蓝 | 信息 / 状态变化    | `color: #2196F3`  |
-| 🟡 黄 | 警告 / 资源释放    | `color: #FF9800`  |
-| 🔴 红 | 错误 / 断线        | `color: #F44336`  |
-| 🟣 紫 | 网络消息           | `color: #9C27B0`  |
-| ⚪ 灰 | 调试 / 帧更新      | `color: #9E9E9E`  |
-| 🔶 橙 | 战斗 / 伤害数字    | `color: #FF5722`  |
-| 🩵 青 | 定时器 / 计时      | `color: #00BCD4`  |
+| 颜色  | 用途              | CSS              |
+| ----- | ----------------- | ---------------- |
+| 🟢 绿 | 成功 / 初始化完成 | `color: #4CAF50` |
+| 🔵 蓝 | 信息 / 状态变化   | `color: #2196F3` |
+| 🟡 黄 | 警告 / 资源释放   | `color: #FF9800` |
+| 🔴 红 | 错误 / 断线       | `color: #F44336` |
+| 🟣 紫 | 网络消息          | `color: #9C27B0` |
+| ⚪ 灰 | 调试 / 帧更新     | `color: #9E9E9E` |
+| 🔶 橙 | 战斗 / 伤害数字   | `color: #FF5722` |
+| 🩵 青 | 定时器 / 计时     | `color: #00BCD4` |
 
 ---
 
 ## 2. 模块覆盖矩阵
 
-> ◉ = 深度使用（核心玩法依赖）  ○ = 常规使用  · = 轻度/间接使用
+> ◉ = 深度使用（核心玩法依赖） ○ = 常规使用 · = 轻度/间接使用
 
-| 模块               | D0 基础设施 | D1 Idle | D2 RPG | D3 Auto-chess | D4 Tactics | D5 Arena | D6 Launcher |
-| ------------------ | :---------: | :-----: | :----: | :-----------: | :--------: | :------: | :---------: |
-| Core               |      ◉      |    ○    |   ○    |       ○       |     ○      |    ○     |      ○      |
-| EventManager       |      ◉      |    ◉    |   ◉    |       ◉       |     ◉      |    ◉     |      ○      |
-| ObjectPool         |      ○      |    ○    |   ◉    |       ◉       |     ◉      |    ◉     |      ·      |
-| DI/IoC             |      ◉      |    ○    |   ○    |       ○       |     ○      |    ○     |      ○      |
-| FSM                |      ·      |    ○    |   ◉    |       ◉       |     ◉      |    ◉     |      ·      |
-| ProcedureManager   |      ·      |    ◉    |   ◉    |       ◉       |     ◉      |    ◉     |      ◉      |
-| ResourceManager    |      ◉      |    ○    |   ○    |       ○       |     ○      |    ○     |      ○      |
-| UIManager          |      ○      |    ◉    |   ◉    |       ○       |     ○      |    ○     |      ◉      |
-| EntityManager      |      ○      |    ·    |   ◉    |       ◉       |     ◉      |    ◉     |      ·      |
-| NetworkManager     |      ◉      |    ·    |   ·    |       ○       |     ·      |    ◉     |      ·      |
-| AudioManager       |      ○      |    ○    |   ◉    |       ○       |     ○      |    ○     |      ○      |
-| SceneManager       |      ○      |    ○    |   ○    |       ○       |     ○      |    ○     |      ◉      |
-| TimerManager       |      ○      |    ◉    |   ○    |       ◉       |     ○      |    ◉     |      ·      |
-| DataTableManager   |      ○      |    ◉    |   ◉    |       ◉       |     ◉      |    ○     |      ·      |
-| LocalizationManager|      ○      |    ·    |   ○    |       ·       |     ·      |    ·     |      ◉      |
-| Logger             |      ◉      |    ○    |   ○    |       ○       |     ○      |    ○     |      ○      |
-| DebugManager       |      ◉      |    ○    |   ○    |       ○       |     ○      |    ○     |      ◉      |
-| HotUpdateManager   |      ·      |    ·    |   ·    |       ·       |     ·      |    ·     |      ◉      |
+| 模块                | D0 基础设施 | D1 Idle | D2 RPG | D3 Auto-chess | D4 Tactics | D5 Arena | D6 Launcher |
+| ------------------- | :---------: | :-----: | :----: | :-----------: | :--------: | :------: | :---------: |
+| Core                |      ◉      |    ○    |   ○    |       ○       |     ○      |    ○     |      ○      |
+| EventManager        |      ◉      |    ◉    |   ◉    |       ◉       |     ◉      |    ◉     |      ○      |
+| ObjectPool          |      ○      |    ○    |   ◉    |       ◉       |     ◉      |    ◉     |      ·      |
+| DI/IoC              |      ◉      |    ○    |   ○    |       ○       |     ○      |    ○     |      ○      |
+| FSM                 |      ·      |    ○    |   ◉    |       ◉       |     ◉      |    ◉     |      ·      |
+| ProcedureManager    |      ·      |    ◉    |   ◉    |       ◉       |     ◉      |    ◉     |      ◉      |
+| ResourceManager     |      ◉      |    ○    |   ○    |       ○       |     ○      |    ○     |      ○      |
+| UIManager           |      ○      |    ◉    |   ◉    |       ○       |     ○      |    ○     |      ◉      |
+| EntityManager       |      ○      |    ·    |   ◉    |       ◉       |     ◉      |    ◉     |      ·      |
+| NetworkManager      |      ◉      |    ·    |   ·    |       ○       |     ·      |    ◉     |      ·      |
+| AudioManager        |      ○      |    ○    |   ◉    |       ○       |     ○      |    ○     |      ○      |
+| SceneManager        |      ○      |    ○    |   ○    |       ○       |     ○      |    ○     |      ◉      |
+| TimerManager        |      ○      |    ◉    |   ○    |       ◉       |     ○      |    ◉     |      ·      |
+| DataTableManager    |      ○      |    ◉    |   ◉    |       ◉       |     ◉      |    ○     |      ·      |
+| LocalizationManager |      ○      |    ·    |   ○    |       ·       |     ·      |    ·     |      ◉      |
+| Logger              |      ◉      |    ○    |   ○    |       ○       |     ○      |    ○     |      ○      |
+| DebugManager        |      ◉      |    ○    |   ○    |       ○       |     ○      |    ○     |      ◉      |
+| HotUpdateManager    |      ·      |    ·    |   ·    |       ·       |     ·      |    ·     |      ◉      |
 
 **覆盖检查**：每个模块至少有 1 个 ◉（深度使用），确保 17 模块 100% 覆盖。
 
@@ -186,7 +186,12 @@ class HtmlRenderer {
     createButtonGroup(groupName: string): HTMLElement;
 
     /** 在按钮组中添加按钮 */
-    addButton(group: HTMLElement, label: string, onClick: () => void, disabled?: boolean): HTMLButtonElement;
+    addButton(
+        group: HTMLElement,
+        label: string,
+        onClick: () => void,
+        disabled?: boolean,
+    ): HTMLButtonElement;
 
     /** 清空日志区域 */
     clearLog(): void;
@@ -279,15 +284,15 @@ class MockAudioPlayer implements IAudioPlayer {
 
 #### 3.2.6 其他 Mock 策略
 
-| Mock 类                    | 实现接口           | 关键行为                                             |
-| -------------------------- | ------------------ | ---------------------------------------------------- |
-| `MockSceneLoader`          | `ISceneLoader`     | 记录场景切换历史，模拟加载延迟，回调 onProgress       |
-| `MockUIFormFactory`        | `IUIFormFactory`   | 创建轻量级 MockUIForm 实例，记录生命周期             |
-| `MockEntityFactory`        | `IEntityFactory`   | 创建 MockEntity 实例（继承 EntityBase），内存中管理    |
-| `MockDataTableParser`      | `IDataTableParser` | 直接接收 JSON 数组，无需文件解析                      |
-| `MockHotUpdateAdapter`     | `IHotUpdateAdapter` | 模拟版本检查、清单对比、文件下载流程                  |
-| `MockLocalizationLoader`   | *(自定义)*         | 内存中多语言数据，模拟资源加载                        |
-| `MockVersionComparator`    | `IVersionComparator` | 可编程的版本比较结果（用于测试各种场景）              |
+| Mock 类                  | 实现接口             | 关键行为                                            |
+| ------------------------ | -------------------- | --------------------------------------------------- |
+| `MockSceneLoader`        | `ISceneLoader`       | 记录场景切换历史，模拟加载延迟，回调 onProgress     |
+| `MockUIFormFactory`      | `IUIFormFactory`     | 创建轻量级 MockUIForm 实例，记录生命周期            |
+| `MockEntityFactory`      | `IEntityFactory`     | 创建 MockEntity 实例（继承 EntityBase），内存中管理 |
+| `MockDataTableParser`    | `IDataTableParser`   | 直接接收 JSON 数组，无需文件解析                    |
+| `MockHotUpdateAdapter`   | `IHotUpdateAdapter`  | 模拟版本检查、清单对比、文件下载流程                |
+| `MockLocalizationLoader` | _(自定义)_           | 内存中多语言数据，模拟资源加载                      |
+| `MockVersionComparator`  | `IVersionComparator` | 可编程的版本比较结果（用于测试各种场景）            |
 
 ### 3.3 面试亮点
 
@@ -316,25 +321,25 @@ class MockAudioPlayer implements IAudioPlayer {
 
 ### 4.3 覆盖模块清单
 
-| 模块             | 具体职责                                                              |
-| ---------------- | --------------------------------------------------------------------- |
-| Core             | GameEntry 初始化，模块注册                                            |
-| EventManager     | 金币变化事件、建筑升级事件、成就达成事件、离线收益事件                |
-| ObjectPool       | 飘字动画对象池（"+100金币" 等文本效果的复用）                          |
-| DI/IoC           | Container 注入 Mock 策略                                              |
-| FSM              | 建筑状态机：Idle → Producing → Upgrading → Idle                     |
-| ProcedureManager | 游戏主流程驱动（Launch → Preload → OfflineSettle → Main → Settings）  |
-| ResourceManager  | 加载建筑配置表、成就配置表                                            |
-| UIManager        | 主界面（建筑列表面板）、升级确认弹窗、成就通知、设置面板              |
-| TimerManager     | **深度使用** — 每个建筑独立产出 Timer（不同间隔）+ 自动存档 Timer + 离线收益计算 |
-| DataTableManager | **深度使用** — 建筑配置表、升级曲线表、成就条件表                      |
-| AudioManager     | 点击音效、升级音效、成就音效、背景音乐                                |
-| SceneManager     | 游戏场景（仅一个，但用 Scene 管理生命周期）                            |
-| Logger           | 标准日志输出                                                          |
-| DebugManager     | 展示实时数据（金币/秒、各建筑产出、Timer 数量）                        |
-| LocalizationManager | 建筑名称、成就描述的多语言                                         |
-| NetworkManager   | 轻度使用 — 模拟排行榜数据拉取                                        |
-| HotUpdateManager | 轻度使用 — 检测配置表更新                                            |
+| 模块                | 具体职责                                                                         |
+| ------------------- | -------------------------------------------------------------------------------- |
+| Core                | GameEntry 初始化，模块注册                                                       |
+| EventManager        | 金币变化事件、建筑升级事件、成就达成事件、离线收益事件                           |
+| ObjectPool          | 飘字动画对象池（"+100金币" 等文本效果的复用）                                    |
+| DI/IoC              | Container 注入 Mock 策略                                                         |
+| FSM                 | 建筑状态机：Idle → Producing → Upgrading → Idle                                  |
+| ProcedureManager    | 游戏主流程驱动（Launch → Preload → OfflineSettle → Main → Settings）             |
+| ResourceManager     | 加载建筑配置表、成就配置表                                                       |
+| UIManager           | 主界面（建筑列表面板）、升级确认弹窗、成就通知、设置面板                         |
+| TimerManager        | **深度使用** — 每个建筑独立产出 Timer（不同间隔）+ 自动存档 Timer + 离线收益计算 |
+| DataTableManager    | **深度使用** — 建筑配置表、升级曲线表、成就条件表                                |
+| AudioManager        | 点击音效、升级音效、成就音效、背景音乐                                           |
+| SceneManager        | 游戏场景（仅一个，但用 Scene 管理生命周期）                                      |
+| Logger              | 标准日志输出                                                                     |
+| DebugManager        | 展示实时数据（金币/秒、各建筑产出、Timer 数量）                                  |
+| LocalizationManager | 建筑名称、成就描述的多语言                                                       |
+| NetworkManager      | 轻度使用 — 模拟排行榜数据拉取                                                    |
+| HotUpdateManager    | 轻度使用 — 检测配置表更新                                                        |
 
 ### 4.4 Procedure 流程
 
@@ -374,43 +379,44 @@ graph TB
 
 #### 建筑配置表 `building_config`
 
-| 字段             | 类型   | 说明                        |
-| ---------------- | ------ | --------------------------- |
-| id               | number | 建筑 ID                    |
-| name             | string | 建筑名称（i18n key）       |
-| baseCost         | number | 基础购买价格                |
-| baseOutput       | number | 基础每秒产出                |
-| outputInterval   | number | 产出间隔（秒）              |
-| costMultiplier   | number | 升级费用倍率（指数底数）     |
-| outputPerLevel   | number | 每级增加产出                |
-| maxLevel         | number | 最大等级                    |
-| unlockCondition  | number | 解锁所需总金币数            |
+| 字段            | 类型   | 说明                     |
+| --------------- | ------ | ------------------------ |
+| id              | number | 建筑 ID                  |
+| name            | string | 建筑名称（i18n key）     |
+| baseCost        | number | 基础购买价格             |
+| baseOutput      | number | 基础每秒产出             |
+| outputInterval  | number | 产出间隔（秒）           |
+| costMultiplier  | number | 升级费用倍率（指数底数） |
+| outputPerLevel  | number | 每级增加产出             |
+| maxLevel        | number | 最大等级                 |
+| unlockCondition | number | 解锁所需总金币数         |
 
 #### 升级曲线表 `upgrade_curve`
 
-| 字段         | 类型   | 说明                     |
-| ------------ | ------ | ------------------------ |
-| id           | number | 行 ID                   |
-| buildingId   | number | 对应建筑 ID              |
-| level        | number | 等级                     |
-| cost         | number | 升级费用                 |
-| output       | number | 该等级产出               |
-| upgradeTime  | number | 升级所需时间（秒）        |
+| 字段        | 类型   | 说明               |
+| ----------- | ------ | ------------------ |
+| id          | number | 行 ID              |
+| buildingId  | number | 对应建筑 ID        |
+| level       | number | 等级               |
+| cost        | number | 升级费用           |
+| output      | number | 该等级产出         |
+| upgradeTime | number | 升级所需时间（秒） |
 
 #### 成就配置表 `achievement_config`
 
-| 字段       | 类型   | 说明                    |
-| ---------- | ------ | ----------------------- |
-| id         | number | 成就 ID                 |
-| name       | string | 成就名称（i18n key）    |
-| desc       | string | 成就描述（i18n key）    |
-| type       | string | 条件类型（totalGold / buildingLevel / buildingCount） |
-| target     | number | 达成目标值              |
-| reward     | number | 奖励金币                |
+| 字段   | 类型   | 说明                                                  |
+| ------ | ------ | ----------------------------------------------------- |
+| id     | number | 成就 ID                                               |
+| name   | string | 成就名称（i18n key）                                  |
+| desc   | string | 成就描述（i18n key）                                  |
+| type   | string | 条件类型（totalGold / buildingLevel / buildingCount） |
+| target | number | 达成目标值                                            |
+| reward | number | 奖励金币                                              |
 
 ### 4.7 HTML 按钮与日志
 
 **按钮组**：
+
 - `[点击挖矿]` — 手动点击获取金币
 - `[购买矿场]` `[购买伐木场]` `[购买农田]` `[购买炼金所]` — 购买建筑
 - `[升级矿场]` `[升级伐木场]` ... — 升级已有建筑
@@ -419,9 +425,11 @@ graph TB
 - `[查看成就]` — 展示成就列表
 
 **状态面板**：
+
 - 当前金币 / 每秒总产出 / 各建筑等级和产出 / 活跃 Timer 数量
 
 **日志示例**：
+
 ```
 🟢 [LaunchProcedure] 框架初始化完成，注册 17 个模块
 🔵 [PreloadProcedure] 加载 building_config (5行) ...完成
@@ -451,8 +459,8 @@ graph TB
 
 ### 4.10 插件发现方向
 
-- `gfc-save-system`：自动存档插件（序列化/反序列化 + localStorage / IndexedDB）
-- `gfc-offline-reward`：离线收益计算引擎（支持多种结算策略）
+- `fbi-save-system`：自动存档插件（序列化/反序列化 + localStorage / IndexedDB）
+- `fbi-offline-reward`：离线收益计算引擎（支持多种结算策略）
 
 ---
 
@@ -475,26 +483,26 @@ graph TB
 
 ### 5.3 覆盖模块清单
 
-| 模块             | 具体职责                                                                     |
-| ---------------- | ---------------------------------------------------------------------------- |
-| Core             | GameEntry 初始化                                                             |
-| EventManager     | **深度使用** — 战斗事件流（攻击、受伤、死亡、回合切换、技能释放、BUFF变化）    |
-| ObjectPool       | **深度使用** — 伤害飘字池、战斗特效池、BUFF 图标池                             |
-| DI/IoC           | Container 注入策略                                                           |
-| FSM              | **深度使用** — 战斗 FSM（回合开始→选择行动→执行行动→回合结束→判定胜负）       |
-| ProcedureManager | **深度使用** — Launch → Preload → Lobby → BattlePrep → Battle → Settle → Lobby |
-| ResourceManager  | 加载角色数据表、技能数据表、关卡配置表                                       |
-| UIManager        | **深度使用** — 角色信息面板、技能选择面板、战斗日志面板、结算面板              |
-| EntityManager    | **深度使用** — 角色实体和敌人实体管理（Group: "player" / "enemy"）             |
-| AudioManager     | **深度使用** — 战斗 BGM、攻击音效、技能音效、胜利/失败音效                    |
-| TimerManager     | BUFF 持续时间计时、技能冷却计时                                               |
-| DataTableManager | **深度使用** — 角色表、技能表、怪物表、关卡表                                 |
-| SceneManager     | 大厅场景 ↔ 战斗场景切换                                                     |
-| Logger           | 标准日志输出                                                                 |
-| DebugManager     | 战斗数据实时展示（各角色 HP/MP、回合数、Entity 数量）                         |
-| LocalizationManager | 技能名称、角色名称、战斗日志多语言                                       |
-| NetworkManager   | 轻度使用 — 模拟在线排行榜                                                   |
-| HotUpdateManager | 轻度使用 — 模拟关卡配置更新                                                 |
+| 模块                | 具体职责                                                                       |
+| ------------------- | ------------------------------------------------------------------------------ |
+| Core                | GameEntry 初始化                                                               |
+| EventManager        | **深度使用** — 战斗事件流（攻击、受伤、死亡、回合切换、技能释放、BUFF变化）    |
+| ObjectPool          | **深度使用** — 伤害飘字池、战斗特效池、BUFF 图标池                             |
+| DI/IoC              | Container 注入策略                                                             |
+| FSM                 | **深度使用** — 战斗 FSM（回合开始→选择行动→执行行动→回合结束→判定胜负）        |
+| ProcedureManager    | **深度使用** — Launch → Preload → Lobby → BattlePrep → Battle → Settle → Lobby |
+| ResourceManager     | 加载角色数据表、技能数据表、关卡配置表                                         |
+| UIManager           | **深度使用** — 角色信息面板、技能选择面板、战斗日志面板、结算面板              |
+| EntityManager       | **深度使用** — 角色实体和敌人实体管理（Group: "player" / "enemy"）             |
+| AudioManager        | **深度使用** — 战斗 BGM、攻击音效、技能音效、胜利/失败音效                     |
+| TimerManager        | BUFF 持续时间计时、技能冷却计时                                                |
+| DataTableManager    | **深度使用** — 角色表、技能表、怪物表、关卡表                                  |
+| SceneManager        | 大厅场景 ↔ 战斗场景切换                                                        |
+| Logger              | 标准日志输出                                                                   |
+| DebugManager        | 战斗数据实时展示（各角色 HP/MP、回合数、Entity 数量）                          |
+| LocalizationManager | 技能名称、角色名称、战斗日志多语言                                             |
+| NetworkManager      | 轻度使用 — 模拟在线排行榜                                                      |
+| HotUpdateManager    | 轻度使用 — 模拟关卡配置更新                                                    |
 
 ### 5.4 Procedure 流程
 
@@ -558,41 +566,41 @@ graph TB
 
 #### 角色配置表 `character_config`
 
-| 字段     | 类型   | 说明       |
-| -------- | ------ | ---------- |
-| id       | number | 角色 ID    |
-| name     | string | 名称 key   |
-| hp       | number | 基础 HP    |
-| mp       | number | 基础 MP    |
-| atk      | number | 攻击力     |
-| def      | number | 防御力     |
-| spd      | number | 速度       |
-| skills   | string | 技能 ID 列表（逗号分隔） |
+| 字段   | 类型   | 说明                     |
+| ------ | ------ | ------------------------ |
+| id     | number | 角色 ID                  |
+| name   | string | 名称 key                 |
+| hp     | number | 基础 HP                  |
+| mp     | number | 基础 MP                  |
+| atk    | number | 攻击力                   |
+| def    | number | 防御力                   |
+| spd    | number | 速度                     |
+| skills | string | 技能 ID 列表（逗号分隔） |
 
 #### 技能配置表 `skill_config`
 
-| 字段       | 类型   | 说明                                         |
-| ---------- | ------ | -------------------------------------------- |
-| id         | number | 技能 ID                                      |
-| name       | string | 技能名称 key                                  |
-| mpCost     | number | MP 消耗                                       |
-| damageRate | number | 伤害倍率（基于 ATK）                           |
-| target     | string | 目标类型（single_enemy / all_enemy / single_ally / all_ally） |
-| effect     | string | 附加效果（none / stun / heal / buff_atk）      |
-| effectDuration | number | 效果持续回合数                             |
-| cooldown   | number | 冷却回合数                                    |
+| 字段           | 类型   | 说明                                                          |
+| -------------- | ------ | ------------------------------------------------------------- |
+| id             | number | 技能 ID                                                       |
+| name           | string | 技能名称 key                                                  |
+| mpCost         | number | MP 消耗                                                       |
+| damageRate     | number | 伤害倍率（基于 ATK）                                          |
+| target         | string | 目标类型（single_enemy / all_enemy / single_ally / all_ally） |
+| effect         | string | 附加效果（none / stun / heal / buff_atk）                     |
+| effectDuration | number | 效果持续回合数                                                |
+| cooldown       | number | 冷却回合数                                                    |
 
 #### 怪物配置表 `monster_config`
 
-| 字段   | 类型   | 说明     |
-| ------ | ------ | -------- |
-| id     | number | 怪物 ID  |
-| name   | string | 名称 key |
-| hp     | number | HP       |
-| atk    | number | 攻击力   |
-| def    | number | 防御力   |
-| spd    | number | 速度     |
-| expReward | number | 经验奖励 |
+| 字段       | 类型   | 说明     |
+| ---------- | ------ | -------- |
+| id         | number | 怪物 ID  |
+| name       | string | 名称 key |
+| hp         | number | HP       |
+| atk        | number | 攻击力   |
+| def        | number | 防御力   |
+| spd        | number | 速度     |
+| expReward  | number | 经验奖励 |
 | goldReward | number | 金币奖励 |
 
 #### 关卡配置表 `stage_config`
@@ -601,23 +609,26 @@ graph TB
 | -------- | ------ | ------------------------ |
 | id       | number | 关卡 ID                  |
 | name     | string | 关卡名称 key             |
-| monsters | string | 怪物 ID 列表（逗号分隔）  |
-| bgm      | string | 背景音乐资源路径          |
-| maxRound | number | 最大回合数（超过判败）    |
+| monsters | string | 怪物 ID 列表（逗号分隔） |
+| bgm      | string | 背景音乐资源路径         |
+| maxRound | number | 最大回合数（超过判败）   |
 
 ### 5.7 HTML 按钮与日志
 
 **按钮组（大厅）**：
+
 - `[角色1 信息]` `[角色2 信息]` `[角色3 信息]` — 查看角色属性
 - `[关卡1: 新手村]` `[关卡2: 黑暗森林]` `[关卡3: 火山洞穴]` — 选择关卡
 - `[出发!]` — 进入战斗
 
 **按钮组（战斗中）**：
+
 - `[普通攻击]` `[技能1]` `[技能2]` — 当前角色行动选择
 - `[选择目标: 敌人1]` `[选择目标: 敌人2]` ... — 目标选择
 - `[自动战斗]` — 切换 AI 自动
 
 **日志示例**：
+
 ```
 🔵 [Battle] === 第 3 回合 ===
 🔵 [Battle] 行动顺序: 战士(SPD:12) → 敌人B(SPD:10) → 法师(SPD:8) → 敌人A(SPD:6)
@@ -649,8 +660,8 @@ graph TB
 
 ### 5.10 插件发现方向
 
-- `gfc-battle-engine`：通用回合制战斗引擎（可配置伤害公式、回合规则）
-- `gfc-buff-system`：BUFF/DEBUFF 管理系统（堆叠、驱散、定时效果）
+- `fbi-battle-engine`：通用回合制战斗引擎（可配置伤害公式、回合规则）
+- `fbi-buff-system`：BUFF/DEBUFF 管理系统（堆叠、驱散、定时效果）
 
 ---
 
@@ -674,26 +685,26 @@ graph TB
 
 ### 6.3 覆盖模块清单
 
-| 模块             | 具体职责                                                                      |
-| ---------------- | ----------------------------------------------------------------------------- |
-| Core             | GameEntry 初始化                                                              |
-| EventManager     | **深度使用** — 棋子购买、放置、合成、战斗攻击、回合切换等事件                   |
-| ObjectPool       | **深度使用** — 棋子 Entity 回收复用（战斗结束后回池，下轮重新布阵）              |
-| DI/IoC           | Container 注入策略                                                            |
-| FSM              | **深度使用** — 棋子 AI FSM（Idle→MoveTo→Attack→Idle）+ 游戏阶段 FSM           |
-| ProcedureManager | **深度使用** — Launch → Preload → PreparePhase → BattlePhase → Settle → 循环  |
-| ResourceManager  | 加载棋子表、羁绊表                                                            |
-| UIManager        | 商店面板、棋盘显示、玩家 HP 面板                                               |
-| EntityManager    | **深度使用** — 大量棋子 Entity 管理（Group: "player_chess" / "enemy_chess"）     |
-| NetworkManager   | 模拟匹配对手数据                                                               |
-| AudioManager     | 购买音效、合成音效、攻击音效、胜利/失败                                        |
-| SceneManager     | 场景管理                                                                       |
-| TimerManager     | **深度使用** — 准备阶段倒计时（30s）、战斗阶段每 tick AI 行动间隔               |
-| DataTableManager | **深度使用** — 棋子配置表、羁绊配置表、商店池配置                               |
-| Logger           | 标准日志                                                                       |
-| DebugManager     | 实时展示棋盘状态、Entity 数量、ObjectPool 统计                                  |
-| LocalizationManager | 棋子名称、羁绊描述                                                        |
-| HotUpdateManager | 轻度使用                                                                       |
+| 模块                | 具体职责                                                                     |
+| ------------------- | ---------------------------------------------------------------------------- |
+| Core                | GameEntry 初始化                                                             |
+| EventManager        | **深度使用** — 棋子购买、放置、合成、战斗攻击、回合切换等事件                |
+| ObjectPool          | **深度使用** — 棋子 Entity 回收复用（战斗结束后回池，下轮重新布阵）          |
+| DI/IoC              | Container 注入策略                                                           |
+| FSM                 | **深度使用** — 棋子 AI FSM（Idle→MoveTo→Attack→Idle）+ 游戏阶段 FSM          |
+| ProcedureManager    | **深度使用** — Launch → Preload → PreparePhase → BattlePhase → Settle → 循环 |
+| ResourceManager     | 加载棋子表、羁绊表                                                           |
+| UIManager           | 商店面板、棋盘显示、玩家 HP 面板                                             |
+| EntityManager       | **深度使用** — 大量棋子 Entity 管理（Group: "player_chess" / "enemy_chess"） |
+| NetworkManager      | 模拟匹配对手数据                                                             |
+| AudioManager        | 购买音效、合成音效、攻击音效、胜利/失败                                      |
+| SceneManager        | 场景管理                                                                     |
+| TimerManager        | **深度使用** — 准备阶段倒计时（30s）、战斗阶段每 tick AI 行动间隔            |
+| DataTableManager    | **深度使用** — 棋子配置表、羁绊配置表、商店池配置                            |
+| Logger              | 标准日志                                                                     |
+| DebugManager        | 实时展示棋盘状态、Entity 数量、ObjectPool 统计                               |
+| LocalizationManager | 棋子名称、羁绊描述                                                           |
+| HotUpdateManager    | 轻度使用                                                                     |
 
 ### 6.4 Procedure 流程
 
@@ -752,32 +763,33 @@ graph TB
 
 #### 棋子配置表 `chess_piece_config`
 
-| 字段      | 类型   | 说明                       |
-| --------- | ------ | -------------------------- |
-| id        | number | 棋子 ID                   |
-| name      | string | 名称 key                  |
+| 字段      | 类型   | 说明                                   |
+| --------- | ------ | -------------------------------------- |
+| id        | number | 棋子 ID                                |
+| name      | string | 名称 key                               |
 | race      | string | 种族（warrior / mage / ranger / tank） |
-| hp        | number | 基础 HP                   |
-| atk       | number | 攻击力                    |
-| atkSpeed  | number | 攻击间隔（秒）             |
-| range     | number | 攻击范围（格数）           |
-| cost      | number | 商店购买价格               |
-| star2Mult | number | ★2 属性倍率               |
+| hp        | number | 基础 HP                                |
+| atk       | number | 攻击力                                 |
+| atkSpeed  | number | 攻击间隔（秒）                         |
+| range     | number | 攻击范围（格数）                       |
+| cost      | number | 商店购买价格                           |
+| star2Mult | number | ★2 属性倍率                            |
 
 #### 羁绊配置表 `synergy_config`
 
-| 字段       | 类型   | 说明                        |
-| ---------- | ------ | --------------------------- |
-| id         | number | 羁绊 ID                    |
-| race       | string | 对应种族                    |
-| threshold  | number | 激活所需数量                |
-| effect     | string | 效果类型（atk_boost / hp_boost / spd_boost） |
-| value      | number | 效果数值（百分比）           |
-| desc       | string | 描述 key                    |
+| 字段      | 类型   | 说明                                         |
+| --------- | ------ | -------------------------------------------- |
+| id        | number | 羁绊 ID                                      |
+| race      | string | 对应种族                                     |
+| threshold | number | 激活所需数量                                 |
+| effect    | string | 效果类型（atk_boost / hp_boost / spd_boost） |
+| value     | number | 效果数值（百分比）                           |
+| desc      | string | 描述 key                                     |
 
 ### 6.7 HTML 按钮与日志
 
 **按钮组（准备阶段）**：
+
 - `[刷新商店 (2金币)]` — 刷新商店棋子
 - `[购买: 战士 (3金币)]` `[购买: 法师 (2金币)]` ... — 购买棋子
 - `[放置棋子到 (1,1)]` `[(1,2)]` ... — 布阵
@@ -785,9 +797,11 @@ graph TB
 - `[准备完毕]` — 跳过倒计时
 
 **按钮组（战斗阶段）**：
+
 - `[加速 ×2]` `[加速 ×4]` — 加速战斗（timeScale）
 
 **棋盘文字显示**：
+
 ```
 === 战斗棋盘 (Round 5) ===
   1    2    3    4
@@ -805,6 +819,7 @@ P1=战士★2  P2=法师★1  P3=游侠★1  P4=坦克★1
 ```
 
 **日志示例**：
+
 ```
 🔵 [Prepare] === 第 5 轮准备阶段 (30s) ===
 🟢 [Shop] 商店刷新: 战士(3金), 法师(2金), 游侠(4金), 坦克(3金), 法师(2金)
@@ -837,8 +852,8 @@ P1=战士★2  P2=法师★1  P3=游侠★1  P4=坦克★1
 
 ### 6.10 插件发现方向
 
-- `gfc-grid-system`：通用网格系统（寻路、范围计算、碰撞检测）
-- `gfc-ai-fsm`：AI 行为 FSM 扩展（带寻路和仇恨列表）
+- `fbi-grid-system`：通用网格系统（寻路、范围计算、碰撞检测）
+- `fbi-ai-fsm`：AI 行为 FSM 扩展（带寻路和仇恨列表）
 
 ---
 
@@ -849,6 +864,7 @@ P1=战士★2  P2=法师★1  P3=游侠★1  P4=坦克★1
 **战棋（SRPG 风格）**——玩家手动控制每个单位在网格地图上移动和攻击，类似 Fire Emblem / 梦幻模拟战。
 
 **关键区分（战棋 vs 自走棋）**：
+
 - 战棋：玩家手动控制每个单位的移动和攻击位置，强调战术决策
 - 自走棋：玩家只管编队和布阵，战斗完全自动进行
 
@@ -858,43 +874,43 @@ P1=战士★2  P2=法师★1  P3=游侠★1  P4=坦克★1
 
 - **网格地图**：6×6 文字网格，支持不同地形
 - **地形系统**：
-  - 平原（Plain）：移动力消耗 1，防御加成 0%
-  - 山地（Mountain）：移动力消耗 2，防御加成 +20%
-  - 水域（Water）：步兵不可通过，弓手移动力消耗 3
-  - 森林（Forest）：移动力消耗 1.5，防御加成 +10%，远程攻击减伤
+    - 平原（Plain）：移动力消耗 1，防御加成 0%
+    - 山地（Mountain）：移动力消耗 2，防御加成 +20%
+    - 水域（Water）：步兵不可通过，弓手移动力消耗 3
+    - 森林（Forest）：移动力消耗 1.5，防御加成 +10%，远程攻击减伤
 - **单位类型**：
-  - 战士（Warrior）：高 HP/DEF，移动力 3，攻击范围 1
-  - 弓手（Archer）：高 ATK，移动力 4，攻击范围 2~3
-  - 骑士（Knight）：高移动力 5，攻击范围 1，可穿越部分地形
-  - 治疗师（Healer）：低攻击，治疗范围 2，移动力 3
+    - 战士（Warrior）：高 HP/DEF，移动力 3，攻击范围 1
+    - 弓手（Archer）：高 ATK，移动力 4，攻击范围 2~3
+    - 骑士（Knight）：高移动力 5，攻击范围 1，可穿越部分地形
+    - 治疗师（Healer）：低攻击，治疗范围 2，移动力 3
 - **回合机制**：
-  - 玩家回合：依次操作己方所有单位（移动→攻击/技能→待机）
-  - 敌方回合：AI 依次操作所有敌方单位
+    - 玩家回合：依次操作己方所有单位（移动→攻击/技能→待机）
+    - 敌方回合：AI 依次操作所有敌方单位
 - **朝向系统**：背面受击伤害 ×1.5（侧面 ×1.2）
 - **关卡目标**：击败所有敌人 / 保护 NPC / 指定回合内通关
 
 ### 7.3 覆盖模块清单
 
-| 模块             | 具体职责                                                                        |
-| ---------------- | ------------------------------------------------------------------------------- |
-| Core             | GameEntry 初始化                                                                |
-| EventManager     | **深度使用** — 单位移动、攻击、受伤、死亡、回合切换、地形触发、关卡目标事件       |
-| ObjectPool       | **深度使用** — 伤害飘字池、移动路径标记池、攻击范围指示池                         |
-| DI/IoC           | Container 注入策略                                                              |
-| FSM              | **深度使用** — 回合 FSM + 单位行动 FSM（双层嵌套）                               |
-| ProcedureManager | **深度使用** — Launch → Preload → StageSelect → Deploy → TacticsBattle → Settle  |
-| ResourceManager  | 加载地图表、单位表、技能表                                                      |
-| UIManager        | 单位信息面板、地形信息面板、行动选择面板                                         |
-| EntityManager    | **深度使用** — 玩家单位 + 敌方单位 + NPC 三组 Entity 管理                        |
-| AudioManager     | 移动音效、攻击音效、技能音效、BGM                                               |
-| SceneManager     | 场景管理                                                                        |
-| TimerManager     | AI 思考延迟（模拟 AI 决策时间），回合时间限制                                    |
-| DataTableManager | **深度使用** — 单位表、地形表、技能表、关卡地图表                                |
-| Logger           | 标准日志                                                                        |
-| DebugManager     | 实时展示地图状态、Entity 数量、FSM 状态                                          |
-| LocalizationManager | 单位名称、地形描述、技能名称                                               |
-| NetworkManager   | 轻度使用                                                                        |
-| HotUpdateManager | 轻度使用                                                                        |
+| 模块                | 具体职责                                                                        |
+| ------------------- | ------------------------------------------------------------------------------- |
+| Core                | GameEntry 初始化                                                                |
+| EventManager        | **深度使用** — 单位移动、攻击、受伤、死亡、回合切换、地形触发、关卡目标事件     |
+| ObjectPool          | **深度使用** — 伤害飘字池、移动路径标记池、攻击范围指示池                       |
+| DI/IoC              | Container 注入策略                                                              |
+| FSM                 | **深度使用** — 回合 FSM + 单位行动 FSM（双层嵌套）                              |
+| ProcedureManager    | **深度使用** — Launch → Preload → StageSelect → Deploy → TacticsBattle → Settle |
+| ResourceManager     | 加载地图表、单位表、技能表                                                      |
+| UIManager           | 单位信息面板、地形信息面板、行动选择面板                                        |
+| EntityManager       | **深度使用** — 玩家单位 + 敌方单位 + NPC 三组 Entity 管理                       |
+| AudioManager        | 移动音效、攻击音效、技能音效、BGM                                               |
+| SceneManager        | 场景管理                                                                        |
+| TimerManager        | AI 思考延迟（模拟 AI 决策时间），回合时间限制                                   |
+| DataTableManager    | **深度使用** — 单位表、地形表、技能表、关卡地图表                               |
+| Logger              | 标准日志                                                                        |
+| DebugManager        | 实时展示地图状态、Entity 数量、FSM 状态                                         |
+| LocalizationManager | 单位名称、地形描述、技能名称                                                    |
+| NetworkManager      | 轻度使用                                                                        |
+| HotUpdateManager    | 轻度使用                                                                        |
 
 ### 7.4 Procedure 流程
 
@@ -959,6 +975,7 @@ graph TB
 ```
 
 **双层嵌套说明**：
+
 - **外层 TurnFsm**：控制回合大循环（玩家回合 ↔ 敌方回合）
 - **内层 UnitActionFsm**：控制单个单位的行动流程（选中→移动→行动→待机）
 - 玩家回合期间，每操作一个单位就创建/复用一个 UnitActionFsm
@@ -968,70 +985,73 @@ graph TB
 
 #### 单位配置表 `tactics_unit_config`
 
-| 字段       | 类型   | 说明                           |
-| ---------- | ------ | ------------------------------ |
-| id         | number | 单位 ID                       |
-| name       | string | 名称 key                      |
-| unitClass  | string | 职业（warrior/archer/knight/healer） |
-| hp         | number | 基础 HP                       |
-| atk        | number | 攻击力                        |
-| def        | number | 防御力                        |
-| moveRange  | number | 移动力（格数）                 |
-| atkRange   | string | 攻击范围（如 "1" 或 "2-3"）    |
-| skills     | string | 技能 ID 列表                   |
-| passable   | string | 可通过的特殊地形（如 "water"） |
+| 字段      | 类型   | 说明                                 |
+| --------- | ------ | ------------------------------------ |
+| id        | number | 单位 ID                              |
+| name      | string | 名称 key                             |
+| unitClass | string | 职业（warrior/archer/knight/healer） |
+| hp        | number | 基础 HP                              |
+| atk       | number | 攻击力                               |
+| def       | number | 防御力                               |
+| moveRange | number | 移动力（格数）                       |
+| atkRange  | string | 攻击范围（如 "1" 或 "2-3"）          |
+| skills    | string | 技能 ID 列表                         |
+| passable  | string | 可通过的特殊地形（如 "water"）       |
 
 #### 地形配置表 `terrain_config`
 
-| 字段       | 类型   | 说明                           |
-| ---------- | ------ | ------------------------------ |
-| id         | number | 地形 ID                       |
+| 字段       | 类型   | 说明                                    |
+| ---------- | ------ | --------------------------------------- |
+| id         | number | 地形 ID                                 |
 | type       | string | 地形类型（plain/mountain/water/forest） |
-| moveCost   | number | 移动力消耗                     |
-| defBonus   | number | 防御加成百分比                  |
-| atkPenalty | number | 远程攻击减伤百分比（森林遮蔽）  |
-| passable   | string | 允许通过的职业（all/mounted/none）|
-| desc       | string | 描述 key                       |
+| moveCost   | number | 移动力消耗                              |
+| defBonus   | number | 防御加成百分比                          |
+| atkPenalty | number | 远程攻击减伤百分比（森林遮蔽）          |
+| passable   | string | 允许通过的职业（all/mounted/none）      |
+| desc       | string | 描述 key                                |
 
 #### 技能配置表 `tactics_skill_config`
 
-| 字段       | 类型   | 说明                           |
-| ---------- | ------ | ------------------------------ |
-| id         | number | 技能 ID                       |
-| name       | string | 技能名称 key                   |
-| type       | string | 类型（attack/heal/buff）       |
-| range      | number | 作用范围（格数）               |
-| power      | number | 威力/治疗量                    |
-| cooldown   | number | 冷却回合数                     |
-| aoeRadius  | number | AOE 半径（0=单体）             |
-| desc       | string | 描述 key                       |
+| 字段      | 类型   | 说明                     |
+| --------- | ------ | ------------------------ |
+| id        | number | 技能 ID                  |
+| name      | string | 技能名称 key             |
+| type      | string | 类型（attack/heal/buff） |
+| range     | number | 作用范围（格数）         |
+| power     | number | 威力/治疗量              |
+| cooldown  | number | 冷却回合数               |
+| aoeRadius | number | AOE 半径（0=单体）       |
+| desc      | string | 描述 key                 |
 
 #### 关卡地图配置表 `tactics_map_config`
 
-| 字段           | 类型   | 说明                              |
-| -------------- | ------ | --------------------------------- |
-| id             | number | 关卡 ID                          |
-| name           | string | 关卡名称 key                     |
-| width          | number | 地图宽度                          |
-| height         | number | 地图高度                          |
-| terrain        | string | 地形矩阵（如 "PPMPFF/PPWWPP/..."）|
-| playerSpawns   | string | 玩家出生点（如 "0,0;1,0;0,1"）    |
-| enemyUnits     | string | 敌方单位配置（如 "1,3,3;2,4,4"）  |
-| winCondition   | string | 胜利条件（defeat_all/protect_npc/survive_turns） |
-| winParam       | number | 胜利参数（NPC id / 回合数）       |
-| maxTurns       | number | 最大回合数                        |
+| 字段         | 类型   | 说明                                             |
+| ------------ | ------ | ------------------------------------------------ |
+| id           | number | 关卡 ID                                          |
+| name         | string | 关卡名称 key                                     |
+| width        | number | 地图宽度                                         |
+| height       | number | 地图高度                                         |
+| terrain      | string | 地形矩阵（如 "PPMPFF/PPWWPP/..."）               |
+| playerSpawns | string | 玩家出生点（如 "0,0;1,0;0,1"）                   |
+| enemyUnits   | string | 敌方单位配置（如 "1,3,3;2,4,4"）                 |
+| winCondition | string | 胜利条件（defeat_all/protect_npc/survive_turns） |
+| winParam     | number | 胜利参数（NPC id / 回合数）                      |
+| maxTurns     | number | 最大回合数                                       |
 
 ### 7.7 HTML 按钮与日志
 
 **按钮组（关卡选择）**：
+
 - `[关卡1: 平原遭遇]` `[关卡2: 山地伏击]` `[关卡3: 河谷之战]` — 选择关卡
 
 **按钮组（部署阶段）**：
+
 - `[部署战士到(0,0)]` `[部署弓手到(1,0)]` ... — 放置单位
 - `[查看地形]` — 显示地形详情
 - `[开始战斗!]`
 
 **按钮组（玩家回合）**：
+
 - `[选择: 战士]` `[选择: 弓手]` `[选择: 骑士]` `[选择: 治疗师]` — 选择操作单位
 - `[移动到(x,y)]` — 移动目标
 - `[攻击]` `[技能1]` `[待机]` — 行动选择
@@ -1039,6 +1059,7 @@ graph TB
 - `[结束回合]` — 提前结束玩家回合
 
 **地图文字显示**：
+
 ```
 === 关卡2: 山地伏击 (Turn 3 - 玩家回合) ===
     1     2     3     4     5     6
@@ -1061,6 +1082,7 @@ P:戦=玩家战士(HP:80/100)  E:弓=敌方弓手(HP:45/60)
 ```
 
 **日志示例**：
+
 ```
 🔵 [Tactics] === Turn 3 - 玩家回合 ===
 🔵 [Tactics] 选中: 战士 (4,2) HP:80/100 移动力:3
@@ -1099,9 +1121,9 @@ P:戦=玩家战士(HP:80/100)  E:弓=敌方弓手(HP:45/60)
 
 ### 7.10 插件发现方向
 
-- `gfc-grid-system`：通用网格系统（A* 寻路、BFS 范围计算、六角网格支持）
-- `gfc-tactics-ai`：战棋 AI 引擎（威胁评估、多目标优先级、阵型分析）
-- `gfc-turn-system`：通用回合管理器（支持插入行动、延迟行动、行动取消）
+- `fbi-grid-system`：通用网格系统（A\* 寻路、BFS 范围计算、六角网格支持）
+- `fbi-tactics-ai`：战棋 AI 引擎（威胁评估、多目标优先级、阵型分析）
+- `fbi-turn-system`：通用回合管理器（支持插入行动、延迟行动、行动取消）
 
 ---
 
@@ -1125,26 +1147,26 @@ P:戦=玩家战士(HP:80/100)  E:弓=敌方弓手(HP:45/60)
 
 ### 8.3 覆盖模块清单
 
-| 模块             | 具体职责                                                                        |
-| ---------------- | ------------------------------------------------------------------------------- |
-| Core             | GameEntry 初始化                                                                |
-| EventManager     | **深度使用** — 网络消息事件、状态同步事件、连接状态事件、战斗事件                 |
-| ObjectPool       | **深度使用** — NetworkPacket 对象池（高频消息复用）                               |
-| DI/IoC           | Container 注入策略                                                              |
-| FSM              | **深度使用** — 角色状态 FSM（Idle→Moving→Attacking→Rolling→Stunned）             |
-| ProcedureManager | **深度使用** — Launch → Preload → Matching → Loading → Countdown → Battle → Settle |
-| ResourceManager  | 加载角色配置                                                                    |
-| UIManager        | 匹配面板、战斗 HUD（双方 HP）、断线提示面板                                      |
-| EntityManager    | **深度使用** — 玩家角色 Entity + 投射物 Entity                                   |
-| NetworkManager   | **深度使用** — MockNetworkSocket 双通道（游戏通道 + 匹配通道）、心跳、重连       |
-| AudioManager     | 攻击音效、技能音效、匹配成功音效                                                |
-| SceneManager     | 大厅场景 ↔ 竞技场场景                                                          |
-| TimerManager     | **深度使用** — 移动 tick 间隔、技能冷却、倒计时、对局时长限制                     |
-| DataTableManager | 角色属性表、技能表                                                               |
-| Logger           | 标准日志                                                                        |
-| DebugManager     | 网络延迟监控、丢包率、消息频率、Entity 状态                                       |
-| LocalizationManager | 角色名称、技能名称                                                         |
-| HotUpdateManager | 轻度使用                                                                        |
+| 模块                | 具体职责                                                                           |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| Core                | GameEntry 初始化                                                                   |
+| EventManager        | **深度使用** — 网络消息事件、状态同步事件、连接状态事件、战斗事件                  |
+| ObjectPool          | **深度使用** — NetworkPacket 对象池（高频消息复用）                                |
+| DI/IoC              | Container 注入策略                                                                 |
+| FSM                 | **深度使用** — 角色状态 FSM（Idle→Moving→Attacking→Rolling→Stunned）               |
+| ProcedureManager    | **深度使用** — Launch → Preload → Matching → Loading → Countdown → Battle → Settle |
+| ResourceManager     | 加载角色配置                                                                       |
+| UIManager           | 匹配面板、战斗 HUD（双方 HP）、断线提示面板                                        |
+| EntityManager       | **深度使用** — 玩家角色 Entity + 投射物 Entity                                     |
+| NetworkManager      | **深度使用** — MockNetworkSocket 双通道（游戏通道 + 匹配通道）、心跳、重连         |
+| AudioManager        | 攻击音效、技能音效、匹配成功音效                                                   |
+| SceneManager        | 大厅场景 ↔ 竞技场场景                                                              |
+| TimerManager        | **深度使用** — 移动 tick 间隔、技能冷却、倒计时、对局时长限制                      |
+| DataTableManager    | 角色属性表、技能表                                                                 |
+| Logger              | 标准日志                                                                           |
+| DebugManager        | 网络延迟监控、丢包率、消息频率、Entity 状态                                        |
+| LocalizationManager | 角色名称、技能名称                                                                 |
+| HotUpdateManager    | 轻度使用                                                                           |
 
 ### 8.4 Procedure 流程
 
@@ -1222,19 +1244,19 @@ graph TB
 
 #### 消息 ID 定义
 
-| ID   | 消息名              | 方向           | 描述                              |
-| ---- | -------------------- | -------------- | --------------------------------- |
-| 1001 | C2S_MATCH_REQUEST    | Client → Server | 请求匹配                          |
-| 1002 | S2C_MATCH_RESULT     | Server → Client | 匹配结果（对手信息）              |
-| 2001 | C2S_PLAYER_INPUT     | Client → Server | 玩家操作（移动/攻击/技能）        |
-| 2002 | S2C_STATE_SYNC       | Server → Client | 状态同步帧（双方位置/HP/状态）    |
-| 2003 | S2C_BATTLE_EVENT     | Server → Client | 战斗事件（伤害/击杀/效果）        |
-| 2004 | C2S_HEARTBEAT        | Client → Server | 心跳包                            |
-| 2005 | S2C_HEARTBEAT_ACK    | Server → Client | 心跳回复                          |
-| 3001 | S2C_GAME_START       | Server → Client | 游戏开始（倒计时结束）            |
-| 3002 | S2C_GAME_OVER        | Server → Client | 游戏结束（胜负结果）              |
-| 3003 | C2S_RECONNECT        | Client → Server | 断线重连请求                      |
-| 3004 | S2C_RECONNECT_STATE  | Server → Client | 重连后的完整状态快照              |
+| ID   | 消息名              | 方向            | 描述                           |
+| ---- | ------------------- | --------------- | ------------------------------ |
+| 1001 | C2S_MATCH_REQUEST   | Client → Server | 请求匹配                       |
+| 1002 | S2C_MATCH_RESULT    | Server → Client | 匹配结果（对手信息）           |
+| 2001 | C2S_PLAYER_INPUT    | Client → Server | 玩家操作（移动/攻击/技能）     |
+| 2002 | S2C_STATE_SYNC      | Server → Client | 状态同步帧（双方位置/HP/状态） |
+| 2003 | S2C_BATTLE_EVENT    | Server → Client | 战斗事件（伤害/击杀/效果）     |
+| 2004 | C2S_HEARTBEAT       | Client → Server | 心跳包                         |
+| 2005 | S2C_HEARTBEAT_ACK   | Server → Client | 心跳回复                       |
+| 3001 | S2C_GAME_START      | Server → Client | 游戏开始（倒计时结束）         |
+| 3002 | S2C_GAME_OVER       | Server → Client | 游戏结束（胜负结果）           |
+| 3003 | C2S_RECONNECT       | Client → Server | 断线重连请求                   |
+| 3004 | S2C_RECONNECT_STATE | Server → Client | 重连后的完整状态快照           |
 
 #### MockNetworkSocket 实现要点
 
@@ -1260,20 +1282,24 @@ class MockNetworkSocket implements INetworkSocket {
 ### 8.7 HTML 按钮与日志
 
 **按钮组（大厅）**：
+
 - `[开始匹配]` `[取消匹配]` — 匹配操作
 - `[查看战绩]` — 历史战绩
 
 **按钮组（战斗中）**：
+
 - `[↑]` `[←]` `[→]` `[↓]` — 移动方向
 - `[近战攻击 (CD: 0)]` — 近战
 - `[远程投射 (CD: 3)]` — 远程技能
 - `[闪避翻滚 (CD: 5)]` — 闪避
 
 **按钮组（调试）**：
+
 - `[模拟断线]` `[模拟高延迟 (500ms)]` `[模拟丢包 30%]` — 网络调试
 - `[切换观战模式]` — 观战
 
 **竞技场文字显示**：
+
 ```
 === 竞技场 (Tick 42 | 延迟: 87ms) ===
     1     2     3     4     5
@@ -1293,6 +1319,7 @@ P1: 玩家 HP:75/100 [Idle]   P2: AI HP:60/100 [Moving→(3,4)]
 ```
 
 **日志示例**：
+
 ```
 🟣 [Network] 发送 C2S_MATCH_REQUEST
 🟣 [Network] 收到 S2C_MATCH_RESULT: 对手=AI_Player (延迟: 92ms)
@@ -1329,9 +1356,9 @@ P1: 玩家 HP:75/100 [Idle]   P2: AI HP:60/100 [Moving→(3,4)]
 
 ### 8.10 插件发现方向
 
-- `gfc-state-sync`：通用状态同步引擎（差量同步、快照对比、插值预测）
-- `gfc-matchmaking`：匹配系统（ELO 积分、房间管理、负载均衡）
-- `gfc-replay`：回放系统（录制操作序列 + 回放引擎）
+- `fbi-state-sync`：通用状态同步引擎（差量同步、快照对比、插值预测）
+- `fbi-matchmaking`：匹配系统（ELO 积分、房间管理、负载均衡）
+- `fbi-replay`：回放系统（录制操作序列 + 回放引擎）
 
 ---
 
@@ -1353,26 +1380,26 @@ P1: 玩家 HP:75/100 [Idle]   P2: AI HP:60/100 [Moving→(3,4)]
 
 ### 9.3 覆盖模块清单
 
-| 模块               | 具体职责                                                                          |
-| ------------------ | --------------------------------------------------------------------------------- |
-| Core               | GameEntry 初始化，模块注册                                                        |
-| EventManager       | 语言切换事件、热更新事件、场景切换事件、设置变更事件                               |
-| ObjectPool         | 轻度使用                                                                          |
-| DI/IoC             | Container 注入策略                                                                |
-| FSM                | 轻度使用                                                                          |
-| ProcedureManager   | **深度使用** — Launch → HotUpdate → Menu → DemoLoading → DemoRunning → BackToMenu  |
-| ResourceManager    | 加载 Demo 配置、公告数据、多语言资源                                               |
-| UIManager          | **深度使用** — 主菜单面板、设置面板、更新进度面板、公告面板、Demo 信息面板          |
-| EntityManager      | 轻度使用                                                                          |
-| NetworkManager     | 模拟公告拉取、版本检查（HTTP 模拟）                                                |
-| AudioManager       | 背景音乐、按钮点击音效                                                            |
-| SceneManager       | **深度使用** — Launcher Scene ↔ Demo Scene 互相切换                                |
-| TimerManager       | 轻度使用 — 公告轮播 Timer                                                         |
-| DataTableManager   | Demo 列表配置表                                                                   |
-| LocalizationManager | **深度使用** — 全界面多语言（中/英/日），动态切换所有文本                          |
-| Logger             | 标准日志                                                                          |
-| DebugManager       | **深度使用** — 展示 DebugPanel 完整功能，所有 DataSource 注册                      |
-| HotUpdateManager   | **深度使用** — 完整热更新流程（版本检查→清单对比→差量下载→MD5校验→应用→回退）     |
+| 模块                | 具体职责                                                                          |
+| ------------------- | --------------------------------------------------------------------------------- |
+| Core                | GameEntry 初始化，模块注册                                                        |
+| EventManager        | 语言切换事件、热更新事件、场景切换事件、设置变更事件                              |
+| ObjectPool          | 轻度使用                                                                          |
+| DI/IoC              | Container 注入策略                                                                |
+| FSM                 | 轻度使用                                                                          |
+| ProcedureManager    | **深度使用** — Launch → HotUpdate → Menu → DemoLoading → DemoRunning → BackToMenu |
+| ResourceManager     | 加载 Demo 配置、公告数据、多语言资源                                              |
+| UIManager           | **深度使用** — 主菜单面板、设置面板、更新进度面板、公告面板、Demo 信息面板        |
+| EntityManager       | 轻度使用                                                                          |
+| NetworkManager      | 模拟公告拉取、版本检查（HTTP 模拟）                                               |
+| AudioManager        | 背景音乐、按钮点击音效                                                            |
+| SceneManager        | **深度使用** — Launcher Scene ↔ Demo Scene 互相切换                               |
+| TimerManager        | 轻度使用 — 公告轮播 Timer                                                         |
+| DataTableManager    | Demo 列表配置表                                                                   |
+| LocalizationManager | **深度使用** — 全界面多语言（中/英/日），动态切换所有文本                         |
+| Logger              | 标准日志                                                                          |
+| DebugManager        | **深度使用** — 展示 DebugPanel 完整功能，所有 DataSource 注册                     |
+| HotUpdateManager    | **深度使用** — 完整热更新流程（版本检查→清单对比→差量下载→MD5校验→应用→回退）     |
 
 ### 9.4 Procedure 流程
 
@@ -1425,37 +1452,62 @@ graph TB
 
 #### Demo 列表配置表 `demo_list`
 
-| 字段        | 类型   | 说明               |
-| ----------- | ------ | ------------------ |
-| id          | number | Demo ID            |
-| name        | string | 名称 key（i18n）   |
-| desc        | string | 描述 key（i18n）   |
-| version     | string | 当前版本号         |
-| sceneName   | string | 场景名称           |
-| icon        | string | 图标资源路径       |
-| tags        | string | 标签（逗号分隔）   |
+| 字段      | 类型   | 说明             |
+| --------- | ------ | ---------------- |
+| id        | number | Demo ID          |
+| name      | string | 名称 key（i18n） |
+| desc      | string | 描述 key（i18n） |
+| version   | string | 当前版本号       |
+| sceneName | string | 场景名称         |
+| icon      | string | 图标资源路径     |
+| tags      | string | 标签（逗号分隔） |
 
 ### 9.7 i18n 多语言文本
 
 ```json
 {
-    "launcher.title": { "zh-CN": "游戏启动器", "en-US": "Game Launcher", "ja-JP": "ゲームランチャー" },
+    "launcher.title": {
+        "zh-CN": "游戏启动器",
+        "en-US": "Game Launcher",
+        "ja-JP": "ゲームランチャー"
+    },
     "launcher.demo1.name": { "zh-CN": "挂机放置", "en-US": "Idle Clicker", "ja-JP": "放置ゲーム" },
-    "launcher.demo2.name": { "zh-CN": "回合制RPG", "en-US": "Turn-based RPG", "ja-JP": "ターン制RPG" },
+    "launcher.demo2.name": {
+        "zh-CN": "回合制RPG",
+        "en-US": "Turn-based RPG",
+        "ja-JP": "ターン制RPG"
+    },
     "launcher.demo3.name": { "zh-CN": "自走棋", "en-US": "Auto-chess", "ja-JP": "オートチェス" },
     "launcher.demo4.name": { "zh-CN": "战棋", "en-US": "Tactics Grid", "ja-JP": "タクティクス" },
-    "launcher.demo5.name": { "zh-CN": "多人对战", "en-US": "Multiplayer Arena", "ja-JP": "マルチプレイ" },
+    "launcher.demo5.name": {
+        "zh-CN": "多人对战",
+        "en-US": "Multiplayer Arena",
+        "ja-JP": "マルチプレイ"
+    },
     "launcher.settings": { "zh-CN": "设置", "en-US": "Settings", "ja-JP": "設定" },
     "launcher.language": { "zh-CN": "语言", "en-US": "Language", "ja-JP": "言語" },
-    "launcher.update.checking": { "zh-CN": "正在检查更新...", "en-US": "Checking for updates...", "ja-JP": "アップデートを確認中..." },
-    "launcher.update.downloading": { "zh-CN": "下载中 {0}%", "en-US": "Downloading {0}%", "ja-JP": "ダウンロード中 {0}%" },
-    "launcher.update.complete": { "zh-CN": "更新完成", "en-US": "Update complete", "ja-JP": "アップデート完了" }
+    "launcher.update.checking": {
+        "zh-CN": "正在检查更新...",
+        "en-US": "Checking for updates...",
+        "ja-JP": "アップデートを確認中..."
+    },
+    "launcher.update.downloading": {
+        "zh-CN": "下载中 {0}%",
+        "en-US": "Downloading {0}%",
+        "ja-JP": "ダウンロード中 {0}%"
+    },
+    "launcher.update.complete": {
+        "zh-CN": "更新完成",
+        "en-US": "Update complete",
+        "ja-JP": "アップデート完了"
+    }
 }
 ```
 
 ### 9.8 HTML 按钮与日志
 
 **按钮组（主菜单）**：
+
 - `[🎮 挂机放置 v1.0.0]` `[⚔️ 回合制RPG v1.0.0]` `[♟ 自走棋 v1.0.0]` `[🏰 战棋 v1.0.0]` `[🏟 多人对战 v1.0.0]` — 选择 Demo
 - `[⚙️ 设置]` — 打开设置
 - `[📢 公告]` — 查看公告
@@ -1463,16 +1515,19 @@ graph TB
 - `[🐛 DebugPanel]` — 切换调试面板
 
 **按钮组（设置面板）**：
+
 - `[🌐 中文]` `[🌐 English]` `[🌐 日本語]` — 语言切换
 - `[🔊 主音量: 80%]` `[🎵 音乐: 60%]` `[🔉 音效: 100%]` — 音量调节
 - `[🛠 开发者模式: 关]` — 开发者模式
 
 **按钮组（DebugPanel）**：
+
 - `[📊 模块状态]` — ModuleDataSource 采集结果
 - `[📡 事件统计]` — EventDataSource 采集结果
 - `[🔧 收集快照]` — 手动触发 collectAll()
 
 **日志示例**：
+
 ```
 🟢 [Launch] 框架初始化完成, 17 个模块注册成功
 🔵 [HotUpdate] 检查更新... 本地版本: 1.0.0
@@ -1512,9 +1567,9 @@ graph TB
 
 ### 9.11 插件发现方向
 
-- `gfc-settings`：设置管理器（持久化 + 类型安全 + 热加载）
-- `gfc-announcement`：公告系统（服务端拉取 + 缓存 + 轮播）
-- `gfc-launcher`：通用启动器 SDK（版本管理 + 场景路由 + 设置中心）
+- `fbi-settings`：设置管理器（持久化 + 类型安全 + 热加载）
+- `fbi-announcement`：公告系统（服务端拉取 + 缓存 + 轮播）
+- `fbi-launcher`：通用启动器 SDK（版本管理 + 场景路由 + 设置中心）
 
 ---
 
@@ -1522,15 +1577,15 @@ graph TB
 
 ### 推荐顺序
 
-| 阶段 | Demo           | 理由                                                                   |
-| ---- | -------------- | ---------------------------------------------------------------------- |
-| 1    | Demo 0 Infrastructure | 必须首先完成——所有其他 Demo 依赖此基础设施                        |
-| 2    | Demo 1 Idle Clicker   | 最简单的游戏循环，验证 DemoBase + Timer + DataTable 的基础协作   |
-| 3    | Demo 2 Turn-based RPG | 中等复杂度，验证 FSM + Entity + 完整战斗系统                    |
-| 4    | Demo 4 Tactics Grid   | 在 Demo 2 基础上进阶——双层 FSM + 网格系统 + 地形                |
-| 5    | Demo 3 Auto-chess     | 与 Demo 4 类似但侧重不同（AI FSM + ObjectPool 大量复用）        |
-| 6    | Demo 5 Arena          | Network 深度使用，需要 Mock 设计经验充足后再做                   |
-| 7    | Demo 6 Launcher       | 最后做——集成所有 Demo，测试 HotUpdate + Scene 切换 + i18n        |
+| 阶段 | Demo                  | 理由                                                           |
+| ---- | --------------------- | -------------------------------------------------------------- |
+| 1    | Demo 0 Infrastructure | 必须首先完成——所有其他 Demo 依赖此基础设施                     |
+| 2    | Demo 1 Idle Clicker   | 最简单的游戏循环，验证 DemoBase + Timer + DataTable 的基础协作 |
+| 3    | Demo 2 Turn-based RPG | 中等复杂度，验证 FSM + Entity + 完整战斗系统                   |
+| 4    | Demo 4 Tactics Grid   | 在 Demo 2 基础上进阶——双层 FSM + 网格系统 + 地形               |
+| 5    | Demo 3 Auto-chess     | 与 Demo 4 类似但侧重不同（AI FSM + ObjectPool 大量复用）       |
+| 6    | Demo 5 Arena          | Network 深度使用，需要 Mock 设计经验充足后再做                 |
+| 7    | Demo 6 Launcher       | 最后做——集成所有 Demo，测试 HotUpdate + Scene 切换 + i18n      |
 
 ### 顺序理由
 
@@ -1546,37 +1601,37 @@ graph TB
 
 通过 Demo Series 发现的可提取插件方向：
 
-| 插件名                | 来源 Demo | 描述                                                 | 优先级 |
-| --------------------- | --------- | ---------------------------------------------------- | ------ |
-| `gfc-save-system`     | Demo 1    | 自动存档（序列化 + localStorage/IndexedDB）           | 高     |
-| `gfc-offline-reward`  | Demo 1    | 离线收益计算引擎                                     | 中     |
-| `gfc-battle-engine`   | Demo 2    | 通用回合制战斗引擎（可配置伤害公式、回合规则）        | 高     |
-| `gfc-buff-system`     | Demo 2    | BUFF/DEBUFF 管理（堆叠、驱散、定时效果）             | 高     |
-| `gfc-grid-system`     | Demo 3/4  | 通用网格系统（A* 寻路、BFS 范围、六角支持）           | 高     |
-| `gfc-ai-fsm`          | Demo 3    | AI 行为 FSM（寻路 + 仇恨列表）                       | 中     |
-| `gfc-tactics-ai`      | Demo 4    | 战棋 AI（威胁评估、多目标优先级、阵型分析）          | 中     |
-| `gfc-turn-system`     | Demo 4    | 通用回合管理器（插入行动、延迟行动、行动取消）       | 中     |
-| `gfc-state-sync`      | Demo 5    | 通用状态同步引擎（差量同步、快照对比、插值预测）      | 高     |
-| `gfc-matchmaking`     | Demo 5    | 匹配系统（ELO 积分、房间管理）                       | 低     |
-| `gfc-replay`          | Demo 5    | 回放系统（录制操作 + 回放引擎）                       | 低     |
-| `gfc-settings`        | Demo 6    | 设置管理器（持久化 + 类型安全 + 热加载）              | 中     |
-| `gfc-announcement`    | Demo 6    | 公告系统（拉取 + 缓存 + 轮播）                       | 低     |
+| 插件名               | 来源 Demo | 描述                                             | 优先级 |
+| -------------------- | --------- | ------------------------------------------------ | ------ |
+| `fbi-save-system`    | Demo 1    | 自动存档（序列化 + localStorage/IndexedDB）      | 高     |
+| `fbi-offline-reward` | Demo 1    | 离线收益计算引擎                                 | 中     |
+| `fbi-battle-engine`  | Demo 2    | 通用回合制战斗引擎（可配置伤害公式、回合规则）   | 高     |
+| `fbi-buff-system`    | Demo 2    | BUFF/DEBUFF 管理（堆叠、驱散、定时效果）         | 高     |
+| `fbi-grid-system`    | Demo 3/4  | 通用网格系统（A\* 寻路、BFS 范围、六角支持）     | 高     |
+| `fbi-ai-fsm`         | Demo 3    | AI 行为 FSM（寻路 + 仇恨列表）                   | 中     |
+| `fbi-tactics-ai`     | Demo 4    | 战棋 AI（威胁评估、多目标优先级、阵型分析）      | 中     |
+| `fbi-turn-system`    | Demo 4    | 通用回合管理器（插入行动、延迟行动、行动取消）   | 中     |
+| `fbi-state-sync`     | Demo 5    | 通用状态同步引擎（差量同步、快照对比、插值预测） | 高     |
+| `fbi-matchmaking`    | Demo 5    | 匹配系统（ELO 积分、房间管理）                   | 低     |
+| `fbi-replay`         | Demo 5    | 回放系统（录制操作 + 回放引擎）                  | 低     |
+| `fbi-settings`       | Demo 6    | 设置管理器（持久化 + 类型安全 + 热加载）         | 中     |
+| `fbi-announcement`   | Demo 6    | 公告系统（拉取 + 缓存 + 轮播）                   | 低     |
 
 ---
 
 ## 附录 A：策略注入接口一览
 
-| 模块             | 策略接口            | Mock 实现                  |
-| ---------------- | ------------------- | -------------------------- |
-| ResourceManager  | `IResourceLoader`   | `MockResourceLoader`       |
-| AudioManager     | `IAudioPlayer`      | `MockAudioPlayer`          |
-| SceneManager     | `ISceneLoader`      | `MockSceneLoader`          |
-| UIManager        | `IUIFormFactory`    | `MockUIFormFactory`        |
-| EntityManager    | `IEntityFactory`    | `MockEntityFactory`        |
-| NetworkManager   | `INetworkSocket`    | `MockNetworkSocket`        |
-| DataTableManager | `IDataTableParser`  | `MockDataTableParser`      |
-| HotUpdateManager | `IHotUpdateAdapter` | `MockHotUpdateAdapter`     |
-| HotUpdateManager | `IVersionComparator`| `MockVersionComparator`    |
+| 模块             | 策略接口             | Mock 实现               |
+| ---------------- | -------------------- | ----------------------- |
+| ResourceManager  | `IResourceLoader`    | `MockResourceLoader`    |
+| AudioManager     | `IAudioPlayer`       | `MockAudioPlayer`       |
+| SceneManager     | `ISceneLoader`       | `MockSceneLoader`       |
+| UIManager        | `IUIFormFactory`     | `MockUIFormFactory`     |
+| EntityManager    | `IEntityFactory`     | `MockEntityFactory`     |
+| NetworkManager   | `INetworkSocket`     | `MockNetworkSocket`     |
+| DataTableManager | `IDataTableParser`   | `MockDataTableParser`   |
+| HotUpdateManager | `IHotUpdateAdapter`  | `MockHotUpdateAdapter`  |
+| HotUpdateManager | `IVersionComparator` | `MockVersionComparator` |
 
 ## 附录 B：集成测试共用 Utilities
 
@@ -1596,6 +1651,10 @@ class TestDemoHelper {
     static waitForProcedure(procedureManager: ProcedureManager, targetName: string): Promise<void>;
 
     /** 断言事件被触发了指定次数 */
-    static assertEventEmitted(eventManager: EventManager, eventKey: EventKey<unknown>, expectedCount: number): void;
+    static assertEventEmitted(
+        eventManager: EventManager,
+        eventKey: EventKey<unknown>,
+        expectedCount: number,
+    ): void;
 }
 ```

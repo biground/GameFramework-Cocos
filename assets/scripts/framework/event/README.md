@@ -29,14 +29,14 @@ interface EventBinding<T> { callback; caller; once; _removed?; }
 
 ## 设计决策
 
-| 决策 | 选择 | 原因 |
-|------|------|------|
-| 类型安全 | `EventKey<T>` 幻影类型 | `on(KEY, cb)` 和 `emit(KEY, data)` 编译期类型联动 |
-| void 事件 | `emit<void>(key)` 无需传参 | 条件类型 `[T] extends [void] ? [] : [data: T]` 区分 |
-| 快照遍历 | `_emitDepth` 嵌套深度计数 | emit 过程中 off 仅标记 `_removed`，遍历完后才清理 |
-| once 延迟移除 | 标记 `_removed` 在遍历后清理 | 保证同一轮 emit 中 once 回调仅触发一次且不影响遍历 |
-| 重复注册 | callback + caller 精确匹配去重 | 静默忽略重复注册，避免意外多次触发 |
-| offByCaller | 按 caller 批量移除 | 对象销毁时一次性清理所有监听，防止内存泄漏 |
+| 决策          | 选择                           | 原因                                                |
+| ------------- | ------------------------------ | --------------------------------------------------- |
+| 类型安全      | `EventKey<T>` 幻影类型         | `on(KEY, cb)` 和 `emit(KEY, data)` 编译期类型联动   |
+| void 事件     | `emit<void>(key)` 无需传参     | 条件类型 `[T] extends [void] ? [] : [data: T]` 区分 |
+| 快照遍历      | `_emitDepth` 嵌套深度计数      | emit 过程中 off 仅标记 `_removed`，遍历完后才清理   |
+| once 延迟移除 | 标记 `_removed` 在遍历后清理   | 保证同一轮 emit 中 once 回调仅触发一次且不影响遍历  |
+| 重复注册      | callback + caller 精确匹配去重 | 静默忽略重复注册，避免意外多次触发                  |
+| offByCaller   | 按 caller 批量移除             | 对象销毁时一次性清理所有监听，防止内存泄漏          |
 
 ## 依赖
 

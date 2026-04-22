@@ -46,15 +46,15 @@ interface ITimerInfo { id; delay; elapsed; repeat; paused; tag; }
 
 ## 设计决策
 
-| 决策 | 选择 | 原因 |
-|------|------|------|
-| 遍历安全 | 标记删除 + 延迟清理 | 回调中调用 removeTimer 不破坏当前帧遍历 |
-| 查找性能 | `Map<id, entry>` 哈希索引 | removeTimer / pauseTimer 等操作 O(1) |
-| 时间精度 | 保留溢出量 `elapsed -= currentDelay` | 防止误差累积，保证长期运行精度 |
-| initialDelay | 首次触发可独立配置 | 支持"立即触发一次 + 后续按间隔重复"模式（设为 0） |
-| 时间缩放 | 全局 `timeScale` + 单个 `useTimeScale` | 慢动作/加速场景，UI 动画可豁免缩放 |
-| 标签分组 | `tag` 字段 + 批量操作 API | 按场景批量暂停/恢复/移除（如 'combat'、'ui-anim'） |
-| 清理策略 | swap-and-pop 单遍扫描 | 延迟清理时 O(n) 紧凑数组，避免频繁 splice |
+| 决策         | 选择                                   | 原因                                               |
+| ------------ | -------------------------------------- | -------------------------------------------------- |
+| 遍历安全     | 标记删除 + 延迟清理                    | 回调中调用 removeTimer 不破坏当前帧遍历            |
+| 查找性能     | `Map<id, entry>` 哈希索引              | removeTimer / pauseTimer 等操作 O(1)               |
+| 时间精度     | 保留溢出量 `elapsed -= currentDelay`   | 防止误差累积，保证长期运行精度                     |
+| initialDelay | 首次触发可独立配置                     | 支持"立即触发一次 + 后续按间隔重复"模式（设为 0）  |
+| 时间缩放     | 全局 `timeScale` + 单个 `useTimeScale` | 慢动作/加速场景，UI 动画可豁免缩放                 |
+| 标签分组     | `tag` 字段 + 批量操作 API              | 按场景批量暂停/恢复/移除（如 'combat'、'ui-anim'） |
+| 清理策略     | swap-and-pop 单遍扫描                  | 延迟清理时 O(n) 紧凑数组，避免频繁 splice          |
 
 ## 依赖
 

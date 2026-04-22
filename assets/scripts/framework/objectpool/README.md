@@ -37,14 +37,14 @@ interface PoolStats { freeCount: number; usedCount: number; totalCreated: number
 
 ## 设计决策
 
-| 决策 | 选择 | 原因 |
-|------|------|------|
-| 取出/回收 | 数组栈 push/pop | O(1) 操作，简单高效 |
-| 防重复入池 | `Set<T>` 查重（`_freeSet`） | O(1) 替代 `includes` 的 O(n)，重复 release 静默忽略 |
-| 容量上限 | `maxSize` 限制空闲池大小 | 池满时丢弃对象，防止内存无限增长 |
-| 生命周期钩子 | `IPoolable.onSpawn()` / `onRecycle()` | 取出时重置状态，回收时清理脏数据 |
-| 全局管理 | `ReferencePool` 按 Constructor 路由 | 业务层统一入口，无需手动管理单个 ObjectPool |
-| 预热 | `preload(count)` | 避免运行时首次获取的创建峰值 |
+| 决策         | 选择                                  | 原因                                                |
+| ------------ | ------------------------------------- | --------------------------------------------------- |
+| 取出/回收    | 数组栈 push/pop                       | O(1) 操作，简单高效                                 |
+| 防重复入池   | `Set<T>` 查重（`_freeSet`）           | O(1) 替代 `includes` 的 O(n)，重复 release 静默忽略 |
+| 容量上限     | `maxSize` 限制空闲池大小              | 池满时丢弃对象，防止内存无限增长                    |
+| 生命周期钩子 | `IPoolable.onSpawn()` / `onRecycle()` | 取出时重置状态，回收时清理脏数据                    |
+| 全局管理     | `ReferencePool` 按 Constructor 路由   | 业务层统一入口，无需手动管理单个 ObjectPool         |
+| 预热         | `preload(count)`                      | 避免运行时首次获取的创建峰值                        |
 
 ## 依赖
 
