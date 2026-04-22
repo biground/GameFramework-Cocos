@@ -1,0 +1,732 @@
+plan_id: phase4-demo
+objective: "Demo 2 Turn-based RPG 开发前研究——梳理现有基础设施、Demo 1 模式、框架模块 API 和设计文档"
+focus_area: demo2-rpg
+created_at: "2026-04-22"
+created_by: researcher
+status: completed
+
+tldr: |
+  - Demo 0 共享层（DemoBase + HtmlRenderer + 12 个 Mock）已完全就绪，Demo 2 可直接继承 DemoBase 使用
+  - Demo 1 Idle Clicker 已建立完整模式：DemoBase 子类 → setupProcedures/setupDataTables → start() → 主循环
+  - Demo 2 深度依赖的 6 个核心模块（FSM/Procedure/Entity/UI/Audio/DataTable）API 已稳定，无阻塞项
+  - `assets/scripts/game/demo2-rpg/` 目录尚不存在，需从零创建
+  - 设计文档 docs/demo-design.md 已包含完整的 Demo 2 设计（Procedure 流程、双层 FSM、4 张 DataTable、按钮/日志规范）
+
+research_metadata:
+  methodology: "hybrid retrieval: semantic_search + grep_search + read_file 多遍扫描"
+  scope: "Demo 0 shared/、Demo 1 demo1-idle/、framework 核心模块、integration tests、docs/demo-design.md"
+  confidence: high
+  coverage: 95
+  decision_blockers: 0
+  research_blockers: 0
+
+# ═══════════════════════════════════════════════════════
+# 1. Demo 0 共享基础设施
+# ═══════════════════════════════════════════════════════
+
+files_analyzed:
+  # ─── Demo 0 Shared ───
+  - file: DemoBase.ts
+    path: assets/scripts/game/shared/DemoBase.ts
+    purpose: "所有 Demo 的抽象基类，bootstrap() 注册 15 个模块 + 注入 Mock 策略"
+    key_elements:
+      - element: DemoBase
+        type: class
+        location: "DemoBase.ts:39"
+        description: |
+          抽象基类。构造函数接收 title 创建 HtmlRenderer。
+          bootstrap() 按优先级注册 15 个模块 → 注入 Mock 策略 → 调用子类 setupProcedures() + setupDataTables()。
+          startMainLoop(fps) 用 setInterval 驱动 GameModule.update(dt)。
+          shutdown() 停止主循环并 GameModule.shutdownAll()。
+      - element: setupProcedures
+        type: function
+        location: "DemoBase.ts:abstract"
+        description: "子类实现：注册 Procedure 并启动流程"
+      - element: setupDataTables
+        type: function
+        location: "DemoBase.ts:abstract"
+        description: "子类实现：注册 DataTable 数据"
+      - element: getModule
+        type: function
+        location: "DemoBase.ts:207"
+        description: "protected 泛型方法，类型安全获取已注册模块"
+    language: typescript
+    lines: 220
+
+  - file: HtmlRenderer.ts
+    path: assets/scripts/game/shared/HtmlRenderer.ts
+    purpose: "HTML 日志 + 状态面板 + 按钮交互渲染器"
+    key_elements:
+      - element: log
+        type: function
+        location: "HtmlRenderer.ts:122"
+        description: "追加带颜色的日志行（一次性事件用）"
+      - element: updateLog
+        type: function
+        location: "HtmlRenderer.ts:141"
+        description: "原地更新日志行（相同 key 只保留一条，高频事件专用）"
+      - element: createStatusPanel
+        type: function
+        location: "HtmlRenderer.ts:245"
+        description: "创建键值对状态面板，返回 StatusPanel 接口"
+      - element: updateStatus
+        type: function
+        location: "HtmlRenderer.ts:296"
+        description: "更新面板中指定键的值（DOM 原地覆写）"
+      - element: createButtonGroup
+        type: function
+        location: "HtmlRenderer.ts:178"
+        description: "创建命名按钮组容器"
+      - element: addButton
+        type: function
+        location: "HtmlRenderer.ts:200"
+        description: "在按钮组中添加可点击按钮"
+      - element: separator
+        type: function
+        location: "HtmlRenderer.ts:166"
+        description: "添加分隔线（可附带标题）"
+      - element: createTable
+        type: function
+        location: "HtmlRenderer.ts:335"
+        description: "创建数据表格并追加到日志区"
+      - element: LOG_COLORS
+        type: variable
+        location: "HtmlRenderer.ts:4"
+        description: "日志颜色常量集（SUCCESS/INFO/WARNING/ERROR/COMBAT/TIMER 等）"
+    language: typescript
+    lines: 380
+
+  - file: MockEntityFactory.ts
+    path: assets/scripts/game/shared/MockEntityFactory.ts
+    purpose: "实体工厂 Mock，支持池化复用和创建/销毁追踪"
+    key_elements:
+      - element: MockEntity
+        type: class
+        location: "MockEntityFactory.ts:12"
+        description: "继承 EntityBase，追踪 onShow/onHide/onUpdate 调用历史"
+      - element: MockEntityFactory
+        type: class
+        location: "MockEntityFactory.ts:90"
+        description: |
+          实现 IEntityFactory。
+          enablePooling(true) 启用池化；createEntity 从池中复用或 new MockEntity；
+          destroyEntity 回池或标记销毁。createdEntities/destroyedEntities 供测试断言。
+    language: typescript
+    lines: 170
+
+  # ─── Mock 策略汇总（12 个） ───
+  - file: "全部 Mock 策略"
+    path: assets/scripts/game/shared/
+    purpose: "12 个 Mock 策略实现，DemoBase.bootstrap() 中自动注入"
+    key_elements:
+      - element: MockResourceLoader
+        type: class
+        location: "MockResourceLoader.ts"
+        description: "registerAsset → loadAsset 模拟异步加载"
+      - element: MockAudioPlayer
+        type: class
+        location: "MockAudioPlayer.ts"
+        description: "playHistory 追踪所有播放操作，createInstance/destroyInstance"
+      - element: MockSceneLoader
+        type: class
+        location: "MockSceneLoader.ts"
+        description: "记录场景切换历史，模拟加载延迟"
+      - element: MockUIFormFactory
+        type: class
+        location: "MockUIFormFactory.ts"
+        description: "创建轻量 MockUIForm 实例，记录生命周期"
+      - element: MockEntityFactory
+        type: class
+        location: "MockEntityFactory.ts"
+        description: "池化实体创建/销毁，追踪所有操作"
+      - element: MockDataTableParser
+        type: class
+        location: "MockDataTableParser.ts"
+        description: "直接接收 JSON 数组解析为 DataTable 行"
+      - element: MockNetworkSocket
+        type: class
+        location: "MockNetworkSocket.ts"
+        description: "模拟延迟、丢包、断线/重连"
+      - element: MockHotUpdateAdapter
+        type: class
+        location: "MockHotUpdateAdapter.ts"
+        description: "模拟版本检查、清单对比、文件下载"
+      - element: MockLocalizationLoader
+        type: class
+        location: "MockLocalizationLoader.ts"
+        description: "内存中多语言数据加载"
+      - element: MockVersionComparator
+        type: class
+        location: "MockVersionComparator.ts"
+        description: "可编程的版本比较结果"
+    language: typescript
+    lines: 0
+
+  # ─── Demo 1 实现 ───
+  - file: IdleClickerDemo.ts
+    path: assets/scripts/game/demo1-idle/IdleClickerDemo.ts
+    purpose: "Demo 1 主入口，展示完整的 DemoBase 子类实现模式"
+    key_elements:
+      - element: IdleClickerDemo
+        type: class
+        location: "IdleClickerDemo.ts:44"
+        description: |
+          继承 DemoBase，实现 setupProcedures + setupDataTables。
+          start() 流程：bootstrap → _preloadGameConfigs → startProcedure → _setupUI → _registerEventListeners → startMainLoop(30) → _startUIRefresh
+      - element: setupProcedures
+        type: function
+        location: "IdleClickerDemo.ts:67"
+        description: |
+          创建 4 个游戏系统 → 构建 IProcedureContext → procMgr.initialize(5 个 Procedure) → procMgr.setData
+      - element: setupDataTables
+        type: function
+        location: "IdleClickerDemo.ts:120"
+        description: "dtMgr.createTableFromRawData 注册 3 张表"
+    language: typescript
+    lines: 260
+
+  - file: IdleEvents.ts
+    path: assets/scripts/game/demo1-idle/events/IdleEvents.ts
+    purpose: "Demo 1 事件键定义，使用 EventKey<T> 幻影类型"
+    key_elements:
+      - element: "EventKey 模式"
+        type: pattern
+        location: "IdleEvents.ts"
+        description: |
+          import { EventKey } from '@framework/event/EventDefs';
+          export const CLICK_MINE = new EventKey<{ amount: number }>('idle:click_mine');
+          命名空间前缀 'idle:' + 事件名
+    language: typescript
+    lines: 55
+
+  - file: ProcedureContext.ts
+    path: assets/scripts/game/demo1-idle/procedures/ProcedureContext.ts
+    purpose: "Procedure 间共享上下文接口 + FSM 数据键"
+    key_elements:
+      - element: IProcedureContext
+        type: interface
+        location: "ProcedureContext.ts:20"
+        description: "聚合所有系统引用和框架模块引用，通过 procMgr.setData 写入 FSM"
+      - element: PROCEDURE_CONTEXT_KEY
+        type: variable
+        location: "ProcedureContext.ts:49"
+        description: "'__procedure_context__' 字符串常量"
+    language: typescript
+    lines: 50
+
+  - file: MainProcedure.ts
+    path: assets/scripts/game/demo1-idle/procedures/MainProcedure.ts
+    purpose: "Demo 1 主游戏流程示例"
+    key_elements:
+      - element: MainProcedure
+        type: class
+        location: "MainProcedure.ts:32"
+        description: |
+          继承 ProcedureBase。
+          onEnter: 从 fsm.getData 获取上下文 → 启动系统 → 注册 Timer。
+          onUpdate: 定期检测成就。
+          changeProcedure 切换到 SettingsProcedure。
+    language: typescript
+    lines: 80
+
+  # ─── 集成测试 ───
+  - file: demo0-infrastructure.test.ts
+    path: tests/integration/demo0-infrastructure.test.ts
+    purpose: "Demo 0 基础设施集成测试，展示测试模式"
+    key_elements:
+      - element: "测试模式"
+        type: pattern
+        location: "demo0-infrastructure.test.ts"
+        description: |
+          @jest-environment jsdom。
+          jest.mock('@framework/debug/Logger') 模拟 Logger（静态方法 + 实例化）。
+          TestDemo 继承 DemoBase 作为测试子类。
+          beforeEach: GameModule.shutdownAll() + new TestDemo()。
+          afterEach: demo.shutdown() + document.body.innerHTML = ''。
+          jest.useFakeTimers() 控制主循环时间推进。
+    language: typescript
+    lines: 200
+
+  # ─── 框架核心模块 ───
+  - file: FsmManager.ts
+    path: assets/scripts/framework/fsm/FsmManager.ts
+    purpose: "FSM 管理器，统一创建/获取/驱动/销毁状态机"
+    key_elements:
+      - element: createFsm
+        type: function
+        location: "FsmManager.ts:76"
+        description: "createFsm<T>(name, owner, ...states): IFsm<T> — 创建并注册状态机"
+      - element: getFsm
+        type: function
+        location: "FsmManager.ts"
+        description: "按名称获取已创建的状态机"
+      - element: destroyFsm
+        type: function
+        location: "FsmManager.ts"
+        description: "销毁指定名称的状态机"
+    language: typescript
+    lines: 80
+
+  - file: Fsm.ts
+    path: assets/scripts/framework/fsm/Fsm.ts
+    purpose: "FSM 实体，管理状态集合、切换、共享数据"
+    key_elements:
+      - element: "start(stateType)"
+        type: function
+        location: "Fsm.ts:88"
+        description: "启动 FSM，进入指定初始状态"
+      - element: "changeState(stateType)"
+        type: function
+        location: "Fsm.ts"
+        description: "切换到指定类型的状态（自动 onLeave → onEnter）"
+      - element: "getData/setData"
+        type: function
+        location: "Fsm.ts"
+        description: "共享数据存取，用于状态间传递上下文"
+    language: typescript
+    lines: 100
+
+  - file: EntityManager.ts
+    path: assets/scripts/framework/entity/EntityManager.ts
+    purpose: "实体管理器，按分组管理实体生命周期"
+    key_elements:
+      - element: setEntityFactory
+        type: function
+        location: "EntityManager.ts:75"
+        description: "注入实体工厂策略"
+      - element: registerGroup
+        type: function
+        location: "EntityManager.ts:82"
+        description: "注册实体分组（groupName 唯一）"
+      - element: showEntity
+        type: function
+        location: "EntityManager.ts:100"
+        description: "showEntity(groupName, data?, callbacks?) → EntityBase — 创建并激活实体"
+      - element: hideEntity
+        type: function
+        location: "EntityManager.ts:118"
+        description: "hideEntity(entity) — 回收实体到分组等待池"
+      - element: hideAllEntities
+        type: function
+        location: "EntityManager.ts:130"
+        description: "隐藏指定分组或所有分组的实体"
+      - element: getEntitiesByGroup
+        type: function
+        location: "EntityManager.ts:150"
+        description: "获取指定分组的所有活跃实体"
+    language: typescript
+    lines: 200
+
+  - file: ProcedureManager.ts
+    path: assets/scripts/framework/procedure/ProcedureManager.ts
+    purpose: "流程管理器，内部 FSM 驱动全局流程切换"
+    key_elements:
+      - element: initialize
+        type: function
+        location: "ProcedureManager.ts:60"
+        description: "initialize(...procedures) — 注册流程列表"
+      - element: startProcedure
+        type: function
+        location: "ProcedureManager.ts"
+        description: "startProcedure(Type) — 启动初始流程"
+      - element: setData
+        type: function
+        location: "ProcedureManager.ts:79"
+        description: "setData<V>(key, value) — 写入 FSM 共享数据"
+      - element: currentProcedure
+        type: variable
+        location: "ProcedureManager.ts:49"
+        description: "当前流程实例（getter）"
+    language: typescript
+    lines: 80
+
+  - file: UIManager.ts
+    path: assets/scripts/framework/ui/UIManager.ts
+    purpose: "UI 管理器，分层栈式管理表单生命周期"
+    key_elements:
+      - element: setUIFormFactory
+        type: function
+        location: "UIManager.ts"
+        description: "注入 UI 表单工厂"
+      - element: registerForm
+        type: function
+        location: "UIManager.ts"
+        description: "注册表单配置（formName → UIFormConfig）"
+      - element: openForm
+        type: function
+        location: "UIManager.ts"
+        description: "打开表单（自动创建、入栈、onOpen）"
+      - element: closeForm
+        type: function
+        location: "UIManager.ts"
+        description: "关闭表单（出栈、onClose）"
+    language: typescript
+    lines: 60
+
+  - file: AudioManager.ts
+    path: assets/scripts/framework/audio/AudioManager.ts
+    purpose: "音频管理器，音乐/音效/音量/静音统一控制"
+    key_elements:
+      - element: setAudioPlayer
+        type: function
+        location: "AudioManager.ts"
+        description: "注入音频播放器策略"
+      - element: playMusic
+        type: function
+        location: "AudioManager.ts"
+        description: "播放背景音乐（自动停止旧曲）"
+      - element: playSound
+        type: function
+        location: "AudioManager.ts"
+        description: "播放音效（可叠加多实例）"
+      - element: stopMusic/stopSound/stopAllSounds
+        type: function
+        location: "AudioManager.ts"
+        description: "停止音乐/音效"
+    language: typescript
+    lines: 60
+
+  - file: DataTableManager.ts
+    path: assets/scripts/framework/datatable/DataTableManager.ts
+    purpose: "数据表管理器，加载/解析/查询配置数据表"
+    key_elements:
+      - element: setParser
+        type: function
+        location: "DataTableManager.ts"
+        description: "注入数据表解析器策略"
+      - element: createTableFromRawData
+        type: function
+        location: "DataTableManager.ts"
+        description: "createTableFromRawData<T>(name, rawData) — 用 parser 从原始数据创建表"
+      - element: getRow
+        type: function
+        location: "DataTableManager.ts"
+        description: "getRow<T>(tableName, id) — 按 ID 查询行"
+      - element: getAllRows
+        type: function
+        location: "DataTableManager.ts"
+        description: "getAllRows<T>(tableName) — 获取全部行"
+    language: typescript
+    lines: 60
+
+  - file: ObjectPool.ts
+    path: assets/scripts/framework/objectpool/ObjectPool.ts
+    purpose: "泛型单类型对象池，数组栈 + Set 查重"
+    key_elements:
+      - element: acquire
+        type: function
+        location: "ObjectPool.ts"
+        description: "从池中获取对象（无空闲则 new），自动调用 onSpawn"
+      - element: release
+        type: function
+        location: "ObjectPool.ts"
+        description: "回收对象到池中（Set 防重复入池），自动调用 onRecycle"
+    language: typescript
+    lines: 60
+
+# ═══════════════════════════════════════════════════════
+# 2. 模式发现
+# ═══════════════════════════════════════════════════════
+
+patterns_found:
+  - category: architecture
+    pattern: "DemoBase 子类模式"
+    description: |
+      每个 Demo 继承 DemoBase，实现两个抽象方法（setupProcedures + setupDataTables），
+      然后在 start() 中依次：bootstrap → 预加载配置 → startProcedure → 创建 UI → 注册事件 → startMainLoop。
+    examples:
+      - file: IdleClickerDemo.ts
+        location: "IdleClickerDemo.ts:44-155"
+        snippet: |
+          export class IdleClickerDemo extends DemoBase {
+              constructor() { super('Idle Clicker Demo'); }
+              setupProcedures(): void { ... }
+              setupDataTables(): void { ... }
+              start(): void { this.bootstrap(); ... this.startMainLoop(30); }
+          }
+    prevalence: common
+
+  - category: architecture
+    pattern: "Procedure 上下文共享"
+    description: |
+      定义 IProcedureContext 接口聚合所有系统引用 →
+      procMgr.setData(PROCEDURE_CONTEXT_KEY, ctx) 写入 FSM 共享数据 →
+      各 Procedure 在 onEnter 中 fsm.getData 获取上下文。
+    examples:
+      - file: ProcedureContext.ts
+        location: "ProcedureContext.ts:20-49"
+        snippet: |
+          export interface IProcedureContext { gameData; buildingSystem; eventManager; ... }
+          export const PROCEDURE_CONTEXT_KEY = '__procedure_context__';
+    prevalence: common
+
+  - category: architecture
+    pattern: "EventKey 幻影类型事件定义"
+    description: |
+      使用 EventKey<T> 定义类型安全事件键，命名空间前缀 + 事件名。
+      集中在独立 events/ 目录中定义，每个 Demo 一个事件文件。
+    examples:
+      - file: IdleEvents.ts
+        location: "IdleEvents.ts:11"
+        snippet: |
+          export const GOLD_CHANGED = new EventKey<{ oldGold: number; newGold: number }>('idle:gold_changed');
+    prevalence: common
+
+  - category: architecture
+    pattern: "FSM 黑板模式"
+    description: |
+      FSM 状态间通过 getData/setData 共享黑板数据，定义接口 + 数据键常量。
+      Demo 1 的 BuildingFsm 用 IBuildingBlackboard 传递 buildingId/buildingSystem/gameData。
+    examples:
+      - file: BuildingFsmDefs.ts
+        location: "BuildingFsmDefs.ts"
+        snippet: |
+          export interface IBuildingBlackboard { buildingId: number; buildingSystem: BuildingSystem; gameData: IdleGameData; }
+          export const BuildingFsmDataKeys = { BLACKBOARD: 'blackboard', ... };
+    prevalence: common
+
+  - category: structure
+    pattern: "Demo 目录结构"
+    description: |
+      每个 Demo 目录下包含：data/（数据定义）、events/（事件键）、fsm/（状态机定义和状态）、
+      procedures/（Procedure 实现 + ProcedureContext）、systems/（游戏系统）、ui/（面板）、
+      主入口类 + index.ts。
+    examples:
+      - file: demo1-idle/
+        location: "assets/scripts/game/demo1-idle/"
+        snippet: |
+          data/: IdleGameData, BuildingConfigRow, UpgradeCurveRow, AchievementConfigRow
+          events/: IdleEvents.ts
+          fsm/: BuildingFsmDefs, BuildingFsmStates
+          procedures/: 5 个 Procedure + ProcedureContext
+          systems/: BuildingSystem, AchievementSystem, OfflineRewardSystem, SaveSystem
+          ui/: IdleMainPanel, IdleSettingsPanel
+          IdleClickerDemo.ts + index.ts
+    prevalence: common
+
+  - category: testing
+    pattern: "集成测试模式"
+    description: |
+      @jest-environment jsdom。Logger 完整 mock（静态方法 + 实例化）。
+      TestDemo 继承 DemoBase 作为测试子类。
+      beforeEach: shutdownAll + new。afterEach: shutdown + DOM 清理。
+      jest.useFakeTimers() 控制时间推进。
+    examples:
+      - file: demo0-infrastructure.test.ts
+        location: "tests/integration/demo0-infrastructure.test.ts:1-100"
+        snippet: |
+          jest.mock('@framework/debug/Logger', () => { class MockLogger { ... } return { Logger: MockLogger }; });
+          class TestDemo extends DemoBase { ... }
+    prevalence: common
+
+  - category: naming
+    pattern: "事件命名空间前缀"
+    description: "每个 Demo 的事件键使用 'demoName:event_name' 前缀，如 'idle:gold_changed'"
+    examples:
+      - file: IdleEvents.ts
+        location: "IdleEvents.ts"
+        snippet: "'idle:click_mine', 'idle:building_purchased'"
+    prevalence: common
+
+# ═══════════════════════════════════════════════════════
+# 3. 关联架构
+# ═══════════════════════════════════════════════════════
+
+related_architecture:
+  components_relevant_to_domain:
+    - component: DemoBase
+      responsibility: "所有 Demo 的抽象基类，统一初始化 15 个模块 + Mock 注入"
+      location: assets/scripts/game/shared/DemoBase.ts
+      relationship_to_domain: "Demo 2 直接继承"
+
+    - component: HtmlRenderer
+      responsibility: "HTML 日志 + 状态面板 + 按钮交互"
+      location: assets/scripts/game/shared/HtmlRenderer.ts
+      relationship_to_domain: "Demo 2 的所有 UI 展示通过此组件"
+
+    - component: FsmManager + Fsm
+      responsibility: "状态机创建/驱动/销毁"
+      location: assets/scripts/framework/fsm/
+      relationship_to_domain: "Demo 2 需创建 BattleFsm + CharacterFsm 双层状态机"
+
+    - component: ProcedureManager
+      responsibility: "全局流程切换（内部 FSM 驱动）"
+      location: assets/scripts/framework/procedure/ProcedureManager.ts
+      relationship_to_domain: "Demo 2 需要 7 个 Procedure：Launch → Preload → Lobby → BattlePrep → Battle → Settle → Lobby 循环"
+
+    - component: EntityManager
+      responsibility: "按分组管理实体生命周期"
+      location: assets/scripts/framework/entity/EntityManager.ts
+      relationship_to_domain: "Demo 2 需注册 'player' 和 'enemy' 两个分组，showEntity/hideEntity 管理角色实体"
+
+    - component: DataTableManager
+      responsibility: "配置数据表管理"
+      location: assets/scripts/framework/datatable/DataTableManager.ts
+      relationship_to_domain: "Demo 2 需 4 张表：character_config / skill_config / monster_config / stage_config"
+
+    - component: AudioManager
+      responsibility: "音频播放控制"
+      location: assets/scripts/framework/audio/AudioManager.ts
+      relationship_to_domain: "Demo 2 深度使用：战斗 BGM、攻击/技能/胜利/失败音效"
+
+    - component: UIManager
+      responsibility: "分层栈式 UI 表单管理"
+      location: assets/scripts/framework/ui/UIManager.ts
+      relationship_to_domain: "Demo 2 需多个面板：角色信息、技能选择、战斗日志、结算"
+
+  interfaces_used_by_domain:
+    - interface: IEntityFactory
+      location: assets/scripts/framework/entity/EntityDefs.ts
+      usage_pattern: "MockEntityFactory 已实现，DemoBase 自动注入"
+    - interface: IFsmState<T>
+      location: assets/scripts/framework/fsm/FsmDefs.ts
+      usage_pattern: "战斗 FSM 的 6 个状态和角色 FSM 的 4 个状态需实现此接口（或继承 FsmState）"
+    - interface: IFsm<T>
+      location: assets/scripts/framework/fsm/FsmDefs.ts
+      usage_pattern: "各状态通过 IFsm 访问 getData/setData/changeState"
+
+  data_flow_involving_domain: |
+    DemoBase.bootstrap() → 15 模块注册 → setupProcedures 创建战斗系统 + 注册 7 个 Procedure →
+    setupDataTables 注册 4 张配置表 → startProcedure(Launch) →
+    Launch → Preload（加载配置表数据注入系统）→ Lobby（展示编队 UI + 选关）→
+    BattlePrep（创建玩家/敌人 Entity）→ Battle（BattleFsm 驱动回合制战斗）→
+    Settle（结算经验/金币）→ Lobby（循环）
+
+  key_relationships_to_domain:
+    - from: TurnBasedRpgDemo
+      to: DemoBase
+      relationship: inherits
+    - from: BattleProcedure
+      to: FsmManager
+      relationship: "calls createFsm 创建 BattleFsm"
+    - from: BattleFsm states
+      to: EntityManager
+      relationship: "calls showEntity/hideEntity/getEntitiesByGroup"
+    - from: Procedures
+      to: DataTableManager
+      relationship: "calls getRow/getAllRows 查询配置"
+    - from: BattleFsm states
+      to: EventManager
+      relationship: "emits 战斗事件（攻击/受伤/死亡/回合切换）"
+    - from: Battle states
+      to: AudioManager
+      relationship: "calls playSound/playMusic"
+
+# ═══════════════════════════════════════════════════════
+# 4. 设计文档摘要（Demo 2 专属）
+# ═══════════════════════════════════════════════════════
+
+related_conventions:
+  naming_patterns_in_domain: |
+    - Demo 类：TurnBasedRpgDemo（PascalCase）
+    - 事件键前缀：'rpg:' + event_name（如 'rpg:attack', 'rpg:character_dead'）
+    - FSM 名：'battle_fsm'（BattleFsm）、'character_fsm_{entityId}'（CharacterFsm）
+    - Entity 分组：'player'、'enemy'
+    - DataTable 名：'character_config'、'skill_config'、'monster_config'、'stage_config'
+    - Procedure：Launch/Preload/Lobby/BattlePrep/Battle/Settle（6+1 = Lobby 循环）
+  structure_of_domain: |
+    assets/scripts/game/demo2-rpg/
+    ├── TurnBasedRpgDemo.ts       # 主入口
+    ├── index.ts                   # 导出入口
+    ├── data/                      # DataTable 行类型 + 静态数据 + 游戏状态
+    │   ├── RpgGameData.ts         # 游戏运行时状态
+    │   ├── CharacterConfigRow.ts
+    │   ├── SkillConfigRow.ts
+    │   ├── MonsterConfigRow.ts
+    │   └── StageConfigRow.ts
+    ├── events/                    # 事件键定义
+    │   └── RpgEvents.ts
+    ├── fsm/                       # FSM 定义和状态
+    │   ├── BattleFsmDefs.ts       # 战斗 FSM 黑板 + 状态名常量
+    │   ├── BattleFsmStates.ts     # 6 个战斗状态
+    │   ├── CharacterFsmDefs.ts    # 角色 FSM 黑板
+    │   └── CharacterFsmStates.ts  # 4 个角色状态
+    ├── procedures/                # Procedure 实现
+    │   ├── ProcedureContext.ts     # RPG 专用上下文接口
+    │   ├── LaunchProcedure.ts
+    │   ├── PreloadProcedure.ts
+    │   ├── LobbyProcedure.ts
+    │   ├── BattlePrepProcedure.ts
+    │   ├── BattleProcedure.ts
+    │   └── SettleProcedure.ts
+    ├── systems/                   # 游戏系统
+    │   ├── BattleSystem.ts        # 回合制战斗引擎
+    │   ├── DamageCalculator.ts    # 伤害计算（ATK × rate - DEF）
+    │   ├── BuffSystem.ts          # BUFF/DEBUFF 管理
+    │   └── EnemyAI.ts             # 敌方 AI 决策
+    └── ui/                        # UI 面板
+        ├── LobbyPanel.ts          # 大厅：编队 + 选关
+        ├── BattlePanel.ts         # 战斗：角色状态 + 技能按钮 + 目标选择
+        └── SettlePanel.ts         # 结算：经验/金币/升级
+  error_handling_in_domain: "错误消息格式：[模块名] 描述性消息"
+  testing_in_domain: |
+    tests/integration/demo2-rpg.integration.test.ts
+    覆盖要点：完整战斗流程、SPD 回合顺序、伤害公式、技能效果、Entity 生命周期、FSM 状态切换、死亡判定
+  documentation_in_domain: "中文 JSDoc，所有 public API"
+
+# ═══════════════════════════════════════════════════════
+# 5. 依赖关系
+# ═══════════════════════════════════════════════════════
+
+related_dependencies:
+  internal:
+    - component: DemoBase + HtmlRenderer + MockXxx
+      relationship_to_domain: "Demo 2 直接继承和使用"
+      direction: outbound
+    - component: FsmManager
+      relationship_to_domain: "创建 BattleFsm + 多个 CharacterFsm"
+      direction: outbound
+    - component: ProcedureManager
+      relationship_to_domain: "7 个 Procedure 注册和驱动"
+      direction: outbound
+    - component: EntityManager
+      relationship_to_domain: "'player'/'enemy' 分组，showEntity/hideEntity"
+      direction: outbound
+    - component: EventManager
+      relationship_to_domain: "战斗事件流（攻击/受伤/死亡/回合切换/技能释放/BUFF）"
+      direction: outbound
+    - component: ObjectPool
+      relationship_to_domain: "伤害飘字池、战斗特效池、BUFF 图标池"
+      direction: outbound
+    - component: DataTableManager
+      relationship_to_domain: "4 张配置表查询"
+      direction: outbound
+    - component: AudioManager
+      relationship_to_domain: "BGM + 攻击/技能/胜利/失败音效"
+      direction: outbound
+    - component: UIManager
+      relationship_to_domain: "角色信息/技能选择/战斗日志/结算面板"
+      direction: outbound
+    - component: TimerManager
+      relationship_to_domain: "BUFF 持续时间、技能冷却"
+      direction: outbound
+  external: []
+
+# ═══════════════════════════════════════════════════════
+# 6. 测试模式
+# ═══════════════════════════════════════════════════════
+
+testing_patterns:
+  framework: jest
+  coverage_areas:
+    - "完整战斗流程（编队→战斗→结算）端到端"
+    - "SPD 回合顺序排序"
+    - "伤害公式：ATK × damageRate - DEF"
+    - "技能效果：眩晕/治疗/BUFF 应用和持续时间"
+    - "Entity 生命周期：战前创建 + 战后回收"
+    - "FSM 状态切换：BattleFsm 6 状态 + CharacterFsm 4 状态"
+    - "死亡判定：HP ≤ 0 触发死亡，全灭判定"
+    - "Procedure 切换：Lobby ↔ BattlePrep → Battle → Settle → Lobby"
+  test_organization: "tests/integration/demo2-rpg.integration.test.ts"
+  mock_patterns:
+    - "jest.mock('@framework/debug/Logger') — 静态方法 + 实例化"
+    - "jest.useFakeTimers() — 控制 BUFF 计时和技能冷却"
+    - "DemoBase 子类 + bootstrap() — 全模块 Mock 环境"
+
+# ═══════════════════════════════════════════════════════
+# 7. 开放问题和差距
+# ═══════════════════════════════════════════════════════
+
+open_questions: []
+
+gaps: []

@@ -1,0 +1,759 @@
+plan_id: phase4-demo
+objective: "对 Demo 1 Idle Clicker 做深度代码分析，为 Demo 2 RPG 提供精确的模式参考"
+focus_area: demo1_code_patterns
+created_at: "2026-04-22"
+created_by: researcher
+status: completed
+
+tldr: |
+  - Demo 1 通过 DemoBase 抽象基类实现 15 个框架模块的标准化 bootstrap，子类只需实现 setupProcedures() + setupDataTables()
+  - Procedure 链通过 IProcedureContext 接口传递共享上下文（含所有子系统引用），用 ProcedureManager.setData() 写入 FSM 共享数据
+  - FSM 使用 IBuildingBlackboard 接口 + BuildingFsmDataKeys 常量定义黑板键，状态类继承 FsmState<TBlackboard> 泛型
+  - EventKey<T> 幻影类型按域分组定义（idle:xxx 命名空间），所有事件集中在单文件
+  - DataTable 行类实现 IDataRow 接口（readonly id + parseRow），配置数据作为 Record<string, unknown>[] 常量内联
+  - UI Panel 类为纯逻辑类，接收 HtmlRenderer + 业务数据，通过 Callbacks 接口与 Demo 入口类解耦
+  - 集成测试只有 demo0 基础设施测试，Demo 1 无独立集成测试文件
+
+research_metadata:
+  methodology: "read_file 全量读取 + list_dir 结构探查 + file_search 搜索"
+  scope: "assets/scripts/game/demo1-idle/ 全部文件 + shared/ 全部文件 + tests/integration/"
+  confidence: high
+  coverage: 100
+  decision_blockers: 0
+  research_blockers: 0
+
+# ============================================================
+# 1. DemoBase 基类 (assets/scripts/game/shared/DemoBase.ts)
+# ============================================================
+demo_base:
+  file: assets/scripts/game/shared/DemoBase.ts
+  lines: 180
+  class_signature: "abstract class DemoBase"
+  constructor: "(title: string) → 创建 HtmlRenderer 实例"
+
+  abstract_methods:
+    - name: setupProcedures
+      signature: "abstract setupProcedures(): void"
+      description: "子类实现: 注册 Procedure 并设置流程链"
+    - name: setupDataTables
+      signature: "abstract setupDataTables(): void"
+      description: "子类实现: 注册 DataTable 数据"
+
+  bootstrap_flow:
+    step_1: "GameModule.shutdownAll() — 清理之前的状态"
+    step_2: "创建 15 个模块实例（Logger, EventManager, TimerManager, FsmManager, ProcedureManager, ResourceManager, AudioManager, SceneManager, UIManager, EntityManager, NetworkManager, DataTableManager, LocalizationManager, HotUpdateManager, DebugManager）"
+    step_3: "按优先级注册模块（register 内部调用 onInit）— 基础设施层 0-99 / 核心服务层 100-199 / 业务模块层 200-399 / 调试层 400+"
+    step_4: "注入 Mock 策略（ResourceLoader, AudioPlayer, SceneLoader, UIFormFactory, EntityFactory, DataTableParser, HotUpdateAdapter, VersionComparator）"
+    step_5: "设置跨模块引用（NetworkManager.setEventManager, LocalizationManager.setEventManager）"
+    step_6: "调用子类 setupProcedures() 和 setupDataTables()"
+
+  mock_strategies:
+    - target: ResourceManager
+      mock: MockResourceLoader
+      method: "resourceManager.setResourceLoader(new MockResourceLoader())"
+    - target: AudioManager
+      mock: MockAudioPlayer
+      method: "audioManager.setAudioPlayer(new MockAudioPlayer())"
+    - target: SceneManager
+      mock: MockSceneLoader
+      method: "sceneManager.setSceneLoader(new MockSceneLoader())"
+    - target: UIManager
+      mock: MockUIFormFactory
+      method: "uiManager.setUIFormFactory(new MockUIFormFactory())"
+    - target: EntityManager
+      mock: MockEntityFactory
+      method: "entityManager.setEntityFactory(new MockEntityFactory())"
+    - target: DataTableManager
+      mock: MockDataTableParser
+      method: "dataTableManager.setParser(new MockDataTableParser())"
+    - target: HotUpdateManager
+      mock: MockHotUpdateAdapter
+      method: "hotUpdateManager.setAdapter(new MockHotUpdateAdapter())"
+    - target: HotUpdateManager
+      mock: MockVersionComparator
+      method: "hotUpdateManager.setComparator(new MockVersionComparator())"
+
+  protected_methods:
+    - name: getModule
+      signature: "protected getModule<T extends ModuleBase>(name: string): T"
+      description: "类型安全的模块获取快捷方法"
+
+  public_methods:
+    - name: startMainLoop
+      signature: "startMainLoop(fps: number = 30): void"
+      description: "setInterval 驱动 GameModule.update(dt)"
+    - name: stopMainLoop
+      signature: "stopMainLoop(): void"
+      description: "停止主循环"
+    - name: shutdown
+      signature: "shutdown(): void"
+      description: "停止主循环 + GameModule.shutdownAll()"
+    - name: isRunning
+      signature: "get isRunning(): boolean"
+      description: "是否正在运行"
+
+  protected_fields:
+    - name: htmlRenderer
+      type: HtmlRenderer
+      description: "HTML 渲染器，子类可直接使用"
+
+# ============================================================
+# 2. Demo 主入口类 (IdleClickerDemo.ts)
+# ============================================================
+demo_entry:
+  file: assets/scripts/game/demo1-idle/IdleClickerDemo.ts
+  lines: ~425
+  class_signature: "class IdleClickerDemo extends DemoBase"
+  constructor: "super('Idle Clicker Demo'); 创建 IdleGameData 实例"
+
+  private_fields:
+    - { name: _gameData, type: IdleGameData }
+    - { name: _buildingSystem, type: BuildingSystem }
+    - { name: _achievementSystem, type: AchievementSystem }
+    - { name: _offlineRewardSystem, type: OfflineRewardSystem }
+    - { name: _saveSystem, type: SaveSystem }
+    - { name: _mainPanel, type: IdleMainPanel }
+    - { name: _settingsPanel, type: IdleSettingsPanel }
+
+  setupProcedures_pattern: |
+    1. 从 DemoBase 获取框架模块引用: getModule<EventManager>('EventManager') 等
+    2. 创建业务子系统实例: new BuildingSystem(gameData, eventMgr, timerMgr)
+    3. 构建 IProcedureContext 对象（聚合所有子系统 + 框架模块引用）
+    4. procMgr.initialize(Launch, Preload, OfflineSettle, Main, Settings) — 注册全部 Procedure
+    5. procMgr.setData<IProcedureContext>(PROCEDURE_CONTEXT_KEY, ctx) — 写入共享数据
+
+  setupDataTables_pattern: |
+    1. dtMgr.createTableFromRawData<BuildingConfigRow>('building_config', BUILDING_CONFIG_DATA)
+    2. dtMgr.createTableFromRawData<UpgradeCurveRow>('upgrade_curve', UPGRADE_CURVE_DATA)
+    3. dtMgr.createTableFromRawData<AchievementConfigRow>('achievement_config', ACHIEVEMENT_CONFIG_DATA)
+
+  start_flow:
+    step_1: "this.bootstrap() — DemoBase 初始化"
+    step_2: "this._preloadGameConfigs() — 从 DataTableManager 加载配置到子系统"
+    step_3: "procMgr.startProcedure(LaunchProcedure) — 启动流程链"
+    step_4: "this._setupUI() — 创建 UI 面板"
+    step_5: "this._registerEventListeners() — 注册事件日志监听"
+    step_6: "this.startMainLoop(30) — 启动主循环 30fps"
+    step_7: "this._startUIRefresh() — Timer 驱动 UI 0.5s 刷新"
+
+  ui_setup_pattern: |
+    创建 Panel 实例并传入 HtmlRenderer + 业务数据:
+      _mainPanel = new IdleMainPanel(htmlRenderer, gameData, buildingSystem)
+      _mainPanel.setup({ onClickMine, onPurchaseBuilding, onUpgradeBuilding, onOpenSettings, onSimulateOffline, onViewAchievements })
+    回调中的典型模式:
+      1. 调用子系统方法 (buildingSystem.clickMine())
+      2. 更新 UI (mainPanel.updateStatus() + updateButtons())
+      3. 写入日志 (htmlRenderer.log(...))
+    Procedure 切换通过 currentProcedure 类型检查:
+      if (currentProc instanceof MainProcedure) currentProc.requestSettings()
+
+  event_listener_pattern: |
+    高频事件用 htmlRenderer.updateLog(key, msg) 原地更新（如挖矿、自动存档）
+    关键事件用 htmlRenderer.log(msg) 追加日志行（如购买、升级、成就）
+    事件监听用 eventMgr.on(EVENT_KEY, (data) => { ... })
+
+  ui_refresh_pattern: |
+    timerMgr.addTimer(0.5, callback, { repeat: TIMER_REPEAT_FOREVER })
+
+# ============================================================
+# 3. Procedure 实现模式
+# ============================================================
+procedures:
+  context:
+    file: assets/scripts/game/demo1-idle/procedures/ProcedureContext.ts
+    interface_name: IProcedureContext
+    fields:
+      - { name: gameData, type: IdleGameData }
+      - { name: buildingSystem, type: BuildingSystem }
+      - { name: achievementSystem, type: AchievementSystem }
+      - { name: offlineRewardSystem, type: OfflineRewardSystem }
+      - { name: saveSystem, type: SaveSystem }
+      - { name: eventManager, type: EventManager }
+      - { name: timerManager, type: TimerManager }
+      - { name: dataTableManager, type: DataTableManager }
+      - { name: fsmManager, type: FsmManager }
+    key_constant: "PROCEDURE_CONTEXT_KEY = '__procedure_context__'"
+    access_pattern: "const ctx = fsm.getData<IProcedureContext>(PROCEDURE_CONTEXT_KEY)"
+
+  chain:
+    - name: LaunchProcedure
+      file: procedures/LaunchProcedure.ts
+      extends: ProcedureBase
+      onEnter: "记录日志 → setTimeout(() => this.changeProcedure(fsm, PreloadProcedure), 0)"
+      onUpdate: null
+      onLeave: null
+      note: "延迟到下一个宏任务避免 FSM 递归切换"
+
+    - name: PreloadProcedure
+      file: procedures/PreloadProcedure.ts
+      extends: ProcedureBase
+      onEnter: |
+        1. fsm.getData<IProcedureContext>(PROCEDURE_CONTEXT_KEY) 获取上下文
+        2. dtMgr.getAllRows<T>('table_name') 读取配置
+        3. ctx.buildingSystem.loadConfigs([...rows], [...curves]) 注入配置
+        4. setTimeout(() => this.changeProcedure(fsm, OfflineSettleProcedure), 0)
+      onUpdate: null
+      onLeave: null
+
+    - name: OfflineSettleProcedure
+      file: procedures/OfflineSettleProcedure.ts
+      extends: ProcedureBase
+      onEnter: |
+        1. 获取上下文
+        2. ctx.saveSystem.load() 加载存档
+        3. 如有存档: 恢复字段 → 计算离线收益 → 应用收益
+        4. setTimeout(() => this.changeProcedure(fsm, MainProcedure), 0)
+      onUpdate: null
+      onLeave: null
+
+    - name: MainProcedure
+      file: procedures/MainProcedure.ts
+      extends: ProcedureBase
+      private_fields:
+        - { name: _autoSaveTimerId, type: "number | null" }
+        - { name: _achievementCheckTimer, type: number }
+        - { name: _settingsRequested, type: boolean }
+      onEnter: |
+        1. 获取上下文
+        2. ctx.buildingSystem.startAllProduction() — 启动生产
+        3. ctx.timerManager.addTimer(AUTO_SAVE_INTERVAL, callback, { repeat: TIMER_REPEAT_FOREVER }) — 自动存档
+        4. ctx.eventManager.emit(PROCEDURE_CHANGED, { from, to })
+      onUpdate: |
+        1. 累加成就检测计时器 → 达到间隔则 ctx.achievementSystem.checkAchievements()
+        2. 检测 _settingsRequested → changeProcedure(fsm, SettingsProcedure)
+      onLeave: |
+        1. ctx.timerManager.removeTimer(autoSaveTimerId) — 停止自动存档
+        2. ctx.buildingSystem.stopAllProduction() — 停止生产
+        3. ctx.saveSystem.save(ctx.gameData) — 离开前保存
+      public_methods:
+        - name: requestSettings
+          signature: "requestSettings(): void"
+          description: "UI 回调调用，设置标志位，下一帧切换"
+
+    - name: SettingsProcedure
+      file: procedures/SettingsProcedure.ts
+      extends: ProcedureBase
+      private_fields:
+        - { name: _backRequested, type: boolean }
+      onEnter: "emit PROCEDURE_CHANGED 事件"
+      onUpdate: "检测 _backRequested → changeProcedure(fsm, MainProcedure)"
+      onLeave: "记录日志"
+      public_methods:
+        - name: requestBack
+          signature: "requestBack(): void"
+        - name: deleteSave
+          signature: "deleteSave(fsm: IFsm<unknown>): void"
+
+  key_patterns:
+    procedure_switch: "setTimeout(() => this.changeProcedure(fsm, TargetProcedure), 0) — 避免 FSM 递归切换"
+    context_access: "fsm.getData<IProcedureContext>(PROCEDURE_CONTEXT_KEY)"
+    ui_interaction: "requestXxx() 设置标志位 → onUpdate 中检测标志 → changeProcedure"
+
+# ============================================================
+# 4. FSM 实现模式
+# ============================================================
+fsm:
+  defs:
+    file: assets/scripts/game/demo1-idle/fsm/BuildingFsmDefs.ts
+    state_names:
+      constant: BuildingFsmStateNames
+      values: { IDLE: 'Idle', PRODUCING: 'Producing', UPGRADING: 'Upgrading', MAX_LEVEL: 'MaxLevel' }
+    fsm_name_prefix: "BUILDING_FSM_PREFIX = 'building_fsm_'"
+    blackboard_interface:
+      name: IBuildingBlackboard
+      fields:
+        - { name: buildingId, type: number }
+        - { name: buildingSystem, type: BuildingSystem }
+        - { name: gameData, type: IdleGameData }
+    data_keys:
+      constant: BuildingFsmDataKeys
+      values:
+        BLACKBOARD: 'blackboard'
+        UPGRADE_START_TIME: 'upgradeStartTime'
+        UPGRADE_DURATION: 'upgradeDuration'
+
+  states:
+    file: assets/scripts/game/demo1-idle/fsm/BuildingFsmStates.ts
+    helper_function: "getBlackboard(fsm) — 从 fsm.getData 获取黑板并断言非空"
+    states:
+      - name: IdleBuildingState
+        extends: "FsmState<IBuildingBlackboard>"
+        onEnter: "获取黑板，记录日志"
+        onUpdate: "检测 buildingState.owned → changeState(fsm, ProducingState)"
+        onLeave: null
+
+      - name: ProducingState
+        extends: "FsmState<IBuildingBlackboard>"
+        onEnter: "记录日志（生产 Timer 由 BuildingSystem 管理）"
+        onUpdate: |
+          1. 检测 buildingState.isUpgrading → changeState(fsm, UpgradingState)
+          2. 检测满级条件 → changeState(fsm, MaxLevelState)
+        onLeave: "记录日志"
+
+      - name: UpgradingState
+        extends: "FsmState<IBuildingBlackboard>"
+        onEnter: "记录升级开始时间到 fsm.setData(UPGRADE_START_TIME, ...)"
+        onUpdate: "检测 !isUpgrading → changeState(fsm, ProducingState)"
+        onLeave: "清理临时数据 fsm.removeData(UPGRADE_START_TIME / UPGRADE_DURATION)"
+
+      - name: MaxLevelState
+        extends: "FsmState<IBuildingBlackboard>"
+        onEnter: "记录日志，持续产出"
+        onUpdate: null
+        onLeave: null
+
+  key_patterns:
+    blackboard_access: "const bb = fsm.getData<IBuildingBlackboard>(BuildingFsmDataKeys.BLACKBOARD)"
+    state_transition: "this.changeState(fsm, TargetState)"
+    temporary_data: "fsm.setData(key, value) / fsm.removeData(key)"
+    state_class_generic: "class XxxState extends FsmState<IBuildingBlackboard>"
+
+# ============================================================
+# 5. 事件定义模式
+# ============================================================
+events:
+  file: assets/scripts/game/demo1-idle/events/IdleEvents.ts
+  namespace_prefix: "idle:"
+  pattern: "export const EVENT_NAME = new EventKey<{ payload_fields }>('namespace:event_name')"
+  definitions:
+    - name: GOLD_CHANGED
+      payload: "{ oldGold: number; newGold: number }"
+      key: "idle:gold_changed"
+    - name: CLICK_MINE
+      payload: "{ amount: number }"
+      key: "idle:click_mine"
+    - name: BUILDING_PURCHASED
+      payload: "{ buildingId: number; cost: number }"
+      key: "idle:building_purchased"
+    - name: BUILDING_UPGRADED
+      payload: "{ buildingId: number; oldLevel: number; newLevel: number; cost: number }"
+      key: "idle:building_upgraded"
+    - name: BUILDING_OUTPUT
+      payload: "{ buildingId: number; amount: number }"
+      key: "idle:building_output"
+    - name: ACHIEVEMENT_UNLOCKED
+      payload: "{ achievementId: number; reward: number }"
+      key: "idle:achievement_unlocked"
+    - name: OFFLINE_REWARD
+      payload: "{ offlineSeconds: number; totalReward: number }"
+      key: "idle:offline_reward"
+    - name: GAME_SAVED
+      payload: "{ timestamp: number }"
+      key: "idle:game_saved"
+    - name: PROCEDURE_CHANGED
+      payload: "{ from: string; to: string }"
+      key: "idle:procedure_changed"
+
+  grouping_convention: |
+    按域分组并用注释分隔:
+    // ─── 金币相关 ──────
+    // ─── 建筑相关 ──────
+    // ─── 成就相关 ──────
+    // ─── 离线 & 存档 ───
+    // ─── 流程相关 ──────
+
+# ============================================================
+# 6. DataTable 数据定义模式
+# ============================================================
+data_tables:
+  row_pattern:
+    description: "实现 IDataRow 接口 (from '@framework/datatable/DataTableDefs')"
+    structure: |
+      class XxxRow implements IDataRow {
+        readonly id: number = 0;   // 主键
+        field1: type = default;
+        // ...
+        parseRow(data: Record<string, unknown>): void {
+          (this as { id: number }).id = Number(data['id'] ?? 0);
+          this.field1 = castFn(data['field1'] ?? default);
+        }
+      }
+    inline_data_pattern: |
+      export const XXX_DATA: Record<string, unknown>[] = [
+        { id: 1, field1: value1, ... },
+        { id: 2, field1: value2, ... },
+      ];
+
+  tables:
+    - name: BuildingConfigRow
+      file: data/BuildingConfigRow.ts
+      table_name: building_config
+      fields:
+        - { name: id, type: number, description: "建筑 ID（主键）" }
+        - { name: name, type: string, description: "建筑名称（i18n key）" }
+        - { name: baseCost, type: number }
+        - { name: baseOutput, type: number }
+        - { name: outputInterval, type: number }
+        - { name: costMultiplier, type: number }
+        - { name: outputPerLevel, type: number }
+        - { name: maxLevel, type: number }
+        - { name: unlockCondition, type: number }
+      data_constant: BUILDING_CONFIG_DATA
+      data_count: 5
+
+    - name: UpgradeCurveRow
+      file: data/UpgradeCurveRow.ts
+      table_name: upgrade_curve
+      fields:
+        - { name: id, type: number }
+        - { name: buildingId, type: number }
+        - { name: level, type: number }
+        - { name: cost, type: number }
+        - { name: output, type: number }
+        - { name: upgradeTime, type: number }
+      data_constant: UPGRADE_CURVE_DATA
+      data_count: 50
+      note: "使用 generateCurve() 辅助函数批量生成"
+
+    - name: AchievementConfigRow
+      file: data/AchievementConfigRow.ts
+      table_name: achievement_config
+      custom_types: "AchievementType = 'totalGold' | 'buildingLevel' | 'buildingCount'"
+      fields:
+        - { name: id, type: number }
+        - { name: name, type: string }
+        - { name: desc, type: string }
+        - { name: type, type: AchievementType }
+        - { name: target, type: number }
+        - { name: reward, type: number }
+      data_constant: ACHIEVEMENT_CONFIG_DATA
+      data_count: 5
+
+  game_data:
+    file: data/IdleGameData.ts
+    interface: IIdleGameData
+    class: IdleGameData
+    fields:
+      - { name: gold, type: number, default: 0 }
+      - { name: totalGoldEarned, type: number, default: 0 }
+      - { name: clickPower, type: number, default: 1 }
+      - { name: buildings, type: "IBuildingState[]", default: "[]" }
+      - { name: unlockedAchievements, type: "number[]", default: "[]" }
+      - { name: lastSaveTime, type: number, default: 0 }
+      - { name: lastOnlineTime, type: number, default: 0 }
+    sub_interface:
+      name: IBuildingState
+      fields:
+        - { name: id, type: number }
+        - { name: level, type: number }
+        - { name: owned, type: boolean }
+        - { name: isUpgrading, type: boolean }
+        - { name: upgradeStartTime, type: number }
+    methods:
+      - "static fromJSON(json: string): IdleGameData"
+      - "toJSON(): string"
+      - "reset(): void"
+
+# ============================================================
+# 7. UI 实现模式
+# ============================================================
+ui:
+  main_panel:
+    file: assets/scripts/game/demo1-idle/ui/IdleMainPanel.ts
+    class: IdleMainPanel
+    constructor: "(renderer: HtmlRenderer, gameData: IdleGameData, buildingSystem: BuildingSystem)"
+    callbacks_interface:
+      name: IdleMainPanelCallbacks
+      methods:
+        - "onClickMine: () => void"
+        - "onPurchaseBuilding: (id: number) => void"
+        - "onUpgradeBuilding: (id: number) => void"
+        - "onOpenSettings: () => void"
+        - "onSimulateOffline: () => void"
+        - "onViewAchievements: () => void"
+    setup_pattern: |
+      1. createStatusPanel('panel-id', '面板标题') — 创建键值对状态面板
+      2. createButtonGroup('组名') — 创建按钮组
+      3. addButton(group, '按钮文字', callback, disabled?) — 添加按钮
+      4. 保存按钮引用到 Map<number, HTMLButtonElement> 用于动态更新
+    public_methods:
+      - name: updateStatus
+        signature: "updateStatus(): void"
+        description: "更新状态面板显示（金币、每秒产出、建筑等级）"
+      - name: updateButtons
+        signature: "updateButtons(): void"
+        description: "更新按钮禁用状态（根据金币、解锁条件、等级）"
+    display_name_mapping: "BUILDING_DISPLAY_NAMES: Record<string, string> — 配置 name → 中文"
+
+  settings_panel:
+    file: assets/scripts/game/demo1-idle/ui/IdleSettingsPanel.ts
+    class: IdleSettingsPanel
+    constructor: "(renderer: HtmlRenderer)"
+    callbacks_interface:
+      name: IdleSettingsPanelCallbacks
+      methods:
+        - "onBack: () => void"
+        - "onDeleteSave: () => void"
+        - "onToggleMute: () => void"
+    setup_pattern: |
+      1. createButtonGroup('设置')
+      2. addButton(group, '按钮文字', callback) × 3
+
+  panel_pattern_summary: |
+    Panel 是纯逻辑类（不继承框架基类），接收 HtmlRenderer 和业务数据:
+    - constructor(renderer, ...businessDeps)
+    - setup(callbacks) — 创建 DOM 元素，绑定回调
+    - updateStatus() — 刷新显示
+    - updateButtons() — 刷新按钮状态
+    回调接口定义为 XxxPanelCallbacks，在 Demo 入口类中实现具体逻辑
+
+# ============================================================
+# 8. HtmlRenderer API
+# ============================================================
+html_renderer:
+  file: assets/scripts/game/shared/HtmlRenderer.ts
+  lines: ~400
+  constructor: "(title: string, container?: HTMLElement)"
+
+  log_colors:
+    constant: LOG_COLORS
+    values:
+      SUCCESS: '#4CAF50'
+      INFO: '#2196F3'
+      WARNING: '#FF9800'
+      ERROR: '#F44336'
+      NETWORK: '#9C27B0'
+      DEBUG: '#9E9E9E'
+      COMBAT: '#FF5722'
+      TIMER: '#00BCD4'
+
+  public_methods:
+    - name: log
+      signature: "log(message: string, color?: string): void"
+      description: "追加带颜色的日志条目，自动滚动到底部"
+    - name: updateLog
+      signature: "updateLog(key: string, message: string, color?: string): void"
+      description: "原地更新日志行（高频事件专用，避免日志爆炸）"
+    - name: separator
+      signature: "separator(title?: string): void"
+      description: "添加分隔线，可附带标题"
+    - name: createButtonGroup
+      signature: "createButtonGroup(groupName: string): HTMLElement"
+      description: "在按钮区域创建命名按钮组，返回容器元素"
+    - name: addButton
+      signature: "addButton(group: HTMLElement, label: string, onClick: () => void, disabled?: boolean): HTMLButtonElement"
+      description: "在指定按钮组中添加按钮"
+    - name: clearLog
+      signature: "clearLog(): void"
+      description: "清空日志区域"
+    - name: createStatusPanel
+      signature: "createStatusPanel(panelId: string, title: string): StatusPanel"
+      description: "创建键值对状态面板（StatusPanel 含 element + update(key, value)）"
+    - name: updateStatus
+      signature: "updateStatus(panelId: string, key: string, value: string): void"
+      description: "更新状态面板中指定键的值"
+    - name: createTable
+      signature: "createTable(headers: string[], rows: string[][]): HTMLElement"
+      description: "创建数据表格并追加到日志区域"
+
+  status_panel_interface:
+    name: StatusPanel
+    fields:
+      - { name: element, type: HTMLElement }
+      - { name: update, type: "(key: string, value: string) => void" }
+
+  layout_structure: |
+    ┌─────────────────────────────────────────────┐
+    │  [Demo 标题]                                │
+    ├──────────────────┬──────────────────────────┤
+    │  状态面板区域     │  日志输出区域             │
+    │  (StatusPanel)   │  (彩色日志，自动滚动)     │
+    ├──────────────────┴──────────────────────────┤
+    │  按钮操作区域                                │
+    │  [按钮1] [按钮2] [按钮3] ...                 │
+    └─────────────────────────────────────────────┘
+
+# ============================================================
+# 9. MockEntityFactory（Demo 2 重点参考）
+# ============================================================
+mock_entity_factory:
+  file: assets/scripts/game/shared/MockEntityFactory.ts
+  class: MockEntityFactory
+  implements: IEntityFactory
+  entity_class: MockEntity (extends EntityBase)
+
+  mock_entity:
+    class: MockEntity
+    extends: EntityBase
+    fields:
+      - { name: calls, type: "string[]", description: "生命周期调用记录" }
+      - { name: lastShowData, type: unknown, description: "最后 onShow 数据" }
+    methods:
+      - "get entityType(): string → 'MockEntity'"
+      - "onShow(data?: unknown): void"
+      - "onHide(): void"
+      - "onUpdate(deltaTime: number): void"
+      - "simulateHide(): void — 手动触发隐藏"
+
+  factory_api:
+    - name: createEntity
+      signature: "createEntity(groupName: string): EntityBase"
+      description: "创建实体，支持池化复用"
+    - name: destroyEntity
+      signature: "destroyEntity(entity: EntityBase): void"
+      description: "销毁实体，支持回池"
+    - name: enablePooling
+      signature: "enablePooling(enabled: boolean): void"
+      description: "启用/禁用实体池"
+    - name: getPool
+      signature: "getPool(): Map<string, MockEntity[]>"
+    - name: getPoolSize
+      signature: "getPoolSize(groupName: string): number"
+    - name: clearPool
+      signature: "clearPool(): void"
+
+  tracking:
+    - "createdEntities: Map<string, MockEntity[]>"
+    - "destroyedEntities: EntityBase[]"
+    - "createCalls: Array<{ groupName: string }>"
+    - "destroyCalls: number"
+
+# ============================================================
+# 10. MockUIFormFactory
+# ============================================================
+mock_ui_form_factory:
+  file: assets/scripts/game/shared/MockUIFormFactory.ts
+  class: MockUIFormFactory
+  implements: IUIFormFactory
+
+  mock_form:
+    class: MockUIForm
+    extends: UIFormBase
+    constructor: "(formName: string, layer: UILayer)"
+    fields:
+      - { name: calls, type: "string[]" }
+      - { name: lastOpenData, type: unknown }
+    lifecycle: "onOpen, onClose, onCover, onReveal, onUpdate"
+
+  factory_api:
+    - "createForm(formName: string, config: UIFormConfig, _asset: unknown): UIFormBase"
+    - "destroyForm(form: UIFormBase): void"
+    - "get createdFormCount(): number"
+
+# ============================================================
+# 11. 集成测试模式
+# ============================================================
+integration_test:
+  note: "Demo 1 无独立集成测试文件，仅有 Demo 0 基础设施测试"
+
+  demo0_test:
+    file: tests/integration/demo0-infrastructure.test.ts
+    jest_environment: jsdom
+    mock_pattern: |
+      jest.mock('@framework/debug/Logger', () => {
+        class MockLogger {
+          moduleName = 'Logger'; priority = 0;
+          onInit = jest.fn(); onUpdate = jest.fn(); onShutdown = jest.fn();
+          static debug = jest.fn(); static info = jest.fn();
+          static warn = jest.fn(); static error = jest.fn();
+        }
+        return { Logger: MockLogger };
+      });
+    test_class_pattern: |
+      class TestDemo extends DemoBase {
+        setupProceduresCalled = false;
+        setupDataTablesCalled = false;
+        constructor() { super('集成测试 Demo'); }
+        setupProcedures(): void { this.setupProceduresCalled = true; }
+        setupDataTables(): void { this.setupDataTablesCalled = true; }
+        getRenderer(): HtmlRenderer { return this.htmlRenderer; }
+      }
+    test_scenarios:
+      - name: "全部模块初始化"
+        tests:
+          - "bootstrap 后 15 个模块均可检测到"
+          - "各模块类型正确（instanceof 检查）"
+          - "子类扩展点被调用"
+      - name: "主循环模拟"
+        setup: "jest.useFakeTimers()"
+        tests:
+          - "startMainLoop 后 GameModule.update 被周期性驱动"
+          - "stopMainLoop 后不再驱动 update"
+      - name: "Mock 策略注入验证"
+        tests:
+          - "ResourceManager loadAsset 不抛异常"
+          - "AudioManager playMusic/playSound 不抛异常"
+          - "DataTableManager createTableFromRawData 可解析"
+      - name: "HtmlRenderer 集成"
+        tests:
+          - "DOM 中存在 HtmlRenderer 创建的元素"
+          - "日志方法可正常调用并写入 DOM"
+      - name: "shutdown 清理"
+        tests:
+          - "主循环停止"
+          - "所有模块被清理"
+          - "getModule 抛出异常"
+
+# ============================================================
+# 12. 子系统目录结构（快速参考）
+# ============================================================
+systems:
+  directory: assets/scripts/game/demo1-idle/systems/
+  files:
+    - BuildingSystem.ts
+    - AchievementSystem.ts
+    - OfflineRewardSystem.ts
+    - SaveSystem.ts
+  note: "子系统为纯业务逻辑类（非框架模块），在 Demo 入口类中手动实例化并传入框架模块引用"
+
+# ============================================================
+# 13. 完整目录结构
+# ============================================================
+directory_structure:
+  assets/scripts/game/demo1-idle/:
+    - IdleClickerDemo.ts          # Demo 入口
+    - data/:
+      - IdleGameData.ts           # 运行时状态 + 序列化
+      - BuildingConfigRow.ts      # DataTable 行 + 内联数据
+      - UpgradeCurveRow.ts        # DataTable 行 + 生成函数
+      - AchievementConfigRow.ts   # DataTable 行 + 内联数据
+    - events/:
+      - IdleEvents.ts             # 所有 EventKey 定义
+    - fsm/:
+      - BuildingFsmDefs.ts        # 状态名常量 + 黑板接口 + 数据键
+      - BuildingFsmStates.ts      # 4 个状态类实现
+    - procedures/:
+      - ProcedureContext.ts       # 共享上下文接口 + 键常量
+      - LaunchProcedure.ts        # 启动 → 预加载
+      - PreloadProcedure.ts       # 加载配置 → 离线结算
+      - OfflineSettleProcedure.ts # 存档恢复 → 主流程
+      - MainProcedure.ts          # 游戏主循环（含定时器管理）
+      - SettingsProcedure.ts      # 设置界面
+    - systems/:
+      - BuildingSystem.ts         # 建筑购买/升级/产出
+      - AchievementSystem.ts      # 成就检测/解锁
+      - OfflineRewardSystem.ts    # 离线收益计算
+      - SaveSystem.ts             # 存档读写
+    - ui/:
+      - IdleMainPanel.ts          # 主界面面板
+      - IdleSettingsPanel.ts      # 设置面板
+
+  assets/scripts/game/shared/:
+    - DemoBase.ts                 # 抽象基类
+    - HtmlRenderer.ts             # HTML 渲染器
+    - MockEntityFactory.ts        # 实体工厂 Mock
+    - MockUIFormFactory.ts        # UI 工厂 Mock
+    - MockResourceLoader.ts
+    - MockAudioPlayer.ts
+    - MockSceneLoader.ts
+    - MockDataTableParser.ts
+    - MockHotUpdateAdapter.ts
+    - MockLocalizationLoader.ts
+    - MockNetworkSocket.ts
+    - MockVersionComparator.ts
+
+# ============================================================
+# Open Questions & Gaps
+# ============================================================
+open_questions:
+  - question: "Demo 2 是否需要创建独立集成测试？Demo 1 没有创建。"
+    context: "tests/integration/ 仅有 demo0-infrastructure.test.ts"
+    type: nice_to_know
+    affects: ["demo2-rpg"]
+
+gaps:
+  - area: "Demo 1 子系统（BuildingSystem, AchievementSystem, OfflineRewardSystem, SaveSystem）的详细 API"
+    description: "未深入读取 systems/ 目录下的实现细节，仅记录了文件列表和使用模式"
+    impact: nice_to_know
+    affects: ["demo2-rpg"]
+    note: "Demo 2 的子系统（战斗、背包等）与 Demo 1 子系统差异较大，参考价值有限"
