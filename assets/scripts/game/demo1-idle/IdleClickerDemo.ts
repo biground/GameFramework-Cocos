@@ -28,18 +28,19 @@ import { OfflineRewardSystem } from '@game/demo1-idle/systems/OfflineRewardSyste
 import { SaveSystem } from '@game/demo1-idle/systems/SaveSystem';
 import { IdleMainPanel } from '@game/demo1-idle/ui/IdleMainPanel';
 import { IdleSettingsPanel } from '@game/demo1-idle/ui/IdleSettingsPanel';
-import { IProcedureContext, PROCEDURE_CONTEXT_KEY } from '@game/demo1-idle/procedures/ProcedureContext';
+import {
+    IProcedureContext,
+    PROCEDURE_CONTEXT_KEY,
+} from '@game/demo1-idle/procedures/ProcedureContext';
 import { LaunchProcedure } from '@game/demo1-idle/procedures/LaunchProcedure';
 import { PreloadProcedure } from '@game/demo1-idle/procedures/PreloadProcedure';
 import { OfflineSettleProcedure } from '@game/demo1-idle/procedures/OfflineSettleProcedure';
 import { MainProcedure } from '@game/demo1-idle/procedures/MainProcedure';
 import { SettingsProcedure } from '@game/demo1-idle/procedures/SettingsProcedure';
 import {
-    GOLD_CHANGED,
     CLICK_MINE,
     BUILDING_PURCHASED,
     BUILDING_UPGRADED,
-    BUILDING_OUTPUT,
     ACHIEVEMENT_UNLOCKED,
     OFFLINE_REWARD,
     GAME_SAVED,
@@ -142,7 +143,7 @@ export class IdleClickerDemo extends DemoBase {
      *
      * 依次执行 bootstrap → 启动流程 → 创建 UI → 启动主循环 → 注册事件日志。
      */
-    async start(): Promise<void> {
+    start(): void {
         Logger.info(TAG, '启动 Idle Clicker Demo...');
 
         // 1. 初始化框架和游戏系统
@@ -189,7 +190,10 @@ export class IdleClickerDemo extends DemoBase {
         this._buildingSystem.loadConfigs([...buildingConfigs], [...upgradeCurves]);
         this._achievementSystem.loadConfigs([...achievementConfigs]);
 
-        Logger.info(TAG, `预加载配置完成: ${buildingConfigs.length} 建筑, ${upgradeCurves.length} 升级曲线, ${achievementConfigs.length} 成就`);
+        Logger.info(
+            TAG,
+            `预加载配置完成: ${buildingConfigs.length} 建筑, ${upgradeCurves.length} 升级曲线, ${achievementConfigs.length} 成就`,
+        );
     }
 
     /**
@@ -213,10 +217,7 @@ export class IdleClickerDemo extends DemoBase {
             onPurchaseBuilding: (id: number) => {
                 const success = this._buildingSystem.purchaseBuilding(id);
                 if (success) {
-                    this.htmlRenderer.log(
-                        `✅ 成功购买建筑 #${id}`,
-                        LOG_COLORS.SUCCESS,
-                    );
+                    this.htmlRenderer.log(`✅ 成功购买建筑 #${id}`, LOG_COLORS.SUCCESS);
                 }
                 this._mainPanel.updateStatus();
                 this._mainPanel.updateButtons();
@@ -224,10 +225,7 @@ export class IdleClickerDemo extends DemoBase {
             onUpgradeBuilding: (id: number) => {
                 const success = this._buildingSystem.upgradeBuilding(id);
                 if (success) {
-                    this.htmlRenderer.log(
-                        `⬆️ 建筑 #${id} 升级成功`,
-                        LOG_COLORS.INFO,
-                    );
+                    this.htmlRenderer.log(`⬆️ 建筑 #${id} 升级成功`, LOG_COLORS.INFO);
                 }
                 this._mainPanel.updateStatus();
                 this._mainPanel.updateButtons();
@@ -268,10 +266,7 @@ export class IdleClickerDemo extends DemoBase {
                 const audioMgr = this.getModule<AudioManager>('AudioManager');
                 const muted = audioMgr.isMuted();
                 audioMgr.setMuted(!muted);
-                this.htmlRenderer.log(
-                    `🔊 音频${muted ? '已恢复' : '已静音'}`,
-                    LOG_COLORS.INFO,
-                );
+                this.htmlRenderer.log(`🔊 音频${muted ? '已恢复' : '已静音'}`, LOG_COLORS.INFO);
             },
         });
 
@@ -284,17 +279,11 @@ export class IdleClickerDemo extends DemoBase {
     private _registerEventListeners(): void {
         const eventMgr = this.getModule<EventManager>('EventManager');
 
-        eventMgr.on(GOLD_CHANGED, (data) => {
-            const diff = data.newGold - data.oldGold;
-            const sign = diff >= 0 ? '+' : '';
-            this.htmlRenderer.log(
-                `💰 金币: ${data.oldGold} → ${data.newGold} (${sign}${diff})`,
-                LOG_COLORS.TIMER,
-            );
-        });
+        // 金币变化通过状态面板实时展示，不再逐条记录日志
+        // （购买、升级、成就等关键事件有独立日志）
 
         eventMgr.on(CLICK_MINE, (data) => {
-            this.htmlRenderer.log(`⛏️ 挖矿 +${data.amount}`, LOG_COLORS.DEBUG);
+            this.htmlRenderer.updateLog('click-mine', `⛏️ 挖矿 +${data.amount}`, LOG_COLORS.DEBUG);
         });
 
         eventMgr.on(BUILDING_PURCHASED, (data) => {
@@ -311,12 +300,7 @@ export class IdleClickerDemo extends DemoBase {
             );
         });
 
-        eventMgr.on(BUILDING_OUTPUT, (data) => {
-            this.htmlRenderer.log(
-                `🏭 建筑 #${data.buildingId} 产出 ${data.amount} 金币`,
-                LOG_COLORS.TIMER,
-            );
-        });
+        // 建筑产出通过状态面板实时展示，不再逐条记录日志
 
         eventMgr.on(ACHIEVEMENT_UNLOCKED, (data) => {
             this.htmlRenderer.log(
@@ -334,14 +318,11 @@ export class IdleClickerDemo extends DemoBase {
 
         eventMgr.on(GAME_SAVED, (data) => {
             const time = new Date(data.timestamp).toLocaleTimeString('zh-CN', { hour12: false });
-            this.htmlRenderer.log(`💾 游戏已保存 (${time})`, LOG_COLORS.DEBUG);
+            this.htmlRenderer.updateLog('game-saved', `💾 游戏已保存 (${time})`, LOG_COLORS.DEBUG);
         });
 
         eventMgr.on(PROCEDURE_CHANGED, (data) => {
-            this.htmlRenderer.log(
-                `🔄 流程切换: ${data.from} → ${data.to}`,
-                LOG_COLORS.NETWORK,
-            );
+            this.htmlRenderer.log(`🔄 流程切换: ${data.from} → ${data.to}`, LOG_COLORS.NETWORK);
         });
 
         Logger.info(TAG, '事件日志监听器注册完成');
