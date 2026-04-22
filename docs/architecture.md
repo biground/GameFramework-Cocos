@@ -1,4 +1,4 @@
-# 🏗️ Forge Blaze Ignite 架构设计文档
+# 🏗️ Framework Blaze Ignite 架构设计文档
 
 > 本文档随框架开发持续更新
 

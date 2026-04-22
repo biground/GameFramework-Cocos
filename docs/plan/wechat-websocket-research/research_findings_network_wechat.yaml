@@ -1,5 +1,5 @@
 plan_id: wechat-websocket-research
-objective: '调研 Forge Blaze Ignite 网络模块多通道架构 & 微信小游戏 WebSocket 限制，评估可行性'
+objective: '调研 Framework Blaze Ignite 网络模块多通道架构 & 微信小游戏 WebSocket 限制，评估可行性'
 focus_area: network-module-and-wechat-websocket
 created_at: '2026-04-13'
 created_by: gem-researcher
@@ -257,7 +257,7 @@ feasibility_analysis:
     confidence: high
 
     compatibility_summary: |
-        Forge Blaze Ignite 的多通道设计（最多同时持有 N 条 NetworkChannel）
+        Framework Blaze Ignite 的多通道设计（最多同时持有 N 条 NetworkChannel）
         与微信小游戏的 5 条并发 WebSocket 上限天然兼容。
         典型游戏场景（游戏服 + 聊天服 + 推送服 = 3 条）远未触及 5 条上限。
 

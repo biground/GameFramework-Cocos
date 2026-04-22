@@ -1,10 +1,10 @@
 # @fbi/ecs
 
-> Forge Blaze Ignite 的高性能 ECS 插件，基于 SparseSet 架构。Generational Entity ID、多字位掩码（BitMask）、查询缓存、响应式分组（ReactiveGroup）、命令缓冲区——为游戏逻辑提供数据驱动的开发范式。
+> Framework Blaze Ignite 的高性能 ECS 插件，基于 SparseSet 架构。Generational Entity ID、多字位掩码（BitMask）、查询缓存、响应式分组（ReactiveGroup）、命令缓冲区——为游戏逻辑提供数据驱动的开发范式。
 
 ## 安装
 
-`@fbi/ecs` 是 Forge Blaze Ignite 的独立插件包，位于 `packages/fbi-ecs/`。
+`@fbi/ecs` 是 Framework Blaze Ignite 的独立插件包，位于 `packages/fbi-ecs/`。
 
 ```jsonc
 // package.json

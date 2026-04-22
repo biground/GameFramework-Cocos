@@ -1,4 +1,4 @@
-# 🎮 Forge Blaze Ignite — 综合 Demo Series 设计文档
+# 🎮 Framework Blaze Ignite — 综合 Demo Series 设计文档
 
 > **版本**：v1.0 | **创建日期**：2026-04-20
 > **目的**：为 Phase 4 综合 Demo 提供完整设计蓝图，每个 Demo 可由独立 worktree + session 开发
@@ -9,7 +9,7 @@
 
 ### 1.1 目标
 
-通过 **6 个完整游戏 Demo + 1 套共享基础设施**，验证 Forge Blaze Ignite 全部 17 个框架模块在真实游戏场景下的协作能力，同时为面试积累深度项目经验。
+通过 **6 个完整游戏 Demo + 1 套共享基础设施**，验证 Framework Blaze Ignite 全部 17 个框架模块在真实游戏场景下的协作能力，同时为面试积累深度项目经验。
 
 ### 1.2 设计原则
 

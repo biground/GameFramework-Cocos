@@ -1,5 +1,5 @@
 plan_id: phase4-demo
-objective: '分析 Forge Blaze Ignite 全部已完成模块的能力边界，为 Phase 4 综合 Demo 设计提供模块-游戏类型匹配矩阵'
+objective: '分析 Framework Blaze Ignite 全部已完成模块的能力边界，为 Phase 4 综合 Demo 设计提供模块-游戏类型匹配矩阵'
 focus_area: module_capabilities
 created_at: '2026-04-20'
 created_by: gem-researcher

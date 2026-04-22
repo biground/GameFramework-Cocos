@@ -1,4 +1,4 @@
-# Forge Blaze Ignite — Agent Rules
+# Framework Blaze Ignite — Agent Rules
 
 > 本文件是 OpenCode AI agent 的仓库级规则。所有 AI 会话自动加载此文件。
 > 优先级：用户指令 > 本文件 > 默认系统提示。
