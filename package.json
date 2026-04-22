@@ -11,7 +11,11 @@
         "test:coverage": "jest --coverage",
         "prepare": "husky",
         "demo1:build": "esbuild assets/scripts/game/demo1-idle/index.ts --bundle --outfile=dist/demo1/demo1.js --platform=browser --format=iife --tsconfig=tsconfig.json --alias:@framework=./assets/scripts/framework --alias:@game=./assets/scripts/game --alias:@utils=./assets/scripts/utils --alias:@runtime=./assets/scripts/runtime",
-        "demo1:serve": "npm run demo1:build && npx serve dist/demo1 -p 3001"
+        "demo1:serve": "npm run demo1:build && npx serve dist/demo1 -p 3001",
+        "demo2:build": "esbuild assets/scripts/game/demo2-rpg/main.ts --bundle --outfile=dist/demo2/demo2.js --platform=browser --format=iife --tsconfig=tsconfig.json --alias:@framework=./assets/scripts/framework --alias:@game=./assets/scripts/game --alias:@utils=./assets/scripts/utils --alias:@runtime=./assets/scripts/runtime",
+        "demo2:serve": "npx serve dist/demo2 -p 3002",
+        "demo2:dev": "npm run demo2:build && npm run demo2:serve",
+        "test:e2e": "npx playwright test"
     },
     "keywords": [
         "cocos-creator",
@@ -24,6 +28,7 @@
     "devDependencies": {
         "@commitlint/cli": "^19.0.0",
         "@commitlint/config-conventional": "^19.0.0",
+        "@playwright/test": "^1.59.1",
         "@types/jest": "^29.5.14",
         "@typescript-eslint/eslint-plugin": "^7.0.0",
         "@typescript-eslint/parser": "^7.0.0",
