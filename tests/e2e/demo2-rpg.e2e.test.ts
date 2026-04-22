@@ -63,7 +63,41 @@ test.describe('Demo 2 - Turn-based RPG', () => {
         // 等待战斗日志出现（自动战斗，BattleProcedure 会输出回合、攻击等日志）
         await expect(page.getByText(/回合开始/).first()).toBeVisible({ timeout: 15000 });
 
-        // 等待战斗结束（SettleProcedure 输出结算信息）
-        await expect(page.getByText(/战斗结束|胜利|失败|结算/)).toBeVisible({ timeout: 20000 });
+        // 等待战斗结束（SettleProcedure 输出结算信息 + 返回大厅按钮）
+        await expect(page.getByRole('button', { name: '返回大厅' })).toBeVisible({
+            timeout: 30000,
+        });
+    });
+
+    test('战后应能返回大厅并再次出发', async ({ page }) => {
+        // 等待大厅
+        const goBtn = page.getByRole('button', { name: '出发' });
+        await expect(goBtn).toBeVisible({ timeout: 10000 });
+
+        // 第一轮：选关卡 → 出发 → 等待战斗结束
+        await page.getByRole('button', { name: /草原之路/ }).click();
+        await goBtn.click();
+        await expect(page.getByText(/回合开始/).first()).toBeVisible({ timeout: 15000 });
+        await expect(page.getByRole('button', { name: '返回大厅' })).toBeVisible({
+            timeout: 30000,
+        });
+
+        // 点击"返回大厅"
+        const backBtn = page.getByRole('button', { name: '返回大厅' });
+        await expect(backBtn).toBeVisible({ timeout: 5000 });
+        await backBtn.click();
+
+        // 验证回到大厅（"出发"按钮重新出现）
+        const goBtn2 = page.getByRole('button', { name: '出发' });
+        await expect(goBtn2).toBeVisible({ timeout: 10000 });
+
+        // 第二轮：选另一个关卡 → 出发
+        const stageBtn2 = page.getByRole('button', { name: /暗影森林/ });
+        await expect(stageBtn2).toBeVisible();
+        await stageBtn2.click();
+        await goBtn2.click();
+
+        // 验证第二轮战斗正常开始
+        await expect(page.getByText(/回合开始/).first()).toBeVisible({ timeout: 15000 });
     });
 });

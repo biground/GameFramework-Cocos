@@ -12,6 +12,7 @@ import {
 } from '@game/demo2-rpg/procedures/RpgProcedureContext';
 import { BattleProcedure } from '@game/demo2-rpg/procedures/BattleProcedure';
 import { SettleProcedure } from '@game/demo2-rpg/procedures/SettleProcedure';
+import { LobbyProcedure } from '@game/demo2-rpg/procedures/LobbyProcedure';
 import { RpgEvents } from '@game/demo2-rpg/events/RpgEvents';
 import { RpgGameData, CharacterState } from '@game/demo2-rpg/data/RpgGameData';
 import { BattleSystem } from '@game/demo2-rpg/systems/BattleSystem';
@@ -150,6 +151,30 @@ function createMockProcedureFsm(ctx: IRpgProcedureContext): {
     return { fsm, lastChangedState: tracker };
 }
 
+/** 创建 mock 渲染器（供 SettleProcedure 使用） */
+function createMockRenderer(): IRpgProcedureContext['renderer'] {
+    const buttonCallbacks = new Map<string, () => void>();
+    return {
+        log: jest.fn(),
+        updateLog: jest.fn(),
+        separator: jest.fn(),
+        clearLog: jest.fn(),
+        clearButtons: jest.fn(),
+        clearStatusPanels: jest.fn(),
+        createButtonGroup: jest.fn().mockReturnValue({}),
+        addButton: jest.fn((_group: unknown, label: string, onClick: () => void) => {
+            buttonCallbacks.set(label, onClick);
+            return {} as HTMLButtonElement;
+        }),
+        createStatusPanel: jest.fn().mockReturnValue({
+            element: {},
+            update: jest.fn(),
+        }),
+        updateStatus: jest.fn(),
+        _getButtonCallback: (label: string) => buttonCallbacks.get(label),
+    } as unknown as IRpgProcedureContext['renderer'];
+}
+
 /** 创建上下文 */
 function createContext(overrides: Partial<IRpgProcedureContext> = {}): IRpgProcedureContext {
     const buffSystem = new BuffSystem();
@@ -160,7 +185,7 @@ function createContext(overrides: Partial<IRpgProcedureContext> = {}): IRpgProce
 
     return {
         gameData: new RpgGameData(),
-        renderer: {} as IRpgProcedureContext['renderer'],
+        renderer: createMockRenderer(),
         battleSystem,
         buffSystem,
         damageCalculator: {} as unknown,
@@ -440,5 +465,80 @@ describe('SettleProcedure — 结算流程', () => {
 
         const procedure = new SettleProcedure();
         expect(() => procedure.onEnter(fsm)).toThrow();
+    });
+
+    it('应销毁 BattleFsm', () => {
+        const gameData = new RpgGameData();
+        gameData.playerCharacters = [makePlayer()];
+
+        const fsmManager = createMockFsmManager();
+        const ctx = createContext({ gameData, fsmManager });
+
+        const { fsm } = createMockProcedureFsm(ctx);
+        fsm.setData('__battle_result__', { victory: true, expReward: 0, goldReward: 0 });
+
+        const procedure = new SettleProcedure();
+        procedure.onEnter(fsm);
+
+        expect(fsmManager.destroyFsm).toHaveBeenCalledWith('battle_fsm');
+    });
+
+    it('应恢复玩家角色 HP/MP/isAlive', () => {
+        const gameData = new RpgGameData();
+        const player = makePlayer({ hp: 10, mp: 5, isAlive: false });
+        gameData.playerCharacters = [player];
+
+        const ctx = createContext({ gameData });
+        const { fsm } = createMockProcedureFsm(ctx);
+        fsm.setData('__battle_result__', { victory: true, expReward: 0, goldReward: 0 });
+
+        const procedure = new SettleProcedure();
+        procedure.onEnter(fsm);
+
+        expect(player.hp).toBe(player.maxHp);
+        expect(player.mp).toBe(player.maxMp);
+        expect(player.isAlive).toBe(true);
+        expect(player.buffs).toEqual([]);
+    });
+
+    it('应创建"返回大厅"按钮', () => {
+        const gameData = new RpgGameData();
+        gameData.playerCharacters = [makePlayer()];
+
+        const renderer = createMockRenderer();
+        const ctx = createContext({ gameData, renderer });
+        const { fsm } = createMockProcedureFsm(ctx);
+        fsm.setData('__battle_result__', { victory: true, expReward: 10, goldReward: 5 });
+
+        const procedure = new SettleProcedure();
+        procedure.onEnter(fsm);
+
+        const addButtonMock = renderer.addButton as jest.Mock;
+        const labels = addButtonMock.mock.calls.map((call: unknown[]) => call[1]);
+        expect(labels).toContain('返回大厅');
+    });
+
+    it('点击"返回大厅"应切换到 LobbyProcedure', () => {
+        const gameData = new RpgGameData();
+        gameData.playerCharacters = [makePlayer()];
+
+        const renderer = createMockRenderer();
+        const ctx = createContext({ gameData, renderer });
+        const { fsm, lastChangedState } = createMockProcedureFsm(ctx);
+        fsm.setData('__battle_result__', { victory: true, expReward: 10, goldReward: 5 });
+
+        const procedure = new SettleProcedure();
+        procedure.onEnter(fsm);
+
+        // 获取"返回大厅"按钮回调并调用
+        const addButtonMock = renderer.addButton as jest.Mock;
+        const lobbyCall = addButtonMock.mock.calls.find(
+            (call: unknown[]) => call[1] === '返回大厅',
+        ) as unknown[] | undefined;
+        expect(lobbyCall).toBeDefined();
+        const callback = lobbyCall![2] as () => void;
+        callback();
+
+        expect(lastChangedState.value).toBe(LobbyProcedure);
     });
 });

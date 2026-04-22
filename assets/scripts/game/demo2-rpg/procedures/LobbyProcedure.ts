@@ -42,12 +42,20 @@ export class LobbyProcedure extends ProcedureBase {
         const gameData = ctx.gameData as RpgGameData;
         const { renderer, dataTableManager, eventManager } = ctx;
 
-        // ── 1. 初始化玩家角色 ───────────────────────────────
-        const charRows = dataTableManager.getAllRows<CharacterConfigRow>('character_config');
-        const characters: CharacterState[] = charRows.map((row) => this._createCharacterState(row));
-        gameData.playerCharacters = characters;
+        // ── 0. 清理上一次的 UI（防止重复进入时出现重复按钮/面板）──
+        renderer.clearButtons();
+        renderer.clearStatusPanels();
 
-        Logger.info(TAG, `进入大厅，已初始化 ${characters.length} 个角色`);
+        // ── 1. 初始化玩家角色（仅首次进入时从配置表创建）──
+        if (gameData.playerCharacters.length === 0) {
+            const charRows = dataTableManager.getAllRows<CharacterConfigRow>('character_config');
+            const characters: CharacterState[] = charRows.map((row) =>
+                this._createCharacterState(row),
+            );
+            gameData.playerCharacters = characters;
+        }
+
+        Logger.info(TAG, `进入大厅，队伍 ${gameData.playerCharacters.length} 个角色`);
 
         // ── 2. 展示大厅信息 ─────────────────────────────────
         renderer.log('═══ 欢迎来到大厅 ═══');
@@ -55,7 +63,7 @@ export class LobbyProcedure extends ProcedureBase {
 
         // 创建状态面板展示角色列表
         this._lobbyPanel = renderer.createStatusPanel('lobby', '队伍角色');
-        for (const char of characters) {
+        for (const char of gameData.playerCharacters) {
             this._lobbyPanel.update(
                 char.name,
                 `HP:${char.hp}/${char.maxHp} ATK:${char.atk} DEF:${char.def} SPD:${char.spd}`,

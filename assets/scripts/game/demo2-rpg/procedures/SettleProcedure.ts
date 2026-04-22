@@ -10,6 +10,7 @@ import { IFsm } from '@framework/fsm/FsmDefs';
 import { Logger } from '@framework/debug/Logger';
 import { IRpgProcedureContext, RPG_PROCEDURE_CONTEXT_KEY } from './RpgProcedureContext';
 import { BATTLE_RESULT_KEY, BattleResultData } from './BattleProcedure';
+import { LobbyProcedure } from './LobbyProcedure';
 import { RpgGameData } from '../data/RpgGameData';
 import { BuffSystem } from '../systems/BuffSystem';
 
@@ -30,7 +31,9 @@ export class SettleProcedure extends ProcedureBase {
      * 1. 获取上下文和战斗结果
      * 2. 计算并发放奖励
      * 3. 检查角色升级
-     * 4. 清理 BUFF、停止 BGM
+     * 4. 清理 BUFF、停止 BGM、销毁 BattleFsm
+     * 5. 恢复角色状态（HP/MP/isAlive）
+     * 6. 展示结算界面与返回大厅按钮
      */
     onEnter(fsm: IFsm<unknown>): void {
         const ctx = fsm.getData<IRpgProcedureContext>(RPG_PROCEDURE_CONTEXT_KEY);
@@ -42,6 +45,7 @@ export class SettleProcedure extends ProcedureBase {
         const result = fsm.getData<BattleResultData>(BATTLE_RESULT_KEY);
         const gameData = ctx.gameData as RpgGameData;
         const buffSystem = ctx.buffSystem as BuffSystem;
+        const { renderer } = ctx;
 
         Logger.info(TAG, '进入结算流程');
 
@@ -66,6 +70,34 @@ export class SettleProcedure extends ProcedureBase {
 
         // 停止 BGM
         ctx.audioManager.stopMusic();
+
+        // 销毁 BattleFsm（防止下次战斗创建同名 FSM 时报错）
+        ctx.fsmManager.destroyFsm('battle_fsm');
+
+        // 恢复玩家角色状态（为下一轮战斗做准备）
+        for (const player of gameData.playerCharacters) {
+            player.hp = player.maxHp;
+            player.mp = player.maxMp;
+            player.isAlive = true;
+            player.buffs = [];
+        }
+
+        // 展示结算界面
+        renderer.separator('战斗结束');
+        if (result && result.victory) {
+            renderer.log(
+                `🎉 胜利！获得 ${result.expReward} 经验、${result.goldReward} 金币`,
+                '#4CAF50',
+            );
+        } else {
+            renderer.log('😵 战斗失败...', '#F44336');
+        }
+
+        // 返回大厅按钮
+        const actionGroup = renderer.createButtonGroup('操作');
+        renderer.addButton(actionGroup, '返回大厅', () => {
+            this.changeProcedure(fsm, LobbyProcedure);
+        });
 
         Logger.info(TAG, '结算完成');
     }

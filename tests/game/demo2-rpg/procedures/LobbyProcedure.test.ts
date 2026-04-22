@@ -45,6 +45,8 @@ function createMockRenderer(): IRpgProcedureContext['renderer'] {
         updateLog: jest.fn(),
         separator: jest.fn(),
         clearLog: jest.fn(),
+        clearButtons: jest.fn(),
+        clearStatusPanels: jest.fn(),
         createButtonGroup: jest.fn().mockReturnValue({}),
         addButton: jest.fn((_group: unknown, label: string, onClick: () => void) => {
             buttonCallbacks.set(label, onClick);
@@ -56,7 +58,7 @@ function createMockRenderer(): IRpgProcedureContext['renderer'] {
         }),
         updateStatus: jest.fn(),
         // 暴露给测试的辅助方法
-        _getButtonCallback: (label: string) => buttonCallbacks.get(label),
+        _getButtonCallback: (label: string): (() => void) | undefined => buttonCallbacks.get(label),
     } as unknown as IRpgProcedureContext['renderer'] & {
         _getButtonCallback: (label: string) => (() => void) | undefined;
     };
@@ -314,6 +316,60 @@ describe('LobbyProcedure', () => {
             const emptyFsm = createMockFsm(new Map());
 
             expect(() => procedure.onEnter(emptyFsm)).toThrow();
+        });
+    });
+
+    describe('二次进入（战后返回大厅）', () => {
+        it('应清理旧 UI（调用 clearButtons 和 clearStatusPanels）', () => {
+            const { procedure, fsm, renderer } = setupTestEnv();
+
+            procedure.onEnter(fsm);
+
+            expect(renderer.clearButtons).toHaveBeenCalledTimes(1);
+            expect(renderer.clearStatusPanels).toHaveBeenCalledTimes(1);
+        });
+
+        it('二次进入时不应重新初始化已有角色', () => {
+            const { procedure, fsm, gameData } = setupTestEnv();
+
+            // 首次进入
+            procedure.onEnter(fsm);
+            expect(gameData.playerCharacters).toHaveLength(3);
+
+            // 模拟战斗结束后角色升级
+            gameData.playerCharacters[0].level = 3;
+            gameData.playerCharacters[0].exp = 200;
+
+            // 二次进入
+            procedure.onLeave(fsm);
+            procedure.onEnter(fsm);
+
+            // 角色应保留升级后的状态
+            expect(gameData.playerCharacters).toHaveLength(3);
+            expect(gameData.playerCharacters[0].level).toBe(3);
+            expect(gameData.playerCharacters[0].exp).toBe(200);
+        });
+
+        it('二次进入时"出发"按钮应仍然可用', () => {
+            const { procedure, fsm, renderer } = setupTestEnv();
+
+            // 首次进入
+            procedure.onEnter(fsm);
+            procedure.onLeave(fsm);
+
+            // 二次进入
+            procedure.onEnter(fsm);
+
+            // 查找"出发"按钮
+            const addButtonMock = renderer.addButton as jest.Mock;
+            const calls = addButtonMock.mock.calls as ButtonCall[];
+            const departCall = calls.find((call) => call[1].includes('出发'));
+            expect(departCall).toBeDefined();
+
+            const departCallback = departCall![2];
+            departCallback();
+
+            expect(fsm.changeState).toHaveBeenCalled();
         });
     });
 });

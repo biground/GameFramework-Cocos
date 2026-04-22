@@ -242,6 +242,22 @@ export class HtmlRenderer {
      */
     public clearLog(): void {
         this.logContainer.innerHTML = '';
+        this.liveEntries.clear();
+    }
+
+    /**
+     * 清空按钮操作区域的所有按钮组
+     */
+    public clearButtons(): void {
+        this.buttonArea.innerHTML = '';
+    }
+
+    /**
+     * 清空状态面板区域的所有面板
+     */
+    public clearStatusPanels(): void {
+        this.statusArea.innerHTML = '';
+        this.panels.clear();
     }
 
     /**
