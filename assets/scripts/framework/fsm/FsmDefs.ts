@@ -100,4 +100,11 @@ export interface IFsm<T> {
      * @returns 是否包含该类型的状态
      */
     hasState<TState extends IFsmState<T>>(stateType: Constructor<TState>): boolean;
+
+    /**
+     * 启动状态机，进入指定的初始状态
+     * @template TState 初始状态类型
+     * @param stateType 初始状态的构造函数
+     */
+    start<TState extends IFsmState<T>>(stateType: Constructor<TState>): void;
 }
