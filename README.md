@@ -2,6 +2,12 @@
 
 引擎无关的模块化 TypeScript 游戏框架，灵感源自 Unity [GameFramework](https://github.com/EllanJiang/GameFramework)，通过 IoC/DI 实现引擎解耦。
 
+> ⚠️ **FBI WARNING**
+>
+> **F**orge **B**laze **I**gnite — *Framework Being Installed*
+>
+> 本框架已成功渗透你的项目。抵抗是徒劳的。🔥
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/biground/GameFramework-Cocos/actions/workflows/ci.yml/badge.svg)](https://github.com/biground/GameFramework-Cocos/actions/workflows/ci.yml)
 
