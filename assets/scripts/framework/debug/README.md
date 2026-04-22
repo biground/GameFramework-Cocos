@@ -47,35 +47,90 @@ if (Logger.isDebugEnabled) {
 
 ## 文件清单
 
-| 文件            | 职责                                   |
-| --------------- | -------------------------------------- |
-| `LoggerDefs.ts` | LogLevel 枚举定义                      |
-| `Logger.ts`     | Logger 类实现（静态 API + ModuleBase） |
+| 文件            | 职责                                                       |
+| --------------- | ---------------------------------------------------------- |
+| `LoggerDefs.ts` | LogLevel 枚举、LogEntry 条目、ILogOutput 输出策略接口      |
+| `Logger.ts`     | Logger 类实现（静态 API + ModuleBase）、ConsoleLogOutput   |
 
 ## 对外 API
 
 ```typescript
 class Logger extends ModuleBase {
-    // 日志输出（静态 API）
+    // ─── 日志输出（静态 API） ────────────
     static debug(tag: string, ...args: unknown[]): void;
     static info(tag: string, ...args: unknown[]): void;
     static warn(tag: string, ...args: unknown[]): void;
     static error(tag: string, ...args: unknown[]): void;
 
-    // 级别控制（静态 API）
+    // ─── 级别控制 ────────────────────────
     static setLevel(level: LogLevel): void;
     static getLevel(): LogLevel;
     static get isDebugEnabled(): boolean;
 
-    // 实例方法（框架内部使用）
+    // ─── Tag 过滤 ────────────────────────
+    static disableTag(tag: string): void;
+    static enableTag(tag: string): void;
+    static disableTags(tags: string[]): void;
+    static enableAllTags(): void;
+    static getDisabledTags(): string[];
+
+    // ─── ILogOutput 输出策略 ─────────────
+    static addOutput(output: ILogOutput): void;
+    static removeOutput(output: ILogOutput): void;
+    static getOutputs(): readonly ILogOutput[];
+    static clearOutputs(): void;
+
+    // ─── 历史缓冲（环形缓冲区） ─────────
+    static getHistory(): LogEntry[];
+    static clearHistory(): void;
+    static setHistoryCapacity(capacity: number): void;
+    static getHistoryCount(): number;
+
+    // ─── 性能计时 ────────────────────────
+    static time(label: string): void;
+    static timeEnd(label: string): number;
+
+    // ─── 实例方法（框架内部） ────────────
     setLogLevel(level: LogLevel): void;
     getLogLevel(): LogLevel;
 
     // ModuleBase
     readonly moduleName: string; // "Logger"
-    readonly priority: number; // 0
+    readonly priority: number;   // 0
     onInit(): void;
     onShutdown(): void;
+}
+```
+
+### ILogOutput 接口
+
+```typescript
+interface ILogOutput {
+    log(entry: LogEntry): void;
+}
+```
+
+### ConsoleLogOutput（默认输出策略）
+
+```typescript
+class ConsoleLogOutput implements ILogOutput {
+    setColorEnabled(enabled: boolean): void;
+    get colorEnabled(): boolean;
+    log(entry: LogEntry): void;
+}
+```
+
+默认已注册，支持浏览器环境的颜色编码输出。格式：`[HH:MM:SS.mmm][LEVEL][tag] ...args`。
+
+### LogEntry 日志条目
+
+```typescript
+interface LogEntry {
+    level: LogLevel;
+    tag: string;
+    timestamp: number;  // Date.now()
+    args: unknown[];
+    stack?: string;     // Error 级别自动附带
 }
 ```
 
@@ -95,6 +150,33 @@ Logger.setLevel(LogLevel.Warn);
 if (Logger.isDebugEnabled) {
     Logger.debug('State', '完整状态', JSON.stringify(state));
 }
+
+// Tag 过滤：屏蔽高频模块日志
+Logger.disableTags(['GameLoop', 'Physics']);
+Logger.enableTag('GameLoop'); // 恢复单个
+Logger.enableAllTags();       // 全部恢复
+
+// 自定义输出目标
+class RemoteLogOutput implements ILogOutput {
+    log(entry: LogEntry): void {
+        fetch('/api/logs', {
+            method: 'POST',
+            body: JSON.stringify(entry),
+        });
+    }
+}
+Logger.addOutput(new RemoteLogOutput());
+
+// 历史回溯（供 DebugPanel 读取）
+const history = Logger.getHistory();
+Logger.setHistoryCapacity(200); // 扩大缓冲
+Logger.clearHistory();
+
+// 性能计时
+Logger.time('loadScene');
+// ... 加载场景 ...
+const ms = Logger.timeEnd('loadScene');
+// [INFO][loadScene] 耗时: 123.45ms
 ```
 
 ## 设计决策
@@ -108,6 +190,9 @@ if (Logger.isDebugEnabled) {
 | \_consoleMethodNames 映射 | 字符串名而非引用             | 使用 `console[methodName]` 动态调用，确保 Jest mock 生效   |
 | \_defaultLevel 降级       | 实例化前也能用               | `Logger._instance` 为 null 时回退到静态默认级别            |
 | onShutdown 重置           | 清理实例引用 + 重置默认级别  | 保证下次初始化时是干净状态                                 |
+| 环形缓冲区                | 固定容量 + head 指针         | O(1) 写入，自动淘汰最旧条目，无内存增长                   |
+| GFC_DEBUG 宏裁剪          | 编译期常量守卫               | 生产环境 debug/info 零开销（代码路径完全跳过）             |
+| ILogOutput 策略           | 数组多目标分发               | 可同时输出到控制台、文件、远程服务器，运行时动态增删       |
 
 ## 依赖
 
@@ -116,26 +201,24 @@ if (Logger.isDebugEnabled) {
 ## 被谁依赖
 
 - 所有其他模块（可选依赖，用于日志输出）
+- DebugManager（通过 `Logger.getHistory()` 读取日志缓冲）
 
 ## 已知限制
 
-- 无日志持久化（文件写入、远程上报）
-- 无运行时动态切换输出目标（如切换到自定义 writer）
-- 无彩色输出支持（浏览器/Node.js 不同环境的 ANSI 颜色）
-- 无 DebugPanel 可视化面板（独立模块，待开发）
+- 无日志持久化（文件写入需自行实现 ILogOutput）
+- 无远程日志批量上报（需自行实现带批量队列的 ILogOutput）
+- 环形缓冲区满后自动覆盖最旧条目，无溢出通知
 
 ## 后续拓展方向
 
-1. **ILogWriter 策略注入**：支持自定义日志输出目标（文件、远程服务器、UI 面板）
-2. **日志缓冲区**：缓存最近 N 条日志，供 DebugPanel 显示
-3. **条件编译**：通过宏定义在发布包中完全移除 Debug 级别代码
-4. **Tag 过滤**：按模块 tag 过滤日志，而非仅按级别
+1. **批量远程上报**：实现带队列、重试的 RemoteLogOutput
+2. **文件日志**：Node.js 环境下的 FileLogOutput
+3. **日志搜索**：按 tag/level/时间范围检索历史
 
 ## 关联测试
 
 - 测试文件路径：`tests/debug/logger.test.ts`
-- 测试数量：19 个
-- 覆盖场景：初始化/优先级、级别过滤（Debug/Warn/Error/None）、格式化输出、静态 API、isDebugEnabled 守卫、性能考量（过滤时零调用）、生命周期（onInit/onShutdown）
+- 覆盖场景：初始化/优先级、级别过滤（Debug/Warn/Error/None）、格式化输出、静态 API、isDebugEnabled 守卫、Tag 过滤、ILogOutput 多目标输出、历史缓冲（环形缓冲区）、性能计时（time/timeEnd）、GFC_DEBUG 条件编译、ConsoleLogOutput 颜色、生命周期（onInit/onShutdown）
 
 ---
 
