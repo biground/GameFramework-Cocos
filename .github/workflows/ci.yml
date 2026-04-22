@@ -1,4 +1,4 @@
-# GitHub Actions CI — Forge Blaze Ignite
+# GitHub Actions CI — Framework Blaze Ignite
 # 对标 Jenkinsfile 的同等流程：lint → typecheck → test
 # 轻量版，主要用于 GitHub PR 状态检查
 

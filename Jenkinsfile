@@ -1,5 +1,5 @@
 // ============================================================
-// Forge Blaze Ignite — 声明式 Jenkins Pipeline
+// Framework Blaze Ignite — 声明式 Jenkins Pipeline
 //
 // 流水线阶段：
 //   1. Checkout   — 拉取代码

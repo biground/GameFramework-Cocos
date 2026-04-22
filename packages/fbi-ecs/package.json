@@ -1,7 +1,7 @@
 {
     "name": "@fbi/ecs",
     "version": "0.1.0",
-    "description": "Forge Blaze Ignite ECS 插件：SparseSet + Archetype 架构，DI 驱动的 System 管理",
+    "description": "Framework Blaze Ignite ECS 插件：SparseSet + Archetype 架构，DI 驱动的 System 管理",
     "main": "src/index.ts",
     "peerDependencies": {
         "@fbi/core": ">=0.1.0"
