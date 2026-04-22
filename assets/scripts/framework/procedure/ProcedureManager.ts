@@ -72,6 +72,19 @@ export class ProcedureManager extends ModuleBase implements IProcedureManager {
     }
 
     /**
+     * 在内部 FSM 上设置共享数据（必须在 startProcedure 之前调用）
+     * @param key 数据键
+     * @param value 数据值
+     */
+    public setData<V>(key: string, value: V): void {
+        if (!this._procedureFsm) {
+            Logger.error(ProcedureManager.TAG, 'setData 失败：请先调用 initialize');
+            throw new Error('[ProcedureManager] setData 失败：请先调用 initialize');
+        }
+        this._procedureFsm.setData(key, value);
+    }
+
+    /**
      * 启动流程管理器，进入入口流程
      * @template T 入口流程类型
      * @param entryProcedure 入口流程的构造函数
