@@ -273,13 +273,14 @@ public setResourceLoader(loader: IResourceLoader): void {
 | `instructions/coach-module-teaching.instructions.md` | `training/**` | 模块教学流程 |
 | `instructions/obsidian-module-notes.instructions.md` | `training/**` | Obsidian 笔记约定 |
 
-## 已知不一致（待修复）
+## 代码一致性（已统一）
 
-<!-- TODO: 待确认 -->
-- 接口文件位置不统一：大部分在 `framework/interfaces/`，但 `audio/IAudioManager.ts`、`scene/ISceneManager.ts`、`timer/ITimerManager.ts` 在模块自己目录
-- Logger TAG 格式不统一：TimerManager / DataTableManager 把 tag 拼进字符串而非使用 `private static readonly TAG`
-- DI Container 错误消息为英文，其余模块全为中文
-- EventKey 命名空间：框架层用 `Module.Event`（点号），游戏层用 `ns:event`（冒号）
+以下项目曾存在不一致，已在 2026-04-23 统一修复：
+- 接口文件统一放置在 `framework/interfaces/`
+- Logger TAG 统一使用 `private static readonly TAG` 常量
+- DI Container 错误消息统一为中文
+- 框架层 EventKey 描述统一为 `Module.EventName` PascalCase 点号格式
+- Game 层 EventKey 使用 `ns:event_name` 冒号格式（与框架层分开约定）
 
 ## 关键文档
 
