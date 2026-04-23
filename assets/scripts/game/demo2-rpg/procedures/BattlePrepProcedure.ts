@@ -155,7 +155,7 @@ export class BattlePrepProcedure extends ProcedureBase {
             );
         }
 
-        // 11. 切换到 BattleProcedure（延迟到下一个宏任务，避免 FSM 递归切换）
-        setTimeout(() => this.changeProcedure(fsm, BattleProcedure), 0);
+        // 11. 切换到 BattleProcedure
+        this.changeProcedure(fsm, BattleProcedure);
     }
 }

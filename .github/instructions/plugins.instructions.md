@@ -1,6 +1,6 @@
 ---
-description: "插件包开发规范。当修改 packages/ 下的独立插件时加载。"
-applyTo: "packages/**"
+description: '插件包开发规范。当修改 packages/ 下的独立插件时加载。'
+applyTo: 'packages/**'
 ---
 
 # 插件包开发规范
@@ -39,11 +39,11 @@ GameModule.register(new HeapTimerManager(), { allowReplace: true });
 
 ## 现有插件
 
-| 包 | 替换目标 | 特点 | 复杂度 |
-|----|---------|------|--------|
-| `fbi-ecs` | 独立模块 | SparseSet + BitMask，Generational Entity ID | O(1) 组件访问 |
-| `fbi-timer-heap` | TimerManager | MinHeap，O(1) 无触发帧 | 适合少量高精度 |
-| `fbi-timer-wheel` | TimerManager | 时间轮，O(1) 添加/触发 | 适合海量低精度 |
+| 包                | 替换目标     | 特点                                        | 复杂度         |
+| ----------------- | ------------ | ------------------------------------------- | -------------- |
+| `fbi-ecs`         | 独立模块     | SparseSet + BitMask，Generational Entity ID | O(1) 组件访问  |
+| `fbi-timer-heap`  | TimerManager | MinHeap，O(1) 无触发帧                      | 适合少量高精度 |
+| `fbi-timer-wheel` | TimerManager | 时间轮，O(1) 添加/触发                      | 适合海量低精度 |
 
 ## ECS 插件特殊约定（fbi-ecs）
 
@@ -56,6 +56,7 @@ GameModule.register(new HeapTimerManager(), { allowReplace: true });
 ## 代码规范
 
 与框架层完全一致：
+
 - 禁止 `any`，禁止 `console`，必须用 `Logger`
 - PascalCase 文件名，中文 JSDoc
 - 错误格式 `[模块名] 描述性消息`

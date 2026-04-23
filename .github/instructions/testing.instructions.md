@@ -1,6 +1,6 @@
 ---
-description: "测试策略与约定。当编写或修改测试文件时加载。"
-applyTo: "tests/**"
+description: '测试策略与约定。当编写或修改测试文件时加载。'
+applyTo: 'tests/**'
 ---
 
 # 测试策略与约定
@@ -26,12 +26,12 @@ tests/
 
 ## 文件命名
 
-| 层 | 格式 | 示例 |
-|----|------|------|
-| 框架测试 | `kebab-case.test.ts` | `event-manager.test.ts` |
-| 游戏测试 | `PascalCase.test.ts` | `BattleSystem.test.ts` |
+| 层       | 格式                         | 示例                            |
+| -------- | ---------------------------- | ------------------------------- |
+| 框架测试 | `kebab-case.test.ts`         | `event-manager.test.ts`         |
+| 游戏测试 | `PascalCase.test.ts`         | `BattleSystem.test.ts`          |
 | 集成测试 | `{name}.integration.test.ts` | `demo2-rpg.integration.test.ts` |
-| E2E | `{name}.e2e.test.ts` | `demo2-rpg.e2e.test.ts` |
+| E2E      | `{name}.e2e.test.ts`         | `demo2-rpg.e2e.test.ts`         |
 
 ## 导入规则
 
@@ -59,11 +59,11 @@ describe('XxxManager', () => {
 
     beforeEach(() => {
         manager = new XxxManager();
-        GameModule.register(manager);  // 触发 onInit()
+        GameModule.register(manager); // 触发 onInit()
     });
 
     afterEach(() => {
-        GameModule.shutdownAll();  // 清理全局注册表，防止状态污染
+        GameModule.shutdownAll(); // 清理全局注册表，防止状态污染
     });
 
     it('描述测试行为', () => {
@@ -82,7 +82,7 @@ describe('XxxManager', () => {
 
 ## Mock 策略
 
-### 全局 Mock（tests/__mocks__/cc.ts）
+### 全局 Mock（tests/**mocks**/cc.ts）
 
 - 通过 `jest.config.js` 的 `moduleNameMapper: { '^cc$': 'tests/__mocks__/cc.ts' }` 映射
 - 提供最小 Cocos Creator API：`_decorator`、`Component`、`Node`、`Label`、`Sprite`、`resources`
@@ -93,9 +93,13 @@ describe('XxxManager', () => {
 // 集成测试中 mock Logger（避免噪声输出）
 jest.mock('@framework/debug/Logger', () => ({
     Logger: {
-        debug: jest.fn(), info: jest.fn(),
-        warn: jest.fn(), error: jest.fn(),
-        onInit: jest.fn(), onUpdate: jest.fn(), onShutdown: jest.fn(),
+        debug: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+        onInit: jest.fn(),
+        onUpdate: jest.fn(),
+        onShutdown: jest.fn(),
     },
 }));
 ```
@@ -103,6 +107,7 @@ jest.mock('@framework/debug/Logger', () => ({
 ### 策略接口 Mock（game/shared/）
 
 每个框架模块的策略接口都有对应 Mock 实现，支持：
+
 - **手动控制模式**：`resolve(path)` / `reject(path)` 手动触发回调
 - **自动成功模式**：`setAutoSuccess(true)` 立即触发成功回调
 - **调用追踪**：`calls: string[]` 记录调用历史

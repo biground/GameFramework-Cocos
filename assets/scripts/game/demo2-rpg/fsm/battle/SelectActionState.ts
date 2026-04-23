@@ -59,7 +59,7 @@ export class SelectActionState extends FsmState<IBattleBlackboard> {
 
         // 全部角色已行动完毕，切换到回合结束
         if (bb.currentActorIndex >= bb.turnOrder.length) {
-            setTimeout(() => this.changeState(fsm, RoundEndState), 0);
+            this.changeState(fsm, RoundEndState);
             return;
         }
 
@@ -81,7 +81,7 @@ export class SelectActionState extends FsmState<IBattleBlackboard> {
             `${actor.name} 选择行动: 技能=${String(decision.skillId)}, 目标=${decision.targetIds.join(',')}`,
         );
 
-        setTimeout(() => this.changeState(fsm, ExecuteActionState), 0);
+        this.changeState(fsm, ExecuteActionState);
     }
 
     /**

@@ -12,6 +12,7 @@ import { ProcedureManager } from '@framework/procedure/ProcedureManager';
 import { DataTableManager } from '@framework/datatable/DataTableManager';
 import { TurnBasedRpgDemo } from '@game/demo2-rpg/TurnBasedRpgDemo';
 import { LaunchProcedure } from '@game/demo2-rpg/procedures/LaunchProcedure';
+import { LobbyProcedure } from '@game/demo2-rpg/procedures/LobbyProcedure';
 
 // 每个测试结束后清理框架状态
 afterEach(() => {
@@ -53,7 +54,8 @@ describe('TurnBasedRpgDemo', () => {
 
             // startProcedure 不抛错说明 Procedure 已注册
             expect(() => procMgr.startProcedure(LaunchProcedure)).not.toThrow();
-            expect(procMgr.currentProcedure).toBeInstanceOf(LaunchProcedure);
+            // Launch → Preload → Lobby 同步链式转换（Fsm 重入保护 pending 队列）
+            expect(procMgr.currentProcedure).toBeInstanceOf(LobbyProcedure);
 
             demo.shutdown();
         });

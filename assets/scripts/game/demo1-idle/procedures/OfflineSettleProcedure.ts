@@ -73,7 +73,9 @@ export class OfflineSettleProcedure extends ProcedureBase {
             if (reward > 0) {
                 ctx.gameData.gold += reward;
                 ctx.gameData.totalGoldEarned += reward;
-                const offlineSeconds = Math.floor((currentTime - ctx.gameData.lastOnlineTime) / 1000);
+                const offlineSeconds = Math.floor(
+                    (currentTime - ctx.gameData.lastOnlineTime) / 1000,
+                );
                 Logger.info(TAG, `离线 ${offlineSeconds} 秒，获得 ${reward} 金币`);
             } else {
                 Logger.info(TAG, '离线时间太短或无产出建筑，无离线收益');
@@ -83,7 +85,6 @@ export class OfflineSettleProcedure extends ProcedureBase {
         }
 
         Logger.info(TAG, '离线结算完成，切换到主流程');
-        // 延迟到下一个宏任务，避免 FSM 递归切换
-        setTimeout(() => this.changeProcedure(fsm, MainProcedure), 0);
+        this.changeProcedure(fsm, MainProcedure);
     }
 }

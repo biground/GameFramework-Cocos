@@ -1,6 +1,6 @@
 ---
-description: "框架层编码规范。当修改 framework/ 下的模块实现、接口、定义文件时加载。"
-applyTo: "assets/scripts/framework/**"
+description: '框架层编码规范。当修改 framework/ 下的模块实现、接口、定义文件时加载。'
+applyTo: 'assets/scripts/framework/**'
 ---
 
 # 框架层编码规范
@@ -23,35 +23,45 @@ import { Logger } from '../debug/Logger';
 export class XxxManager extends ModuleBase implements IXxxManager {
     private static readonly TAG = 'XxxManager';
 
-    public get moduleName(): string { return 'XxxManager'; }
-    public get priority(): number { return 100; }  // 按范围分配
+    public get moduleName(): string {
+        return 'XxxManager';
+    }
+    public get priority(): number {
+        return 100;
+    } // 按范围分配
 
-    public onInit(): void { Logger.info(XxxManager.TAG, '初始化完成'); }
-    public onUpdate(deltaTime: number): void { /* 需要帧更新才 override */ }
-    public onShutdown(): void { /* 清理资源 */ }
+    public onInit(): void {
+        Logger.info(XxxManager.TAG, '初始化完成');
+    }
+    public onUpdate(deltaTime: number): void {
+        /* 需要帧更新才 override */
+    }
+    public onShutdown(): void {
+        /* 清理资源 */
+    }
 }
 ```
 
 ### Priority 分配规则
 
-| 范围 | 类型 | 示例 |
-|------|------|------|
-| 0-99 | 基础设施 | Logger(0), EventManager(10), ObjectPool(10), TimerManager(10) |
-| 100-199 | 核心服务 | ResourceManager(100), FsmManager(110), NetworkManager(130) |
-| 200-299 | 业务模块 | UIManager(200), AudioManager(210), SceneManager(220) |
-| 300-399 | 上层逻辑 | ProcedureManager(300), DataTableManager(310), i18n(350) |
-| 400+ | 调试工具 | DebugManager(400) |
+| 范围    | 类型     | 示例                                                          |
+| ------- | -------- | ------------------------------------------------------------- |
+| 0-99    | 基础设施 | Logger(0), EventManager(10), ObjectPool(10), TimerManager(10) |
+| 100-199 | 核心服务 | ResourceManager(100), FsmManager(110), NetworkManager(130)    |
+| 200-299 | 业务模块 | UIManager(200), AudioManager(210), SceneManager(220)          |
+| 300-399 | 上层逻辑 | ProcedureManager(300), DataTableManager(310), i18n(350)       |
+| 400+    | 调试工具 | DebugManager(400)                                             |
 
 ## 文件组织
 
 每个模块目录包含：
 
-| 文件 | 命名 | 内容 |
-|------|------|------|
-| 实现 | `{Module}Manager.ts` | 模块主类 |
-| 定义 | `{Module}Defs.ts` | 类型、接口、枚举、EventKey 常量 |
-| 接口 | `I{Module}Manager.ts` | 放在 `framework/interfaces/` |
-| README | `README.md` | 模块文档（必须，模板见 docs/module-readme-template.md） |
+| 文件   | 命名                  | 内容                                                    |
+| ------ | --------------------- | ------------------------------------------------------- |
+| 实现   | `{Module}Manager.ts`  | 模块主类                                                |
+| 定义   | `{Module}Defs.ts`     | 类型、接口、枚举、EventKey 常量                         |
+| 接口   | `I{Module}Manager.ts` | 放在 `framework/interfaces/`                            |
+| README | `README.md`           | 模块文档（必须，模板见 docs/module-readme-template.md） |
 
 ## 导入规则
 
@@ -93,6 +103,7 @@ public setResourceLoader(loader: IResourceLoader): void {
 ## 遍历安全
 
 回调列表遍历期间防止并发修改：
+
 1. 进入遍历设 `_emitDepth++` / `_updating = true`
 2. 遍历期间 remove 只设 `_removed = true` 标记
 3. 遍历后 `_emitDepth === 0` 时统一清理

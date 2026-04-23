@@ -218,4 +218,17 @@ export class EventManager extends ModuleBase {
             this._eventMap.delete(key);
         }
     }
+
+    /**
+     * 获取事件绑定的调试信息（供 DebugManager 使用）
+     * @returns 事件名称和监听器数量列表
+     */
+    public getDebugInfo(): Array<{ event: string; listenerCount: number }> {
+        const result: Array<{ event: string; listenerCount: number }> = [];
+        for (const [key, bindings] of this._eventMap.entries()) {
+            const activeCount = bindings.filter((b) => !b._removed).length;
+            result.push({ event: key.description, listenerCount: activeCount });
+        }
+        return result;
+    }
 }

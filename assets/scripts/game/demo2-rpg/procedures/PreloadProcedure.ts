@@ -92,7 +92,6 @@ export class PreloadProcedure extends ProcedureBase {
             to: 'Lobby',
         });
 
-        // 延迟到下一个宏任务，避免 FSM 递归切换
-        setTimeout(() => this.changeProcedure(fsm, LobbyProcedure), 0);
+        this.changeProcedure(fsm, LobbyProcedure);
     }
 }

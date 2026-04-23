@@ -15,6 +15,8 @@ import { DataTableManager } from '@framework/datatable/DataTableManager';
 import { LocalizationManager } from '@framework/i18n/LocalizationManager';
 import { HotUpdateManager } from '@framework/hotupdate/HotUpdateManager';
 import { DebugManager } from '@framework/debug/DebugManager';
+import { Container } from '@framework/di/Container';
+import { SERVICE_KEYS } from '@framework/di/ServiceKeys';
 import { HtmlRenderer } from './HtmlRenderer';
 import { MockResourceLoader } from './MockResourceLoader';
 import { MockAudioPlayer } from './MockAudioPlayer';
@@ -39,6 +41,9 @@ export abstract class DemoBase {
 
     /** HTML 渲染器，用于 Demo 日志和 UI 展示 */
     protected htmlRenderer: HtmlRenderer;
+
+    /** DI 容器（仅 bootstrapWithDI 模式下可用） */
+    protected _container: Container | null = null;
 
     /** 主循环定时器句柄 */
     private _mainLoopTimer: ReturnType<typeof setInterval> | null = null;
@@ -164,6 +169,215 @@ export abstract class DemoBase {
         Logger.info(DemoBase.TAG, 'bootstrap 完成，共注册 15 个模块');
     }
 
+    // ─── DI 容器模式 ──────────────────────────────────
+
+    /**
+     * 使用 DI 容器初始化框架（可选替代 bootstrap）
+     *
+     * @description
+     * 与 bootstrap() 功能等价，但通过 Container 管理模块和策略的绑定关系。
+     * 子类可重写 bindStrategies() 来替换 Mock 策略实现。
+     *
+     * @returns 已配置的 DI 容器
+     */
+    bootstrapWithDI(): Container {
+        Logger.info(DemoBase.TAG, '开始 bootstrapWithDI...');
+
+        // 1. 清理之前的状态
+        GameModule.shutdownAll();
+
+        // 2. 创建并配置容器
+        const container = new Container();
+        this.bindModules(container);
+        this.bindStrategies(container);
+
+        // 3. 从容器解析模块并注册到 GameModule
+        this._assembleFromContainer(container);
+
+        // 4. 子类扩展点
+        this.setupProcedures();
+        this.setupDataTables();
+
+        this._container = container;
+        Logger.info(DemoBase.TAG, 'bootstrapWithDI 完成，共注册 15 个模块');
+        return container;
+    }
+
+    /**
+     * 绑定模块实现到容器
+     * 子类可重写以替换模块实现
+     * @param container DI 容器
+     */
+    protected bindModules(container: Container): void {
+        container
+            .bind(SERVICE_KEYS.Logger)
+            .toFactory(() => new Logger())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.EventManager)
+            .toFactory(() => new EventManager())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.TimerManager)
+            .toFactory(() => new TimerManager())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.FsmManager)
+            .toFactory(() => new FsmManager())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.ProcedureManager)
+            .toFactory(() => new ProcedureManager())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.ResourceManager)
+            .toFactory(() => new ResourceManager())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.AudioManager)
+            .toFactory(() => new AudioManager())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.SceneManager)
+            .toFactory(() => new SceneManager())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.UIManager)
+            .toFactory(() => new UIManager())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.EntityManager)
+            .toFactory(() => new EntityManager())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.NetworkManager)
+            .toFactory(() => new NetworkManager())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.DataTableManager)
+            .toFactory(() => new DataTableManager())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.LocalizationManager)
+            .toFactory(() => new LocalizationManager())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.HotUpdateManager)
+            .toFactory(() => {
+                const em = container.resolve(SERVICE_KEYS.EventManager) as EventManager;
+                return new HotUpdateManager(em);
+            })
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.DebugManager)
+            .toFactory(() => new DebugManager())
+            .inSingletonScope();
+    }
+
+    /**
+     * 绑定策略实现到容器
+     * 子类可重写以使用不同的策略实现（如替换 Mock 为真实引擎适配器）
+     * @param container DI 容器
+     */
+    protected bindStrategies(container: Container): void {
+        container
+            .bind(SERVICE_KEYS.ResourceLoader)
+            .toFactory(() => new MockResourceLoader())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.AudioPlayer)
+            .toFactory(() => new MockAudioPlayer())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.SceneLoader)
+            .toFactory(() => new MockSceneLoader())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.UIFormFactory)
+            .toFactory(() => new MockUIFormFactory())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.EntityFactory)
+            .toFactory(() => new MockEntityFactory())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.DataTableParser)
+            .toFactory(() => new MockDataTableParser())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.HotUpdateAdapter)
+            .toFactory(() => new MockHotUpdateAdapter())
+            .inSingletonScope();
+        container
+            .bind(SERVICE_KEYS.VersionComparator)
+            .toFactory(() => new MockVersionComparator())
+            .inSingletonScope();
+    }
+
+    /**
+     * 从容器解析所有模块，注册到 GameModule 并注入策略
+     * @param container DI 容器
+     */
+    private _assembleFromContainer(container: Container): void {
+        // 解析模块实例（接口类型，实际为 ModuleBase 子类实例）
+        const logger = container.resolve(SERVICE_KEYS.Logger);
+        const eventManager = container.resolve(SERVICE_KEYS.EventManager);
+        const timerManager = container.resolve(SERVICE_KEYS.TimerManager);
+        const fsmManager = container.resolve(SERVICE_KEYS.FsmManager);
+        const procedureManager = container.resolve(SERVICE_KEYS.ProcedureManager);
+        const resourceManager = container.resolve(SERVICE_KEYS.ResourceManager);
+        const audioManager = container.resolve(SERVICE_KEYS.AudioManager);
+        const sceneManager = container.resolve(SERVICE_KEYS.SceneManager);
+        const uiManager = container.resolve(SERVICE_KEYS.UIManager);
+        const entityManager = container.resolve(SERVICE_KEYS.EntityManager);
+        const networkManager = container.resolve(SERVICE_KEYS.NetworkManager);
+        const dataTableManager = container.resolve(SERVICE_KEYS.DataTableManager);
+        const localizationManager = container.resolve(SERVICE_KEYS.LocalizationManager);
+        const hotUpdateManager = container.resolve(SERVICE_KEYS.HotUpdateManager);
+        const debugManager = container.resolve(SERVICE_KEYS.DebugManager);
+
+        // 按优先级注册模块
+        // 注意：resolve 返回接口类型，但实际实例均为 ModuleBase 子类
+        const modules: ModuleBase[] = [
+            logger,
+            eventManager as unknown as ModuleBase,
+            timerManager as unknown as ModuleBase,
+            resourceManager as unknown as ModuleBase,
+            networkManager as unknown as ModuleBase,
+            fsmManager as unknown as ModuleBase,
+            hotUpdateManager as unknown as ModuleBase,
+            entityManager as unknown as ModuleBase,
+            uiManager as unknown as ModuleBase,
+            audioManager as unknown as ModuleBase,
+            sceneManager as unknown as ModuleBase,
+            procedureManager as unknown as ModuleBase,
+            dataTableManager,
+            localizationManager as unknown as ModuleBase,
+            debugManager,
+        ];
+        for (const mod of modules) {
+            GameModule.register(mod);
+        }
+
+        Logger.info(DemoBase.TAG, '所有模块注册完成，开始注入策略...');
+
+        // 注入策略
+        resourceManager.setResourceLoader(container.resolve(SERVICE_KEYS.ResourceLoader));
+        audioManager.setAudioPlayer(container.resolve(SERVICE_KEYS.AudioPlayer));
+        sceneManager.setSceneLoader(container.resolve(SERVICE_KEYS.SceneLoader));
+        uiManager.setUIFormFactory(container.resolve(SERVICE_KEYS.UIFormFactory));
+        entityManager.setEntityFactory(container.resolve(SERVICE_KEYS.EntityFactory));
+        dataTableManager.setParser(container.resolve(SERVICE_KEYS.DataTableParser));
+        hotUpdateManager.setAdapter(container.resolve(SERVICE_KEYS.HotUpdateAdapter));
+        hotUpdateManager.setComparator(container.resolve(SERVICE_KEYS.VersionComparator));
+
+        // 设置跨模块引用
+        (networkManager as NetworkManager).setEventManager(eventManager);
+        (localizationManager as LocalizationManager).setEventManager(eventManager);
+
+        Logger.info(DemoBase.TAG, '策略注入完成');
+    }
+
     /**
      * 启动主循环（setInterval 模拟引擎 update）
      * @param fps 帧率，默认 30
@@ -210,12 +424,24 @@ export abstract class DemoBase {
     }
 
     /**
+     * 获取 DI 容器（仅 bootstrapWithDI 模式下可用）
+     * @returns DI 容器，未使用 DI 模式时返回 null
+     */
+    public get container(): Container | null {
+        return this._container;
+    }
+
+    /**
      * 关闭框架，停止主循环并销毁所有模块
      */
     shutdown(): void {
         Logger.info(DemoBase.TAG, '开始关闭...');
         this.stopMainLoop();
         GameModule.shutdownAll();
+        if (this._container) {
+            this._container.clear();
+            this._container = null;
+        }
         Logger.info(DemoBase.TAG, '关闭完成');
     }
 }

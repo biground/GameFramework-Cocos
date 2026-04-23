@@ -94,4 +94,15 @@ export class GameModule {
         this._sortedModules = [];
         this._isDirty = false;
     }
+
+    /**
+     * 获取已注册模块的调试信息（供 DebugManager 使用）
+     * @returns 模块名称和优先级列表
+     */
+    public static getDebugInfo(): Array<{ name: string; priority: number }> {
+        return Array.from(this._modules.values()).map((m) => ({
+            name: m.moduleName,
+            priority: m.priority,
+        }));
+    }
 }

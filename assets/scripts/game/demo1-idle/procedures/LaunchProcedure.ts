@@ -22,7 +22,6 @@ export class LaunchProcedure extends ProcedureBase {
     onEnter(fsm: IFsm<unknown>): void {
         Logger.info(TAG, '框架初始化完成，进入启动流程');
 
-        // 延迟到下一个宏任务，避免 FSM 递归切换
-        setTimeout(() => this.changeProcedure(fsm, PreloadProcedure), 0);
+        this.changeProcedure(fsm, PreloadProcedure);
     }
 }

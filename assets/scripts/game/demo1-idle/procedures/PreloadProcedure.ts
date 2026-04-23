@@ -49,14 +49,10 @@ export class PreloadProcedure extends ProcedureBase {
         Logger.info(TAG, `成就配置加载完成: ${achievementConfigs.length} 条`);
 
         // 注入系统配置
-        ctx.buildingSystem.loadConfigs(
-            [...buildingConfigs],
-            [...upgradeCurves],
-        );
+        ctx.buildingSystem.loadConfigs([...buildingConfigs], [...upgradeCurves]);
         ctx.achievementSystem.loadConfigs([...achievementConfigs]);
 
         Logger.info(TAG, '配置表加载完成，切换到离线结算流程');
-        // 延迟到下一个宏任务，避免 FSM 递归切换
-        setTimeout(() => this.changeProcedure(fsm, OfflineSettleProcedure), 0);
+        this.changeProcedure(fsm, OfflineSettleProcedure);
     }
 }

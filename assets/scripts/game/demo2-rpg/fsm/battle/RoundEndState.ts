@@ -58,11 +58,11 @@ export class RoundEndState extends FsmState<IBattleBlackboard> {
         // 检查最大回合限制
         if (bb.maxRound > 0 && round >= bb.maxRound) {
             Logger.info(TAG, `已达最大回合数 ${bb.maxRound}，判定失败`);
-            setTimeout(() => this.changeState(fsm, DefeatState), 0);
+            this.changeState(fsm, DefeatState);
             return;
         }
 
         // 切换回回合开始
-        setTimeout(() => this.changeState(fsm, RoundStartState), 0);
+        this.changeState(fsm, RoundStartState);
     }
 }

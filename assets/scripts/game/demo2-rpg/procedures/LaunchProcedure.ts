@@ -37,7 +37,6 @@ export class LaunchProcedure extends ProcedureBase {
             to: 'Preload',
         });
 
-        // 延迟到下一个宏任务，避免 FSM 递归切换
-        setTimeout(() => this.changeProcedure(fsm, PreloadProcedure), 0);
+        this.changeProcedure(fsm, PreloadProcedure);
     }
 }
