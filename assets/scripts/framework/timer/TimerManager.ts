@@ -1,7 +1,7 @@
 import { ModuleBase } from '../core/ModuleBase';
 import { Logger } from '../debug/Logger';
 import { ITimerEntry, ITimerInfo, ITimerOptions } from './TimerDefs';
-import { ITimerManager } from './ITimerManager';
+import { ITimerManager } from '../interfaces/ITimerManager';
 
 /**
  * 定时器管理器
@@ -24,6 +24,8 @@ import { ITimerManager } from './ITimerManager';
  * ```
  */
 export class TimerManager extends ModuleBase implements ITimerManager {
+    private static readonly TAG = 'TimerManager';
+
     // ─── ModuleBase ────────────────────────────────────
 
     public get moduleName(): string {
@@ -66,7 +68,7 @@ export class TimerManager extends ModuleBase implements ITimerManager {
 
     public set timeScale(value: number) {
         if (value < 0) {
-            Logger.error('[TimerManager] timeScale 不能为负数');
+            Logger.error(TimerManager.TAG, 'timeScale 不能为负数');
             return;
         }
         this._timeScale = value;
@@ -80,7 +82,7 @@ export class TimerManager extends ModuleBase implements ITimerManager {
     // ─── 生命周期 ──────────────────────────────────────
 
     public onInit(): void {
-        Logger.debug('[TimerManager] 初始化完成');
+        Logger.debug(TimerManager.TAG, '初始化完成');
     }
 
     public onUpdate(deltaTime: number): void {
@@ -149,18 +151,18 @@ export class TimerManager extends ModuleBase implements ITimerManager {
         this._updating = false;
         this._hasRemoved = false;
         this._timeScale = 1.0;
-        Logger.debug('[TimerManager] 已关闭');
+        Logger.debug(TimerManager.TAG, '已关闭');
     }
 
     // ─── 创建 & 移除 ──────────────────────────────────
 
     public addTimer(delay: number, callback: () => void, options?: ITimerOptions): number {
         if (delay <= 0) {
-            Logger.error('[TimerManager] delay 必须大于 0');
+            Logger.error(TimerManager.TAG, 'delay 必须大于 0');
             throw new Error('[TimerManager] delay 必须大于 0');
         }
         if (!callback) {
-            Logger.error('[TimerManager] callback 不能为空');
+            Logger.error(TimerManager.TAG, 'callback 不能为空');
             throw new Error('[TimerManager] callback 不能为空');
         }
 
@@ -170,7 +172,7 @@ export class TimerManager extends ModuleBase implements ITimerManager {
         const tag = options?.tag ?? null;
 
         if (initialDelay < 0) {
-            Logger.error('[TimerManager] initialDelay 不能为负数');
+            Logger.error(TimerManager.TAG, 'initialDelay 不能为负数');
             throw new Error('[TimerManager] initialDelay 不能为负数');
         }
 
@@ -191,7 +193,7 @@ export class TimerManager extends ModuleBase implements ITimerManager {
         this._timers.push(entry);
         this._timerMap.set(id, entry);
         this._activeCount++;
-        Logger.debug(`[TimerManager] 添加定时器 #${id}, delay=${delay}, repeat=${repeat}`);
+        Logger.debug(TimerManager.TAG, `添加定时器 #${id}, delay=${delay}, repeat=${repeat}`);
         return id;
     }
 

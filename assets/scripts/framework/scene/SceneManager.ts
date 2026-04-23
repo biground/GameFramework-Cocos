@@ -1,6 +1,6 @@
 import { ModuleBase } from '../core/ModuleBase';
 import { Logger } from '../debug/Logger';
-import { ISceneManager } from './ISceneManager';
+import { ISceneManager } from '../interfaces/ISceneManager';
 import { ISceneLoader, LoadSceneOptions } from './SceneDefs';
 
 /**

@@ -137,11 +137,11 @@ export interface MuteChangedData {
  */
 export const AudioEvents = {
     /** 背景音乐切换 */
-    MUSIC_CHANGED: new EventKey<string | null>('audio.music_changed'),
+    MUSIC_CHANGED: new EventKey<string | null>('Audio.MusicChanged'),
     /** 音效播放 */
-    SOUND_PLAYED: new EventKey<string>('audio.sound_played'),
+    SOUND_PLAYED: new EventKey<string>('Audio.SoundPlayed'),
     /** 音量变更 */
-    VOLUME_CHANGED: new EventKey<VolumeChangedData>('audio.volume_changed'),
+    VOLUME_CHANGED: new EventKey<VolumeChangedData>('Audio.VolumeChanged'),
     /** 静音状态变更 */
-    MUTE_CHANGED: new EventKey<MuteChangedData>('audio.mute_changed'),
+    MUTE_CHANGED: new EventKey<MuteChangedData>('Audio.MuteChanged'),
 } as const;

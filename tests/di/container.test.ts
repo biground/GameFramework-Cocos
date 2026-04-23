@@ -260,7 +260,7 @@ describe('Container', () => {
         container.bind(IFoo).to(Foo);
         container.bind(IBar).to(Bar);
 
-        expect(() => container.resolve(IFoo)).toThrow(/Circular dependency detected/);
+        expect(() => container.resolve(IFoo)).toThrow(/检测到循环依赖/);
     });
 
     test('Singleton + @Inject：依赖只创建一次', () => {

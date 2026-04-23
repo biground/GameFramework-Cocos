@@ -1,4 +1,4 @@
-import { ISceneLoader, LoadSceneOptions } from './SceneDefs';
+import { ISceneLoader, LoadSceneOptions } from '../scene/SceneDefs';
 
 /**
  * 场景管理器接口

@@ -1,6 +1,6 @@
 import { ModuleBase } from '../core/ModuleBase';
 import { Logger } from '../debug/Logger';
-import { IAudioManager } from './IAudioManager';
+import { IAudioManager } from '../interfaces/IAudioManager';
 import { AudioPlayConfig, IAudioInstance, IAudioPlayer } from './AudioDefs';
 
 /**

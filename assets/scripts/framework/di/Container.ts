@@ -81,8 +81,8 @@ export class Container {
                 Logger.debug(Container.TAG, `委托父容器解析: ${key.description}`);
                 return this._parent.resolve(key);
             }
-            Logger.error(Container.TAG, `Service not bound: ${key.description}`);
-            throw new Error(`Service not bound: ${key.description}`);
+            Logger.error(Container.TAG, `服务未绑定: ${key.description}`);
+            throw new Error(`[Container] 服务未绑定: ${key.description}`);
         }
 
         if (binding.lifecycle === Lifecycle.Singleton && binding.instance !== undefined) {
@@ -93,13 +93,8 @@ export class Container {
         // 循环依赖检测
         if (this._resolutionStack.has(key)) {
             const chain = [...this._resolutionStack].map((k) => k.description).join(' → ');
-            Logger.error(
-                Container.TAG,
-                `Circular dependency detected: ${chain} → ${key.description}`,
-            );
-            throw new Error(
-                `[Container] Circular dependency detected: ${chain} → ${key.description}`,
-            );
+            Logger.error(Container.TAG, `检测到循环依赖: ${chain} → ${key.description}`);
+            throw new Error(`[Container] 检测到循环依赖: ${chain} → ${key.description}`);
         }
 
         this._resolutionStack.add(key);
@@ -111,8 +106,8 @@ export class Container {
                 const args = this._resolveConstructorArgs(binding.ctor);
                 instance = new (binding.ctor as new (...args: unknown[]) => T)(...args);
             } else {
-                Logger.error(Container.TAG, `Invalid binding for service: ${key.description}`);
-                throw new Error(`Invalid binding for service: ${key.description}`);
+                Logger.error(Container.TAG, `无效的服务绑定: ${key.description}`);
+                throw new Error(`[Container] 无效的服务绑定: ${key.description}`);
             }
 
             if (binding.lifecycle === Lifecycle.Singleton) {
