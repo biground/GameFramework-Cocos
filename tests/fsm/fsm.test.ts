@@ -204,24 +204,28 @@ describe('Fsm', () => {
             ).toThrow('[FSM]');
         });
 
-        it('onEnter 中递归调用 changeState 应该抛出异常（反递归保护）', () => {
+        it('onEnter 中递归调用 changeState 应延迟执行（重入保护）', () => {
             const recursive = new RecursiveState();
             const fsm = new Fsm('test', owner, [idle, recursive]);
             fsm.start(IdleState as unknown as Constructor<IFsmState<MockOwner>>);
 
-            expect(() =>
-                fsm.changeState(RecursiveState as unknown as Constructor<IFsmState<MockOwner>>),
-            ).toThrow('[FSM]');
+            // RecursiveState.onEnter 中调用 changeState(IdleState)
+            // 不再抛出异常，而是延迟到当前转换完成后执行
+            fsm.changeState(RecursiveState as unknown as Constructor<IFsmState<MockOwner>>);
+            // 最终状态应为 IdleState（pending transition 已执行）
+            expect(fsm.currentState).toBeInstanceOf(IdleState);
         });
 
-        it('onLeave 中递归调用 changeState 应该抛出异常（反递归保护）', () => {
+        it('onLeave 中递归调用 changeState 应延迟执行（重入保护）', () => {
             const recursiveLeave = new RecursiveLeaveState();
             const fsm = new Fsm('test', owner, [idle, recursiveLeave]);
             fsm.start(RecursiveLeaveState as unknown as Constructor<IFsmState<MockOwner>>);
 
-            expect(() =>
-                fsm.changeState(IdleState as unknown as Constructor<IFsmState<MockOwner>>),
-            ).toThrow('[FSM]');
+            // RecursiveLeaveState.onLeave 中调用 changeState(IdleState)
+            // 不再抛出异常，而是延迟到当前转换完成后执行
+            fsm.changeState(IdleState as unknown as Constructor<IFsmState<MockOwner>>);
+            // 最终状态应为 IdleState
+            expect(fsm.currentState).toBeInstanceOf(IdleState);
         });
     });
 

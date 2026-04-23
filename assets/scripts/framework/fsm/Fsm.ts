@@ -16,7 +16,8 @@ export class Fsm<T> implements IFsm<T> {
     private _currentState: IFsmState<T> | null = null;
     private _dataMap: Map<string, unknown> = new Map();
     private _isDestroyed: boolean = false;
-    private _isChangingState: boolean = false;
+    private _isTransitioning: boolean = false;
+    private _pendingState: Constructor<IFsmState<T>> | null = null;
 
     /**
      * 创建有限状态机
@@ -102,6 +103,7 @@ export class Fsm<T> implements IFsm<T> {
 
     /**
      * 切换到指定类型的状态
+     * 支持重入保护：在 onEnter/onLeave 期间调用会延迟到当前转换完成后执行（仅保留最后一次）
      * @param stateType 目标状态的构造函数
      */
     changeState<TState extends IFsmState<T>>(stateType: Constructor<TState>): void {
@@ -109,27 +111,49 @@ export class Fsm<T> implements IFsm<T> {
             Logger.error(Fsm.TAG, `状态机 "${this._name}" 尚未启动，无法切换状态`);
             throw new Error(`[FSM] 状态机 "${this._name}" 尚未启动，无法切换状态`);
         }
-        if (this._isChangingState) {
-            Logger.error(Fsm.TAG, `状态机 "${this._name}" 正在切换状态中，禁止递归切换`);
-            throw new Error(`[FSM] 状态机 "${this._name}" 正在切换状态中，禁止递归切换`);
-        }
-        const targetState = this._states.get(stateType as unknown as Constructor<IFsmState<T>>);
+        const targetCtor = stateType as unknown as Constructor<IFsmState<T>>;
+        const targetState = this._states.get(targetCtor);
         if (!targetState) {
             Logger.error(Fsm.TAG, `状态机 "${this._name}" 不包含状态: ${stateType.name}`);
             throw new Error(`[FSM] 状态机 "${this._name}" 不包含状态: ${stateType.name}`);
         }
 
-        this._isChangingState = true;
+        if (this._isTransitioning) {
+            Logger.debug(
+                Fsm.TAG,
+                `状态机 "${this._name}" 正在转换中，延迟切换到 "${stateType.name}"`,
+            );
+            this._pendingState = targetCtor;
+            return;
+        }
+
+        this._performTransition(targetCtor);
+    }
+
+    /**
+     * 执行实际的状态转换
+     * @param stateType 目标状态的构造函数
+     */
+    private _performTransition(stateType: Constructor<IFsmState<T>>): void {
+        const targetState = this._states.get(stateType)!;
+        this._isTransitioning = true;
+
         try {
             Logger.debug(
                 Fsm.TAG,
                 `[${this._name}] 状态切换: ${this._currentState?.constructor.name} → ${stateType.name}`,
             );
-            this._currentState.onLeave(this);
+            this._currentState!.onLeave(this);
             this._currentState = targetState;
             this._currentState.onEnter(this);
         } finally {
-            this._isChangingState = false;
+            this._isTransitioning = false;
+        }
+
+        if (this._pendingState !== null) {
+            const nextState = this._pendingState;
+            this._pendingState = null;
+            this._performTransition(nextState);
         }
     }
 

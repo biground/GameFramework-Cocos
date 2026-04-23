@@ -47,7 +47,6 @@ export class DebugManager extends ModuleBase {
 
     /** 模块初始化 */
     public onInit(): void {
-        // TODO: 学员实现 - 初始化管理器，使用 Logger 输出初始化信息
         Logger.info(DebugManager.TAG, `初始化, collectInterval=${this._config.collectInterval}`);
     }
 
@@ -56,14 +55,18 @@ export class DebugManager extends ModuleBase {
      * @param deltaTime 时间增量（秒）
      */
     public onUpdate(deltaTime: number): void {
-        // TODO: 学员实现 - 根据 collectInterval 进行节流采集
         this._lastCollectTime += deltaTime;
+        if (this._lastCollectTime >= this._config.collectInterval) {
+            this._lastCollectTime = 0;
+            this.collectAll();
+        }
     }
 
     /** 模块销毁 */
     public onShutdown(): void {
-        // TODO: 学员实现 - 清理所有数据源，使用 Logger 输出关闭信息
+        Logger.info(DebugManager.TAG, `调试管理器关闭, 清理 ${this._dataSources.size} 个数据源`);
         this._dataSources.clear();
+        this._lastCollectTime = 0;
     }
 
     // ─── 公共 API ────────────────────────────────
@@ -74,8 +77,12 @@ export class DebugManager extends ModuleBase {
      * @param source 数据源实例
      */
     public registerDataSource(source: IDebugDataSource): void {
-        // TODO: 学员实现 - 检查重复，注册数据源，Logger 输出注册信息
-        void source;
+        if (this._dataSources.has(source.name)) {
+            Logger.warn(DebugManager.TAG, `数据源 "${source.name}" 已注册，忽略重复注册`);
+            return;
+        }
+        this._dataSources.set(source.name, source);
+        Logger.info(DebugManager.TAG, `注册数据源: ${source.name}`);
     }
 
     /**
@@ -84,9 +91,12 @@ export class DebugManager extends ModuleBase {
      * @returns 是否成功注销（名称不存在时返回 false）
      */
     public unregisterDataSource(name: string): boolean {
-        // TODO: 学员实现 - 移除数据源，Logger 输出注销信息
-        void name;
-        return false;
+        if (!this._dataSources.has(name)) {
+            return false;
+        }
+        this._dataSources.delete(name);
+        Logger.info(DebugManager.TAG, `注销数据源: ${name}`);
+        return true;
     }
 
     /**
@@ -94,8 +104,14 @@ export class DebugManager extends ModuleBase {
      * @returns 调试数据快照
      */
     public collectAll(): DebugSnapshot {
-        // TODO: 学员实现 - 遍历所有 DataSource 调用 collect()，组装 DebugSnapshot
-        return { timestamp: 0, sections: [] } as DebugSnapshot;
+        const snapshot: DebugSnapshot = {
+            timestamp: Date.now(),
+            sections: [],
+        };
+        for (const source of this._dataSources.values()) {
+            snapshot.sections.push(source.collect());
+        }
+        return snapshot;
     }
 
     /**
@@ -113,8 +129,30 @@ export class DebugManager extends ModuleBase {
      * @returns 控制台友好的格式化字符串
      */
     public getSnapshot(): string {
-        // TODO: 学员实现 - 调用 collectAll()，格式化为可读字符串
-        return '';
+        const snapshot = this.collectAll();
+        const date = new Date(snapshot.timestamp);
+        const h = String(date.getHours()).padStart(2, '0');
+        const m = String(date.getMinutes()).padStart(2, '0');
+        const s = String(date.getSeconds()).padStart(2, '0');
+        const ms = String(date.getMilliseconds()).padStart(3, '0');
+        const timeStr = `${h}:${m}:${s}.${ms}`;
+
+        const lines: string[] = [];
+        lines.push(`=== Debug Snapshot [${timeStr}] ===`);
+
+        if (snapshot.sections.length === 0) {
+            lines.push('(无数据源)');
+        } else {
+            for (const section of snapshot.sections) {
+                lines.push(`[${section.title}]`);
+                for (const entry of section.entries) {
+                    lines.push(`  ${entry.label}: ${entry.value}`);
+                }
+            }
+        }
+
+        lines.push('===================================');
+        return lines.join('\n');
     }
 
     /**
@@ -123,8 +161,6 @@ export class DebugManager extends ModuleBase {
      * @returns 数据源实例，不存在时返回 undefined
      */
     public getDataSource(name: string): IDebugDataSource | undefined {
-        // TODO: 学员实现 - 从 _dataSources 中查找
-        void name;
-        return undefined;
+        return this._dataSources.get(name);
     }
 }

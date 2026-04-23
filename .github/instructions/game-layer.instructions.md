@@ -1,6 +1,6 @@
 ---
-description: "Game 层 Demo 开发规范。当修改 game/ 下的 Demo、共享基础设施、Mock 策略实现时加载。"
-applyTo: "assets/scripts/game/**"
+description: 'Game 层 Demo 开发规范。当修改 game/ 下的 Demo、共享基础设施、Mock 策略实现时加载。'
+applyTo: 'assets/scripts/game/**'
 ---
 
 # Game 层 Demo 开发规范
@@ -17,7 +17,9 @@ applyTo: "assets/scripts/game/**"
 
 ```typescript
 export class MyDemo extends DemoBase {
-    constructor() { super('Demo 标题'); }
+    constructor() {
+        super('Demo 标题');
+    }
 
     setupProcedures(): void {
         // 1. getModule<T>(name) 获取模块引用
@@ -46,11 +48,11 @@ startMainLoop(30)     → 30fps 主循环（setInterval → GameModule.update(dt
 
 ### 防日志爆炸（铁律）
 
-| 事件类型 | 方法 | 说明 |
-|----------|------|------|
-| 高频/周期性 | `updateLog(key, msg)` | 同 key 原地更新，不追加新行 |
-| 关键事件 | `log(msg, color)` | 追加新行（购买、升级、成就、战斗结果） |
-| 状态数据 | `updateStatus(panelId, key, value)` | 状态面板原地更新 |
+| 事件类型    | 方法                                | 说明                                   |
+| ----------- | ----------------------------------- | -------------------------------------- |
+| 高频/周期性 | `updateLog(key, msg)`               | 同 key 原地更新，不追加新行            |
+| 关键事件    | `log(msg, color)`                   | 追加新行（购买、升级、成就、战斗结果） |
+| 状态数据    | `updateStatus(panelId, key, value)` | 状态面板原地更新                       |
 
 ```typescript
 // ✅ 高频事件：updateLog 原地更新
@@ -67,14 +69,14 @@ eventMgr.on(BUILDING_PURCHASED, (data) => {
 ### LOG_COLORS 常量
 
 ```typescript
-SUCCESS: '#4CAF50'   // 绿 — 购买、升级
-INFO:    '#2196F3'   // 蓝 — 一般信息
-WARNING: '#FF9800'   // 橙 — 警告
-ERROR:   '#F44336'   // 红 — 错误
-NETWORK: '#9C27B0'   // 紫 — 网络
-DEBUG:   '#9E9E9E'   // 灰 — 调试
-COMBAT:  '#FF5722'   // 橙红 — 战斗
-TIMER:   '#00BCD4'   // 青 — 定时器
+SUCCESS: '#4CAF50'; // 绿 — 购买、升级
+INFO: '#2196F3'; // 蓝 — 一般信息
+WARNING: '#FF9800'; // 橙 — 警告
+ERROR: '#F44336'; // 红 — 错误
+NETWORK: '#9C27B0'; // 紫 — 网络
+DEBUG: '#9E9E9E'; // 灰 — 调试
+COMBAT: '#FF5722'; // 橙红 — 战斗
+TIMER: '#00BCD4'; // 青 — 定时器
 ```
 
 ## FSM 定义规范
@@ -122,20 +124,20 @@ procMgr.setData<IProcedureContext>(CONTEXT_KEY, ctx);
 
 所有 Mock 放在 `game/shared/`，实现框架层策略接口：
 
-| Mock | 实现接口 | 特点 |
-|------|---------|------|
-| MockResourceLoader | IResourceLoader | 手动 resolve/reject + 自动成功模式 |
-| MockAudioPlayer | IAudioPlayer | calls 数组追踪调用历史 |
-| MockUIFormFactory | IUIFormFactory | 创建测试用 UIFormBase |
-| MockSceneLoader | ISceneLoader | 模拟场景加载 |
-| MockNetworkSocket | INetworkSocket | 模拟网络连接 |
-| MockDataTableParser | IDataTableParser | 解析内联数据 |
-| MockEntityFactory | IEntityFactory | 创建测试用 Entity |
+| Mock                | 实现接口         | 特点                               |
+| ------------------- | ---------------- | ---------------------------------- |
+| MockResourceLoader  | IResourceLoader  | 手动 resolve/reject + 自动成功模式 |
+| MockAudioPlayer     | IAudioPlayer     | calls 数组追踪调用历史             |
+| MockUIFormFactory   | IUIFormFactory   | 创建测试用 UIFormBase              |
+| MockSceneLoader     | ISceneLoader     | 模拟场景加载                       |
+| MockNetworkSocket   | INetworkSocket   | 模拟网络连接                       |
+| MockDataTableParser | IDataTableParser | 解析内联数据                       |
+| MockEntityFactory   | IEntityFactory   | 创建测试用 Entity                  |
 
 ## 入口文件约定
 
-| 文件 | 用途 |
-|------|------|
-| `index.ts` | 浏览器执行入口（实例化 Demo + start()） |
-| `main.ts` | 备选入口（try/catch 同步启动） |
+| 文件                                                             | 用途                                    |
+| ---------------------------------------------------------------- | --------------------------------------- |
+| `index.ts`                                                       | 浏览器执行入口（实例化 Demo + start()） |
+| `main.ts`                                                        | 备选入口（try/catch 同步启动）          |
 | 或 `index.ts` 也可做模块 re-export（统一导出公开符号供测试引用） |
