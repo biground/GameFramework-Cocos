@@ -186,18 +186,18 @@ export interface NetworkReconnectingEventData extends NetworkEventData {
 // ─── 事件键 ──────────────────────────────────────────
 
 /** 网络连接成功事件 */
-export const NETWORK_CONNECTED = new EventKey<NetworkConnectedEventData>('network_connected');
+export const NETWORK_CONNECTED = new EventKey<NetworkConnectedEventData>('Network.Connected');
 
 /** 网络连接关闭事件 */
-export const NETWORK_CLOSED = new EventKey<NetworkClosedEventData>('network_closed');
+export const NETWORK_CLOSED = new EventKey<NetworkClosedEventData>('Network.Closed');
 
 /** 网络连接错误事件 */
-export const NETWORK_ERROR = new EventKey<NetworkErrorEventData>('network_error');
+export const NETWORK_ERROR = new EventKey<NetworkErrorEventData>('Network.Error');
 
 /** 收到网络消息事件 */
-export const NETWORK_MESSAGE = new EventKey<NetworkMessageEventData>('network_message');
+export const NETWORK_MESSAGE = new EventKey<NetworkMessageEventData>('Network.Message');
 
 /** 网络重连中事件 */
 export const NETWORK_RECONNECTING = new EventKey<NetworkReconnectingEventData>(
-    'network_reconnecting',
+    'Network.Reconnecting',
 );

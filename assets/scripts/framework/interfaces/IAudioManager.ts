@@ -1,4 +1,4 @@
-import { AudioPlayConfig, IAudioPlayer } from './AudioDefs';
+import { AudioPlayConfig, IAudioPlayer } from '../audio/AudioDefs';
 
 /**
  * 音频管理器接口

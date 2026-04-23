@@ -1,4 +1,4 @@
-import { ITimerInfo, ITimerOptions } from './TimerDefs';
+import { ITimerInfo, ITimerOptions } from '../timer/TimerDefs';
 
 /**
  * 定时器管理器接口

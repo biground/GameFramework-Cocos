@@ -18,7 +18,7 @@ import { MonsterConfigRow, MONSTER_DATA } from '@game/demo2-rpg/data/MonsterConf
 import { StageConfigRow, STAGE_DATA } from '@game/demo2-rpg/data/StageConfigRow';
 import { CHAR_DATA } from '@game/demo2-rpg/data/CharacterConfigRow';
 import { RpgEvents } from '@game/demo2-rpg/events/RpgEvents';
-import { IAudioManager } from '@framework/audio/IAudioManager';
+import { IAudioManager } from '@framework/interfaces/IAudioManager';
 import { GameModule } from '@framework/core/GameModule';
 
 // ─── Mock Logger ──────────────────────────────────────

@@ -1,6 +1,6 @@
 import { ModuleBase } from '@framework/core/ModuleBase';
 import { Logger } from '@framework/debug/Logger';
-import { ITimerManager } from '@framework/timer/ITimerManager';
+import { ITimerManager } from '@framework/interfaces/ITimerManager';
 import { ITimerInfo, ITimerOptions } from '@framework/timer/TimerDefs';
 import { TIMER_REPEAT_FOREVER } from '@framework/timer/TimerDefs';
 import { IWheelTimerEntry, IPausedWheelEntry, ITimingWheelOptions } from './WheelTimerDefs';

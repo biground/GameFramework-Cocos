@@ -11,7 +11,7 @@ import { RpgGameData, CharacterState, ActionDecision } from '../data/RpgGameData
 import { SkillConfigRow } from '../data/SkillConfigRow';
 import { MonsterConfigRow } from '../data/MonsterConfigRow';
 import { IEventManager } from '@framework/interfaces/IEventManager';
-import { IAudioManager } from '@framework/audio/IAudioManager';
+import { IAudioManager } from '@framework/interfaces/IAudioManager';
 import { HtmlRenderer } from '@game/shared/HtmlRenderer';
 
 // ─── 黑板接口 ──────────────────────────────────────────

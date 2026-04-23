@@ -30,6 +30,8 @@ import {
  * ```
  */
 export class DataTableManager extends ModuleBase {
+    private static readonly TAG = 'DataTableManager';
+
     // ─── ModuleBase ────────────────────────────────────
 
     public get moduleName(): string {
@@ -51,7 +53,7 @@ export class DataTableManager extends ModuleBase {
     // ─── 生命周期 ──────────────────────────────────────
 
     public onInit(): void {
-        Logger.info('[DataTableManager] 初始化完成');
+        Logger.info(DataTableManager.TAG, '初始化完成');
     }
 
     public onUpdate(_deltaTime: number): void {
@@ -60,7 +62,7 @@ export class DataTableManager extends ModuleBase {
 
     public onShutdown(): void {
         this.removeAllTables();
-        Logger.info('[DataTableManager] 已关闭，所有数据表已释放');
+        Logger.info(DataTableManager.TAG, '已关闭，所有数据表已释放');
     }
 
     // ─── 策略注入 ──────────────────────────────────────
@@ -97,7 +99,8 @@ export class DataTableManager extends ModuleBase {
         // DataTable<T> 是 DataTable<IDataRow> 的子类型（T extends IDataRow）
         this._tables.set(name, table as unknown as DataTable<IDataRow>);
         Logger.info(
-            `[DataTableManager] 数据表 "${name}" 已创建，共 ${table.rowCount} 行（${storageMode} 模式）`,
+            DataTableManager.TAG,
+            `数据表 "${name}" 已创建，共 ${table.rowCount} 行（${storageMode} 模式）`,
         );
     }
 

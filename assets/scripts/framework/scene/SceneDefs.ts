@@ -57,9 +57,9 @@ export interface ISceneLoader {
  */
 export const SceneEvents = {
     /** 场景加载中（携带进度） */
-    SCENE_LOADING: new EventKey<{ sceneName: string; progress: number }>('scene_loading'),
+    SCENE_LOADING: new EventKey<{ sceneName: string; progress: number }>('Scene.Loading'),
     /** 场景加载完成 */
-    SCENE_LOADED: new EventKey<{ sceneName: string }>('scene_loaded'),
+    SCENE_LOADED: new EventKey<{ sceneName: string }>('Scene.Loaded'),
     /** 场景已卸载 */
-    SCENE_UNLOADED: new EventKey<{ sceneName: string }>('scene_unloaded'),
+    SCENE_UNLOADED: new EventKey<{ sceneName: string }>('Scene.Unloaded'),
 } as const;
