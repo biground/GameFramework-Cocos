@@ -268,6 +268,7 @@ public setResourceLoader(loader: IResourceLoader): void {
 | ---------------------------------------------------- | ----------------------------- | ---------------------------- |
 | `instructions/framework-layer.instructions.md`       | `assets/scripts/framework/**` | 框架层编码规范与模块开发约定 |
 | `instructions/game-layer.instructions.md`            | `assets/scripts/game/**`      | Game 层 Demo 开发规范        |
+| `instructions/demo-driven-development.instructions.md` | `assets/scripts/game/**`      | Demo 驱动开发：架构遵循与框架缺口反馈 |
 | `instructions/testing.instructions.md`               | `tests/**`                    | 测试策略与约定               |
 | `instructions/plugins.instructions.md`               | `packages/**`                 | 插件包开发规范               |
 | `instructions/training.instructions.md`              | `training/**`                 | 培训流程规则                 |
