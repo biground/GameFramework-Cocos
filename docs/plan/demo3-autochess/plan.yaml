@@ -1,0 +1,1011 @@
+plan_id: demo3-autochess
+strategy: "综合策略：并行基础+垂直功能"
+objective: "开发 Demo 3 — Auto-chess Lite（自走棋），深度验证 EntityManager、ObjectPool、FSM、Timer、Event、Procedure、DataTable 等框架模块在大量实体管理与 AI 自动对战场景下的协作能力"
+created_at: "2026-04-23"
+created_by: gem-planner
+status: pending_approval
+research_confidence: high
+
+plan_metrics:
+  total_tasks: 18
+  total_waves: 5
+  wave_1_task_count: 4
+  total_dependencies: 32
+  risk_score: medium
+
+tldr: |
+  18 个任务分 5 波执行：
+  - Wave 1（4 并行）：事件/常量/接口定义 + 配置行类型 + 运行时状态 + 构建配置
+  - Wave 2（5 并行）：棋子实体/工厂 + 棋盘/商店/合成/羁绊 5 大系统
+  - Wave 3（2 任务，t13 依赖 t11）：棋子 AI FSM + 战斗系统（阶段流转统一由 Procedure 管理）
+  - Wave 4（5 任务）：渲染器 + 4 组 Procedure（流程上下文/启动/预加载、准备、战斗、结算/结束）
+  - Wave 5（2 任务）：主入口类 + 集成测试
+
+open_questions: []
+
+pre_mortem:
+  overall_risk_level: medium
+  critical_failure_modes:
+    - scenario: "EntityManager 与 MockEntityFactory 创建自定义 ChessPieceEntity 不兼容"
+      likelihood: low
+      impact: high
+      mitigation: "AutoChessEntityFactory 实现 IEntityFactory 接口，在 setupProcedures 中覆盖默认 MockEntityFactory；Wave 2 t05 需先写测试验证 EntityGroup 能正确池化 ChessPieceEntity"
+    - scenario: "FsmManager 为每个棋子创建独立 FSM，8~16 个 FSM 并发更新导致性能/状态混乱"
+      likelihood: medium
+      impact: medium
+      mitigation: "BattleSystem 统一管理 FSM 生命周期，战斗结束后销毁所有棋子 FSM；集成测试验证 Entity 峰值 16 个无泄漏"
+    - scenario: "准备阶段 30s 倒计时与商店/布阵交互竞态条件"
+      likelihood: medium
+      impact: medium
+      mitigation: "PrepareProcedure 使用 TimerManager.addTimer 管理倒计时，倒计时结束后先禁用所有操作再切换 Procedure"
+    - scenario: "棋子合成逻辑在 bench + board 两处棋子间的计数不一致"
+      likelihood: medium
+      impact: low
+      mitigation: "MergeSystem 接收所有同名棋子的扁平列表（bench+board），TDD 覆盖边界 case"
+  assumptions:
+    - "EntityManager、FsmManager、TimerManager、ProcedureManager 等框架模块 API 已完善且测试通过"
+    - "DemoBase.bootstrap() 注册全部 15 个模块并注入 Mock 策略，开箱可用"
+    - "MockEntityFactory 可被自定义 AutoChessEntityFactory 覆盖，EntityGroup 的对象池机制与自定义实体类型兼容"
+    - "jest.config.js 的路径别名 @framework、@game 等已正确配置"
+    - "HtmlRenderer 的 updateLog/updateStatus 原地更新能力可用于棋盘显示"
+
+implementation_specification:
+  code_structure: |
+    遵循 demo2-rpg 的模块化结构：
+    - data/ 层：配置行类型 + 运行时状态类
+    - events/ 层：EventKey 定义（幻影类型安全）
+    - entities/ 层：ChessPieceEntity (extends EntityBase)
+    - factory/ 层：AutoChessEntityFactory (implements IEntityFactory)
+    - systems/ 层：BoardSystem、ShopSystem、MergeSystem、SynergySystem、BattleSystem
+    - fsm/ 层：ChessAI FSM (4 states) + GamePhase FSM (3 states)
+    - procedures/ 层：6 个 Procedure + ProcedureContext
+    - ui/ 层：AutoChessRenderer (extends/wraps HtmlRenderer)
+    - 主入口：AutoChessDemo (extends DemoBase)
+  affected_areas:
+    - "assets/scripts/game/demo3-autochess/ — 新建整个 Demo 目录"
+    - "tests/game/demo3-autochess/ — 新建全部单元测试"
+    - "tests/integration/demo3-autochess.integration.test.ts — 集成测试"
+    - "package.json — 新增 demo3:build 和 demo3:serve 脚本"
+    - "dist/demo3/index.html — 浏览器入口页面"
+  component_details:
+    - component: AutoChessDefs
+      responsibility: "定义全部 EventKey、游戏常量、接口类型、FSM 状态名常量"
+      interfaces:
+        - "EventKey<T> 幻影类型事件键（ace: 前缀）"
+        - "IGridPosition { row: number; col: number }"
+        - "IChessPieceShowData — 传递给 ChessPieceEntity.onShow() 的数据"
+        - "FSM 状态名常量对象"
+    - component: ChessPieceEntity
+      responsibility: "棋子实体，继承 EntityBase，在 onShow 中初始化属性，onHide 中重置状态"
+      interfaces:
+        - "onShow(data: IChessPieceShowData): void"
+        - "onHide(): void"
+        - "hp / atk / star / race / position 等属性"
+    - component: BoardSystem
+      responsibility: "4×4 网格管理，棋子放置/移动/查询"
+      interfaces:
+        - "placePiece(pieceId, row, col): boolean"
+        - "removePiece(row, col): number | null"
+        - "movePiece(fromRow, fromCol, toRow, toCol): boolean"
+        - "findNearestEnemy(pos, isPlayerSide): IGridPosition | null"
+        - "getDistance(a, b): number（曼哈顿距离）"
+    - component: ShopSystem
+      responsibility: "商店刷新、购买、锁定"
+      interfaces:
+        - "refreshShop(configs, slotCount?): void"
+        - "buyPiece(slotIndex): ChessPieceConfigRow | null"
+        - "lockShop() / unlockShop() / isLocked"
+    - component: MergeSystem
+      responsibility: "检测 3 个同名 ★1 自动合成 ★2"
+      interfaces:
+        - "checkAndMerge(pieces): MergeResult | null"
+    - component: SynergySystem
+      responsibility: "根据场上棋子种族计算羁绊加成"
+      interfaces:
+        - "calculateSynergies(pieces, configs): ActiveSynergy[]"
+        - "applySynergyBuffs(pieces, synergies): void"
+    - component: BattleSystem
+      responsibility: "驱动自动战斗，为每个棋子创建 AI FSM，每 tick 推进"
+      interfaces:
+        - "startBattle(playerPieces, enemyPieces, board): void"
+        - "updateBattle(deltaTime): void"
+        - "isBattleOver(): boolean"
+        - "getBattleResult(): BattleResult"
+        - "endBattle(): void"
+    - component: AutoChessDemo
+      responsibility: "主入口类，继承 DemoBase，串联所有系统和流程"
+      interfaces:
+        - "setupProcedures(): void"
+        - "setupDataTables(): void"
+  dependencies:
+    - component: BattleSystem
+      relationship: "组合 FsmManager（创建/销毁棋子 AI FSM）、BoardSystem（位置查询）、EventManager（战斗事件广播）"
+    - component: PrepareProcedure
+      relationship: "调用 ShopSystem、BoardSystem、MergeSystem、SynergySystem；使用 TimerManager 管理倒计时"
+    - component: BattleProcedure
+      relationship: "调用 BattleSystem.startBattle/updateBattle/endBattle；监听战斗结束事件"
+    - component: AutoChessDemo
+      relationship: "继承 DemoBase（bootstrap 注册 15 模块）；覆盖 EntityFactory；注册 6 个 Procedure"
+  integration_points:
+    - "DemoBase.bootstrap() → 注册 15 个模块 → 注入 Mock 策略"
+    - "setupProcedures() 中覆盖 EntityFactory、注册分组、初始化 ProcedureContext"
+    - "setupDataTables() 中注册 chess_piece_config 和 synergy_config 两张表"
+    - "package.json 新增 demo3:build/serve 脚本"
+
+contracts:
+  - from_task: t01
+    to_task: t05
+    interface: "IChessPieceShowData 接口、IGridPosition 类型"
+    format: "TypeScript 接口导出"
+  - from_task: t01
+    to_task: t06
+    interface: "IGridPosition 接口、BOARD_ROWS/BOARD_COLS 常量"
+    format: "TypeScript 常量/接口导出"
+  - from_task: t02
+    to_task: t07
+    interface: "ChessPieceConfigRow 类型（商店使用棋子配置）"
+    format: "TypeScript 类导出"
+  - from_task: t02
+    to_task: t09
+    interface: "SynergyConfigRow 类型（羁绊配置）"
+    format: "TypeScript 类导出"
+  - from_task: t03
+    to_task: t15
+    interface: "AutoChessGameData 运行时状态（金币、HP、棋盘数据）"
+    format: "TypeScript 类导出"
+  - from_task: t05
+    to_task: t11
+    interface: "ChessPieceEntity 实体（AI FSM 操作的目标对象）"
+    format: "TypeScript 类导出"
+  - from_task: t06
+    to_task: t11
+    interface: "BoardSystem（AI 需要查询距离、寻找最近敌人）"
+    format: "TypeScript 类导出"
+  - from_task: t11
+    to_task: t13
+    interface: "Chess AI FSM 状态类 + 黑板接口（BattleSystem 创建和驱动 FSM）"
+    format: "TypeScript 类/接口导出"
+  - from_task: t13
+    to_task: t16
+    interface: "BattleSystem（BattleProcedure 调用 startBattle/updateBattle/endBattle）"
+    format: "TypeScript 类导出"
+
+# ═══════════════════════════════════════════════════════
+# 任务列表
+# ═══════════════════════════════════════════════════════
+
+waves:
+  # ─── Wave 1: Foundation Types ─────────────────────
+  - wave: 1
+    description: "基础定义层——事件键、常量、接口、配置行类型、运行时状态、构建配置。全部并行，无依赖。"
+    tasks:
+      - task_id: t01
+        title: "事件键/常量/接口定义"
+        agent: gem-implementer
+        description: |
+          创建 assets/scripts/game/demo3-autochess/AutoChessDefs.ts，定义 Demo 3 全部共享类型：
+
+          1. **EventKey 定义**（使用 EventKey<T> 幻影类型，'ace:' 前缀）：
+             - CHESS_BOUGHT: EventKey<{ pieceId: number; configId: number; cost: number }>
+             - CHESS_PLACED: EventKey<{ pieceId: number; row: number; col: number }>
+             - CHESS_MERGED: EventKey<{ resultPieceId: number; star: number; name: string }>
+             - CHESS_ATTACK: EventKey<{ attackerId: number; defenderId: number; damage: number }>
+             - CHESS_KILLED: EventKey<{ pieceId: number; killerPieceId: number }>
+             - ROUND_START: EventKey<{ round: number }>
+             - ROUND_END: EventKey<{ round: number; result: 'win' | 'lose' }>
+             - PHASE_CHANGED: EventKey<{ from: string; to: string }>
+             - SYNERGY_ACTIVATED: EventKey<{ race: string; threshold: number; effect: string }>
+             - SHOP_REFRESHED: EventKey<{ slotCount: number }>
+             - HP_CHANGED: EventKey<{ oldHp: number; newHp: number; damage: number }>
+             - GOLD_CHANGED: EventKey<{ oldGold: number; newGold: number }>
+             - GAME_OVER: EventKey<{ finalRound: number; result: string }>
+             - BATTLE_START: EventKey<{ round: number }>
+             - BATTLE_END: EventKey<{ round: number; winner: string }>
+
+          2. **常量**：
+             - BOARD_ROWS = 4, BOARD_COLS = 4
+             - PLAYER_ROWS = [0, 1], ENEMY_ROWS = [2, 3]
+             - INITIAL_HP = 100, INITIAL_GOLD = 10, BASE_INCOME = 5
+             - REFRESH_COST = 2, PREPARE_TIME_SECONDS = 30
+             - SHOP_SIZE = 5, MAX_BENCH_SIZE = 8
+
+          3. **接口**：
+             - IGridPosition { row: number; col: number }
+             - IChessPieceShowData { configId: number; name: string; race: string; hp: number; atk: number; atkSpeed: number; range: number; star: number; position: IGridPosition }
+             - IBoardCell { pieceId: number | null; row: number; col: number }
+
+          4. **FSM 状态名常量**：
+             - ChessAiStateNames = { IDLE: 'Idle', MOVE_TO: 'MoveTo', ATTACK: 'Attack', DEAD: 'Dead' } as const
+             - GamePhaseStateNames = { PREPARE: 'Prepare', BATTLE: 'Battle', SETTLE: 'Settle' } as const
+             - GAME_PHASE_FSM_NAME = 'AutoChess_GamePhase'
+             - CHESS_AI_FSM_PREFIX = 'AutoChess_ChessAI_'
+
+          框架 API 引用：EventKey<T> from '@framework/event/EventDefs'
+        files:
+          - "assets/scripts/game/demo3-autochess/AutoChessDefs.ts"
+          - "tests/game/demo3-autochess/AutoChessDefs.test.ts"
+        dependencies: []
+        conflicts_with: []
+        validation_matrix:
+          - test_command: "npx jest --no-coverage --forceExit tests/game/demo3-autochess/AutoChessDefs.test.ts"
+            expected: "所有测试通过：EventKey 实例化正确、常量值正确、接口类型可构造"
+        tdd_steps:
+          red: "测试 AutoChessEvents 各事件键 description 包含 'ace:' 前缀；测试常量值 BOARD_ROWS===4 等；测试 IChessPieceShowData 对象可赋值"
+          green: "创建 AutoChessDefs.ts，导出所有 EventKey、常量、接口、FSM 名称"
+          refactor: "按用途分区（事件/常量/接口/FSM）排列，添加 JSDoc"
+
+      - task_id: t02
+        title: "配置行类型定义"
+        agent: gem-implementer
+        description: |
+          创建两个 DataTable 行类型文件（参考 demo2 的 CharacterConfigRow 模式）：
+
+          1. **assets/scripts/game/demo3-autochess/data/ChessPieceConfigRow.ts**：
+             实现 IDataRow 接口，字段：
+             - id: number（主键）
+             - name: string（棋子名称）
+             - race: string（种族：warrior / mage / ranger / tank）
+             - hp: number, atk: number, atkSpeed: number（攻击间隔秒）
+             - range: number（攻击范围格数）
+             - cost: number（商店购买价格）
+             - star2Mult: number（★2 属性倍率，默认 2.0）
+             - parseRow(data: Record<string, unknown>): void
+             - 导出静态配置数据 CHESS_PIECE_DATA（6~8 个棋子配置）
+
+          2. **assets/scripts/game/demo3-autochess/data/SynergyConfigRow.ts**：
+             实现 IDataRow 接口，字段：
+             - id: number, race: string, threshold: number
+             - effect: string（atk_boost / hp_boost / spd_boost）
+             - value: number（百分比加成值，如 20 表示 +20%）
+             - desc: string（描述）
+             - parseRow(data: Record<string, unknown>): void
+             - 导出静态配置数据 SYNERGY_DATA（3 条羁绊：战士×3 ATK+20%，法师×2 HP+30%，游侠×3 SPD+25%）
+
+          框架 API 引用：IDataRow from '@framework/datatable/DataTableDefs'
+        files:
+          - "assets/scripts/game/demo3-autochess/data/ChessPieceConfigRow.ts"
+          - "assets/scripts/game/demo3-autochess/data/SynergyConfigRow.ts"
+          - "tests/game/demo3-autochess/data/ConfigRows.test.ts"
+        dependencies: []
+        conflicts_with: []
+        validation_matrix:
+          - test_command: "npx jest --no-coverage --forceExit tests/game/demo3-autochess/data/ConfigRows.test.ts"
+            expected: "所有测试通过：parseRow 正确填充字段、静态数据完整"
+        tdd_steps:
+          red: "测试 ChessPieceConfigRow.parseRow 能正确解析 {id:1, name:'战士', race:'warrior', ...}；测试 CHESS_PIECE_DATA 长度 ≥ 6；测试 SynergyConfigRow 同理"
+          green: "实现两个 ConfigRow 类的 parseRow 方法和静态数据常量"
+          refactor: "确保所有数值字段有合理默认值，添加中文 JSDoc"
+
+      - task_id: t03
+        title: "运行时游戏状态定义"
+        agent: gem-implementer
+        description: |
+          创建 assets/scripts/game/demo3-autochess/data/AutoChessGameData.ts，定义全部运行时状态：
+
+          1. **接口/类型**：
+             - ChessPieceSide = 'player' | 'enemy'
+             - ChessPieceRuntimeState：运行时棋子状态（id, configId, name, race, hp, maxHp, atk, atkSpeed, range, star, side, position, isAlive）
+             - ShopSlot：{ config: ChessPieceConfigRow | null; sold: boolean }
+             - ActiveSynergy：{ race: string; count: number; threshold: number; effect: string; value: number; isActive: boolean }
+             - BattleResult = 'win' | 'lose'
+             - MergeResult：{ mergedPiece: ChessPieceRuntimeState; consumedIds: number[] }
+
+          2. **AutoChessGameData 类**：
+             - gold: number（初始 INITIAL_GOLD）
+             - hp: number（初始 INITIAL_HP）
+             - round: number（从 1 开始）
+             - boardPieces: Map<string, number>（'row,col' → pieceId 映射）
+             - benchPieces: ChessPieceRuntimeState[]
+             - shopSlots: ShopSlot[]
+             - shopLocked: boolean
+             - activeSynergies: ActiveSynergy[]
+             - allPieces: Map<number, ChessPieceRuntimeState>（全局棋子注册表）
+             - nextPieceId: number（自增 ID）
+             - reset(): void（重置到初始状态）
+             - createPieceState(config, star, side): ChessPieceRuntimeState
+             - getPiece(id): ChessPieceRuntimeState | undefined
+             - getPlayerPieces(): ChessPieceRuntimeState[]
+             - getEnemyPieces(): ChessPieceRuntimeState[]
+        files:
+          - "assets/scripts/game/demo3-autochess/data/AutoChessGameData.ts"
+          - "tests/game/demo3-autochess/data/AutoChessGameData.test.ts"
+        dependencies: []
+        conflicts_with: []
+        validation_matrix:
+          - test_command: "npx jest --no-coverage --forceExit tests/game/demo3-autochess/data/AutoChessGameData.test.ts"
+            expected: "所有测试通过：reset 归位、createPieceState 生成正确、getPlayerPieces 过滤正确"
+        tdd_steps:
+          red: "测试 new AutoChessGameData() 初始 gold===10, hp===100, round===1；测试 createPieceState 返回正确结构；测试 reset() 清空所有状态"
+          green: "实现 AutoChessGameData 类的所有属性和方法"
+          refactor: "提取常量引用 AutoChessDefs（如 INITIAL_HP），确保类型安全"
+
+      - task_id: t04
+        title: "构建配置与入口文件"
+        agent: gem-implementer
+        description: |
+          配置 Demo 3 的构建和运行环境：
+
+          1. **修改 package.json**，在 scripts 中新增：
+             - "demo3:build": "esbuild assets/scripts/game/demo3-autochess/main.ts --bundle --outfile=dist/demo3/demo3.js --platform=browser --format=iife --tsconfig=tsconfig.json --alias:@framework=./assets/scripts/framework --alias:@game=./assets/scripts/game --alias:@utils=./assets/scripts/utils --alias:@runtime=./assets/scripts/runtime"
+             - "demo3:serve": "npm run demo3:build && npx serve dist/demo3 -p 3003"
+             - "demo3:dev": "npm run demo3:build && npm run demo3:serve"
+
+          2. **创建 dist/demo3/index.html**：
+             HTML 页面，标题 "Auto-chess Lite Demo"，引用 demo3.js，
+             body 样式 margin:0, overflow:hidden, background:#1e1e1e。
+             参考 dist/demo2/index.html 格式。
+
+          3. **创建 assets/scripts/game/demo3-autochess/main.ts**：
+             浏览器入口，导入 AutoChessDemo → new → try { demo.start() } catch 错误处理。
+             参考 demo2-rpg/main.ts 格式。
+
+          4. **创建 assets/scripts/game/demo3-autochess/index.ts**：
+             模块桶文件（barrel exports），后续 wave 逐步添加导出。
+             初始仅导出 AutoChessDefs 的类型和常量。
+        files:
+          - "package.json"
+          - "dist/demo3/index.html"
+          - "assets/scripts/game/demo3-autochess/main.ts"
+          - "assets/scripts/game/demo3-autochess/index.ts"
+        dependencies: []
+        conflicts_with: []
+        validation_matrix:
+          - test_command: "node -e \"const pkg = require('./package.json'); console.log(pkg.scripts['demo3:build'] ? 'OK' : 'MISSING')\""
+            expected: "输出 OK，确认 demo3:build 脚本已添加"
+        tdd_steps:
+          red: "验证 package.json 中不存在 demo3 脚本"
+          green: "添加 3 个脚本到 package.json，创建 index.html、main.ts、index.ts"
+          refactor: "确保 esbuild 别名与 demo1/demo2 一致"
+
+  # ─── Wave 2: Core Systems & Entity ─────────────────
+  - wave: 2
+    description: "核心系统与实体层——棋子实体/工厂 + 棋盘/商店/合成/羁绊 5 大独立系统。全部并行。"
+    tasks:
+      - task_id: t05
+        title: "棋子实体与实体工厂"
+        agent: gem-implementer
+        description: |
+          创建棋子实体类和自走棋专用实体工厂：
+
+          1. **assets/scripts/game/demo3-autochess/entities/ChessPieceEntity.ts**：
+             继承 EntityBase，实现棋子实体：
+             - 属性：configId, name, race, hp, maxHp, atk, baseAtk, atkSpeed, range, star, side (player/enemy), position (IGridPosition), isAlive, atkCooldown
+             - onShow(data?: unknown): 接收 IChessPieceShowData，初始化所有属性
+             - onHide(): 重置所有属性为默认值（确保回池后干净复用）
+             - onUpdate(dt): 更新攻击冷却计时器
+             - takeDamage(damage: number): number — 扣血并返回实际伤害，hp<=0 时标记 isAlive=false
+             - applyBuff(stat: string, value: number): void — 应用属性加成
+
+          2. **assets/scripts/game/demo3-autochess/factory/AutoChessEntityFactory.ts**：
+             实现 IEntityFactory 接口：
+             - createEntity(groupName: string): EntityBase — 返回 new ChessPieceEntity()
+             - destroyEntity(entity: EntityBase): void — 清理（调用 onHide）
+             - 记录创建/销毁计数供调试
+
+          框架 API：EntityBase, IEntityFactory, EntityId
+        files:
+          - "assets/scripts/game/demo3-autochess/entities/ChessPieceEntity.ts"
+          - "assets/scripts/game/demo3-autochess/factory/AutoChessEntityFactory.ts"
+          - "tests/game/demo3-autochess/ChessPieceEntity.test.ts"
+        dependencies:
+          - t01
+          - t03
+        conflicts_with: []
+        validation_matrix:
+          - test_command: "npx jest --no-coverage --forceExit tests/game/demo3-autochess/ChessPieceEntity.test.ts"
+            expected: "所有测试通过：onShow 初始化正确、onHide 重置干净、takeDamage 扣血正确、工厂创建正确类型"
+        tdd_steps:
+          red: "测试 ChessPieceEntity.onShow(data) 后 hp/atk/name 等属性与 data 一致；测试 onHide 后属性回到默认值；测试 takeDamage(30) 扣血且 hp<=0 时 isAlive=false；测试工厂 createEntity 返回 ChessPieceEntity 实例"
+          green: "实现 ChessPieceEntity 所有属性和生命周期方法，实现 AutoChessEntityFactory"
+          refactor: "确保 onHide 彻底清理，添加 JSDoc"
+
+      - task_id: t06
+        title: "棋盘系统"
+        agent: gem-implementer
+        description: |
+          创建 assets/scripts/game/demo3-autochess/systems/BoardSystem.ts，管理 4×4 网格棋盘：
+
+          - 内部数据：_grid: (number | null)[][] — 4×4 数组，存储 pieceId 或 null
+          - placePiece(pieceId: number, row: number, col: number): boolean
+            放置棋子到指定格子，格子已被占用或越界返回 false
+          - removePiece(row: number, col: number): number | null
+            移除指定格子的棋子，返回移除的 pieceId
+          - movePiece(fromRow: number, fromCol: number, toRow: number, toCol: number): boolean
+            移动棋子从一格到另一格
+          - getPieceAt(row: number, col: number): number | null
+            查询指定格子的棋子 ID
+          - findNearestEnemy(pos: IGridPosition, isPlayerSide: boolean): IGridPosition | null
+            在敌方区域寻找最近的敌方棋子位置（曼哈顿距离）
+          - getDistance(a: IGridPosition, b: IGridPosition): number
+            计算两点曼哈顿距离
+          - isInRange(attacker: IGridPosition, target: IGridPosition, range: number): boolean
+            判断目标是否在攻击范围内
+          - clearBoard(): void — 清空棋盘
+          - getOccupiedCells(): { row: number; col: number; pieceId: number }[]
+          - isValidPosition(row: number, col: number): boolean
+
+          引用常量：BOARD_ROWS, BOARD_COLS from AutoChessDefs
+        files:
+          - "assets/scripts/game/demo3-autochess/systems/BoardSystem.ts"
+          - "tests/game/demo3-autochess/BoardSystem.test.ts"
+        dependencies:
+          - t01
+        conflicts_with: []
+        validation_matrix:
+          - test_command: "npx jest --no-coverage --forceExit tests/game/demo3-autochess/BoardSystem.test.ts"
+            expected: "所有测试通过：放置/移除/移动/查询/寻敌/距离计算全覆盖"
+        tdd_steps:
+          red: "测试 placePiece(1,0,0) 返回 true 且 getPieceAt(0,0)===1；测试重复放置返回 false；测试越界返回 false；测试 findNearestEnemy 返回曼哈顿距离最近的敌方位置；测试 clearBoard 后全部为 null"
+          green: "实现 BoardSystem 所有方法，内部维护 4×4 数组"
+          refactor: "提取边界检查为 isValidPosition，添加 Logger 日志"
+
+      - task_id: t07
+        title: "商店系统"
+        agent: gem-implementer
+        description: |
+          创建 assets/scripts/game/demo3-autochess/systems/ShopSystem.ts，管理商店刷新和购买：
+
+          - 属性：_slots: ShopSlot[]，_isLocked: boolean
+          - refreshShop(configs: ChessPieceConfigRow[], slotCount?: number): void
+            从配置列表中随机抽取 slotCount（默认 SHOP_SIZE=5）个棋子填充商店。
+            如果 _isLocked 为 true 则跳过刷新。
+          - buyPiece(slotIndex: number, currentGold: number): { config: ChessPieceConfigRow; cost: number } | null
+            购买指定槽位的棋子。金币不足或已售出返回 null。
+            购买后标记 slot.sold = true。
+          - lockShop(): void / unlockShop(): void / get isLocked(): boolean
+          - getSlots(): readonly ShopSlot[]
+          - getAvailableSlots(): ShopSlot[] — 仅返回未售出的槽位
+          - reset(): void — 清空商店状态
+
+          依赖类型：ChessPieceConfigRow, ShopSlot from AutoChessDefs/GameData
+        files:
+          - "assets/scripts/game/demo3-autochess/systems/ShopSystem.ts"
+          - "tests/game/demo3-autochess/ShopSystem.test.ts"
+        dependencies:
+          - t01
+          - t02
+          - t03
+        conflicts_with: []
+        validation_matrix:
+          - test_command: "npx jest --no-coverage --forceExit tests/game/demo3-autochess/ShopSystem.test.ts"
+            expected: "所有测试通过：刷新填充正确数量、购买扣费正确、锁定商店跳过刷新、金币不足返回 null"
+        tdd_steps:
+          red: "测试 refreshShop 后 slots 长度等于 slotCount；测试 buyPiece 返回正确 config 且 sold=true；测试金币不足时返回 null；测试 lockShop 后 refreshShop 不变"
+          green: "实现 ShopSystem 所有方法，随机使用 Math.random"
+          refactor: "确保随机抽取逻辑正确（允许重复棋子），添加 Logger"
+
+      - task_id: t08
+        title: "合成系统"
+        agent: gem-implementer
+        description: |
+          创建 assets/scripts/game/demo3-autochess/systems/MergeSystem.ts，实现 3 合 1 升星：
+
+          - checkAndMerge(pieces: ChessPieceRuntimeState[]): MergeResult | null
+            遍历所有 ★1 棋子，按 name 分组计数。
+            如果某个 name 有 ≥3 个 ★1 棋子，取前 3 个合成为 ★2。
+            返回 MergeResult { mergedPiece, consumedIds }。
+            没有可合成的返回 null。
+
+          - createMergedPiece(basePiece: ChessPieceRuntimeState, star2Mult: number): ChessPieceRuntimeState
+            基于原始棋子创建 ★2 版本：hp *= star2Mult, atk *= star2Mult, star = 2。
+            保留原始 name、race、atkSpeed、range、side、position。
+
+          - findMergeCandidates(pieces: ChessPieceRuntimeState[]): Map<string, ChessPieceRuntimeState[]>
+            按 name + star=1 分组，返回 count>=3 的分组。
+
+          依赖类型：ChessPieceRuntimeState, MergeResult from AutoChessGameData
+        files:
+          - "assets/scripts/game/demo3-autochess/systems/MergeSystem.ts"
+          - "tests/game/demo3-autochess/MergeSystem.test.ts"
+        dependencies:
+          - t01
+          - t03
+        conflicts_with: []
+        validation_matrix:
+          - test_command: "npx jest --no-coverage --forceExit tests/game/demo3-autochess/MergeSystem.test.ts"
+            expected: "所有测试通过：3 个同名★1合成★2属性翻倍、不足 3 个返回 null、★2 棋子不参与合成"
+        tdd_steps:
+          red: "测试 3 个同名★1棋子 → checkAndMerge 返回 MergeResult，mergedPiece.star===2 且 hp/atk 翻倍；测试 2 个同名★1 → 返回 null；测试 ★2 棋子不被计入合成"
+          green: "实现按 name+star 分组计数逻辑，取前 3 个消耗并创建 ★2"
+          refactor: "提取 createMergedPiece 为独立方法"
+
+      - task_id: t09
+        title: "羁绊系统"
+        agent: gem-implementer
+        description: |
+          创建 assets/scripts/game/demo3-autochess/systems/SynergySystem.ts，检测和应用羁绊加成：
+
+          - calculateSynergies(pieces: ChessPieceRuntimeState[], configs: SynergyConfigRow[]): ActiveSynergy[]
+            统计场上存活棋子的种族数量，对照 configs 中的 threshold 判断是否激活。
+            返回所有羁绊的状态列表（含是否激活）。
+
+          - applySynergyBuffs(pieces: ChessPieceRuntimeState[], synergies: ActiveSynergy[]): void
+            对所有匹配种族的存活棋子应用加成：
+            - atk_boost: atk += baseAtk * value / 100
+            - hp_boost: maxHp += baseHp * value / 100, hp += bonus
+            - spd_boost: atkSpeed *= (1 - value / 100)（攻击加速）
+
+          - removeSynergyBuffs(pieces: ChessPieceRuntimeState[]): void
+            移除所有羁绊加成，恢复原始属性（需要在 piece 上记录 baseAtk/baseHp）。
+
+          - getActiveSynergies(synergies: ActiveSynergy[]): ActiveSynergy[]
+            过滤返回仅已激活的羁绊。
+
+          依赖类型：ChessPieceRuntimeState, ActiveSynergy, SynergyConfigRow
+        files:
+          - "assets/scripts/game/demo3-autochess/systems/SynergySystem.ts"
+          - "tests/game/demo3-autochess/SynergySystem.test.ts"
+        dependencies:
+          - t01
+          - t02
+          - t03
+        conflicts_with: []
+        validation_matrix:
+          - test_command: "npx jest --no-coverage --forceExit tests/game/demo3-autochess/SynergySystem.test.ts"
+            expected: "所有测试通过：3 战士激活 ATK+20%、不足阈值不激活、应用/移除 buff 数值正确"
+        tdd_steps:
+          red: "测试 3 个 warrior 棋子 → calculateSynergies 中 warrior 羁绊 isActive=true；测试 2 个 warrior → isActive=false；测试 applySynergyBuffs 后 atk 增加 20%；测试 removeSynergyBuffs 后 atk 恢复原值"
+          green: "实现种族计数、阈值判断、buff 应用和移除"
+          refactor: "确保 removeSynergyBuffs 用 baseAtk/baseHp 恢复而非反算"
+
+  # ─── Wave 3: FSM & BattleSystem ─────────────────────
+  - wave: 3
+    description: "FSM 与战斗系统——棋子 AI FSM（4 状态）+ 战斗系统驱动器。阶段流转统一由 Procedure 管理，不再使用 GamePhase FSM。t13 依赖 t11。"
+    tasks:
+      - task_id: t11
+        title: "棋子 AI FSM 定义与状态"
+        agent: gem-implementer
+        description: |
+          创建棋子 AI FSM 的黑板定义和 4 个状态类：
+
+          1. **assets/scripts/game/demo3-autochess/fsm/ChessAiFsmDefs.ts**：
+             - IChessAiBlackboard 接口：
+               { entity: ChessPieceEntity; boardSystem: BoardSystem; allEnemies: () => ChessPieceRuntimeState[]; target: ChessPieceRuntimeState | null; eventManager: IEventManager }
+             - ChessAiDataKeys = { BLACKBOARD: 'chess_ai_blackboard' } as const
+             - 引入 ChessAiStateNames from AutoChessDefs
+
+          2. **assets/scripts/game/demo3-autochess/fsm/chess-ai/IdleState.ts**：
+             继承 FsmState<string>：
+             - onEnter: 通过 boardSystem.findNearestEnemy 寻找目标
+             - 找到目标且在攻击范围内 → 切换到 Attack
+             - 找到目标但不在范围内 → 切换到 MoveTo
+             - 无目标 → 保持 Idle（战斗胜利）
+
+          3. **fsm/chess-ai/MoveToState.ts**：
+             - onEnter: 计算朝目标移动一步的方向
+             - onUpdate: 每次 update 移动 1 格（boardSystem.movePiece）
+             - 到达攻击范围 → Attack；自身 HP<=0 → Dead
+
+          4. **fsm/chess-ai/AttackState.ts**：
+             - onUpdate: 检查攻击冷却，冷却完毕则对 target 造成伤害
+             - 发射 CHESS_ATTACK 事件
+             - 目标死亡 → 回到 Idle 重新寻找；自身 HP<=0 → Dead
+
+          5. **fsm/chess-ai/DeadState.ts**：
+             - onEnter: 发射 CHESS_KILLED 事件，标记 isAlive=false
+
+          框架 API：FsmState<T>, IFsm<T> from '@framework/fsm/FsmDefs'
+        files:
+          - "assets/scripts/game/demo3-autochess/fsm/ChessAiFsmDefs.ts"
+          - "assets/scripts/game/demo3-autochess/fsm/chess-ai/IdleState.ts"
+          - "assets/scripts/game/demo3-autochess/fsm/chess-ai/MoveToState.ts"
+          - "assets/scripts/game/demo3-autochess/fsm/chess-ai/AttackState.ts"
+          - "assets/scripts/game/demo3-autochess/fsm/chess-ai/DeadState.ts"
+          - "tests/game/demo3-autochess/chess-ai-fsm.test.ts"
+        dependencies:
+          - t01
+          - t05
+          - t06
+        conflicts_with: []
+        validation_matrix:
+          - test_command: "npx jest --no-coverage --forceExit tests/game/demo3-autochess/chess-ai-fsm.test.ts"
+            expected: "所有测试通过：Idle 找目标切换正确、MoveTo 移动后检查范围、Attack 扣血触发事件、Dead 标记 isAlive=false"
+        tdd_steps:
+          red: "Mock FsmManager.createFsm，测试 IdleState.onEnter 找到敌人后调用 changeState(Attack/MoveTo)；测试 AttackState 冷却完毕后 target.hp 减少；测试 DeadState 设置 isAlive=false"
+          green: "实现 4 个 FsmState 子类和黑板接口"
+          refactor: "提取 HP 检查为共用辅助方法，确保每个状态的 onLeave 清理干净"
+
+      - task_id: t13
+        title: "战斗系统"
+        agent: gem-implementer
+        description: |
+          创建 assets/scripts/game/demo3-autochess/systems/BattleSystem.ts，驱动自动战斗：
+
+          - 依赖：FsmManager, BoardSystem, EventManager
+          - 属性：_fsmManager, _boardSystem, _eventManager, _chessFsms: Map<number, IFsm<string>>
+          - _battleActive: boolean, _tickInterval: number（默认 0.5s）
+
+          - startBattle(fsmManager: FsmManager, boardSystem: BoardSystem, eventManager: IEventManager, playerPieces: ChessPieceRuntimeState[], enemyPieces: ChessPieceRuntimeState[]): void
+            为每个存活棋子创建 AI FSM（使用 fsmManager.createFsm），
+            FSM 名称：CHESS_AI_FSM_PREFIX + pieceId，
+            状态列表：[IdleState, MoveToState, AttackState, DeadState]，
+            写入黑板数据，启动 FSM（初始状态 Idle）。
+
+          - updateBattle(deltaTime: number): void
+            如果 _battleActive，遍历所有 FSM 执行 update。
+            每个棋子的 AI FSM 自行决策移动/攻击。
+            每次 update 后检查是否战斗结束。
+
+          - isBattleOver(): boolean
+            判断玩家方或敌方是否全灭。
+
+          - getBattleResult(): { winner: ChessPieceSide; survivingCount: number }
+            返回胜利方和存活棋子数。
+
+          - endBattle(): void
+            销毁所有棋子 AI FSM（fsmManager.destroyFsm），清空 _chessFsms。
+
+          框架 API：FsmManager.createFsm / destroyFsm, IFsm
+        files:
+          - "assets/scripts/game/demo3-autochess/systems/BattleSystem.ts"
+          - "tests/game/demo3-autochess/BattleSystem.test.ts"
+        dependencies:
+          - t01
+          - t05
+          - t06
+          - t11
+        conflicts_with: []
+        validation_matrix:
+          - test_command: "npx jest --no-coverage --forceExit tests/game/demo3-autochess/BattleSystem.test.ts"
+            expected: "所有测试通过：startBattle 创建正确数量 FSM、updateBattle 推进战斗、isBattleOver 检测全灭、endBattle 销毁所有 FSM"
+        tdd_steps:
+          red: "Mock FsmManager，测试 startBattle(3 player, 3 enemy) 调用 createFsm 6 次；测试 endBattle 调用 destroyFsm 6 次；测试 isBattleOver 在一方全部 isAlive=false 时返回 true"
+          green: "实现 BattleSystem，为每个棋子创建 AI FSM 并管理生命周期"
+          refactor: "提取 FSM 创建逻辑为 _createChessFsm 方法"
+
+  # ─── Wave 4: Procedures & Renderer ──────────────────
+  - wave: 4
+    description: "流程层与渲染器——ProcedureContext + 6 个 Procedure + HTML 渲染器。t14 与 t18 可并行，t15/t16/t17 依赖 t14。"
+    tasks:
+      - task_id: t14
+        title: "流程上下文与启动/预加载流程"
+        agent: gem-implementer
+        description: |
+          创建流程共享上下文和前两个 Procedure：
+
+          1. **assets/scripts/game/demo3-autochess/procedures/AutoChessProcedureContext.ts**：
+             - IAutoChessProcedureContext 接口：
+               { gameData: AutoChessGameData; renderer: unknown; boardSystem: BoardSystem; shopSystem: ShopSystem; mergeSystem: MergeSystem; synergySystem: SynergySystem; battleSystem: BattleSystem; eventManager: EventManager; timerManager: TimerManager; fsmManager: FsmManager; entityManager: EntityManager; audioManager: AudioManager; dataTableManager: DataTableManager }
+             - AUTO_CHESS_CONTEXT_KEY = '__auto_chess_context__'
+
+          2. **procedures/LaunchProcedure.ts**：
+             继承 ProcedureBase，在 onEnter 中：
+             - 从 FSM 共享数据获取 context
+             - 通过 renderer 输出初始化日志（绿色）
+             - 切换到 PreloadProcedure
+
+          3. **procedures/PreloadProcedure.ts**：
+             在 onEnter 中：
+             - 使用 DataTableManager 注册 chess_piece_config 和 synergy_config 表
+             - 注册 EntityManager 分组：'player_chess' 和 'enemy_chess'
+             - 输出加载完成日志
+             - 切换到 PrepareProcedure
+
+          框架 API：ProcedureBase, IFsm
+        files:
+          - "assets/scripts/game/demo3-autochess/procedures/AutoChessProcedureContext.ts"
+          - "assets/scripts/game/demo3-autochess/procedures/LaunchProcedure.ts"
+          - "assets/scripts/game/demo3-autochess/procedures/PreloadProcedure.ts"
+          - "tests/game/demo3-autochess/procedures/launch-preload.test.ts"
+        dependencies:
+          - t01
+          - t02
+          - t03
+          - t06
+          - t07
+          - t08
+          - t09
+          - t13
+        conflicts_with: []
+        validation_matrix:
+          - test_command: "npx jest --no-coverage --forceExit tests/game/demo3-autochess/procedures/launch-preload.test.ts"
+            expected: "所有测试通过：LaunchProcedure 切换到 Preload、PreloadProcedure 注册数据表和分组后切换到 Prepare"
+        tdd_steps:
+          red: "Mock ProcedureManager，测试 LaunchProcedure.onEnter 调用 changeProcedure(PreloadProcedure)；测试 PreloadProcedure.onEnter 调用 DataTableManager.loadTable 2 次 + EntityManager.registerGroup 2 次"
+          green: "实现 context 接口和两个 Procedure"
+          refactor: "确保错误处理（DataTable 加载失败时 Logger.error）"
+
+      - task_id: t15
+        title: "准备阶段流程"
+        agent: gem-implementer
+        description: |
+          创建 assets/scripts/game/demo3-autochess/procedures/PrepareProcedure.ts：
+
+          继承 ProcedureBase，管理准备阶段的所有交互：
+
+          - onEnter(fsm):
+            1. 从 context 获取 gameData, shopSystem, boardSystem, mergeSystem, synergySystem, timerManager, eventManager, renderer
+            2. 增加 round 计数、增加 BASE_INCOME 金币
+            3. 调用 shopSystem.refreshShop（如未锁定）
+            4. 发射 ROUND_START 事件
+            5. 创建 30s 倒计时 Timer（使用 timerManager.addTimer）
+            6. 通过 renderer 渲染商店和棋盘
+            7. 注册事件监听：购买、放置、刷新商店
+
+          - handleBuyPiece(slotIndex): 调用 shopSystem.buyPiece → gameData 扣金 → 添加到 benchPieces → checkAndMerge
+          - handlePlacePiece(pieceId, row, col): 调用 boardSystem.placePiece → 更新 gameData → 重新计算羁绊
+          - handleRefreshShop(): 扣 REFRESH_COST 金币 → refreshShop
+          - onPrepareComplete(): 移除 Timer → 计算最终羁绊 → 切换到 BattleProcedure
+
+          - onLeave(fsm): 清理事件监听和 Timer
+
+          框架 API：ProcedureBase, TimerManager.addTimer, EventManager.on/off/emit
+        files:
+          - "assets/scripts/game/demo3-autochess/procedures/PrepareProcedure.ts"
+          - "tests/game/demo3-autochess/procedures/PrepareProcedure.test.ts"
+        dependencies:
+          - t01
+          - t03
+          - t06
+          - t07
+          - t08
+          - t09
+          - t14
+        conflicts_with: []
+        validation_matrix:
+          - test_command: "npx jest --no-coverage --forceExit tests/game/demo3-autochess/procedures/PrepareProcedure.test.ts"
+            expected: "所有测试通过：onEnter 刷新商店/创建 Timer、购买扣金正确、合成触发正确、倒计时结束切换 Procedure"
+        tdd_steps:
+          red: "测试 onEnter 后 gameData.round 递增、gold 增加 BASE_INCOME、shopSystem.refreshShop 被调用；测试 handleBuyPiece 扣金并添加 benchPiece；测试 handleBuyPiece 后 3 个同名触发 merge"
+          green: "实现 PrepareProcedure 所有处理方法和事件监听"
+          refactor: "提取 Timer 管理为独立方法，确保 onLeave 清理完整"
+
+      - task_id: t16
+        title: "战斗阶段流程"
+        agent: gem-implementer
+        description: |
+          创建 assets/scripts/game/demo3-autochess/procedures/BattleProcedure.ts：
+
+          继承 ProcedureBase，驱动自动战斗阶段：
+
+          - onEnter(fsm):
+            1. 从 context 获取 battleSystem, boardSystem, fsmManager, entityManager, eventManager, gameData, renderer
+            2. 抽取 EnemyGenerator 工厂方法（放在 factory/EnemyGenerator.ts），接收 round 和配置表，返回敌方棋子列表。BattleProcedure 只调用该方法。
+               使用 EntityManager.showEntity('enemy_chess', data) 创建敌方实体
+            3. 为所有己方棋子也创建实体：EntityManager.showEntity('player_chess', data)
+            4. 调用 battleSystem.startBattle(...)
+            5. 通过 renderer 渲染战斗棋盘
+            6. 发射 BATTLE_START 事件
+
+          - onUpdate(fsm, deltaTime):
+            调用 battleSystem.updateBattle(deltaTime)
+            如果 battleSystem.isBattleOver():
+              获取 battleResult → 存入 context → 切换到 SettleProcedure
+
+          - onLeave(fsm):
+            调用 battleSystem.endBattle()
+            EntityManager.hideAllEntities('player_chess')
+            EntityManager.hideAllEntities('enemy_chess')
+
+          框架 API：ProcedureBase, EntityManager.showEntity/hideAllEntities, BattleSystem
+        files:
+          - "assets/scripts/game/demo3-autochess/procedures/BattleProcedure.ts"
+          - "assets/scripts/game/demo3-autochess/factory/EnemyGenerator.ts"
+          - "tests/game/demo3-autochess/procedures/BattleProcedure.test.ts"
+        dependencies:
+          - t01
+          - t02
+          - t03
+          - t05
+          - t06
+          - t13
+          - t14
+        conflicts_with: []
+        validation_matrix:
+          - test_command: "npx jest --no-coverage --forceExit tests/game/demo3-autochess/procedures/BattleProcedure.test.ts"
+            expected: "所有测试通过：EnemyGenerator 根据 round+配置表生成敌方棋子列表、onEnter 创建实体 + 启动战斗、onUpdate 驱动战斗、战斗结束切换 Settle、onLeave 清理实体和 FSM"
+        tdd_steps:
+          red: "测试 EnemyGenerator.generate(round, configs) 返回 3~5 个敌方棋子且属性随 round 递增；Mock EntityManager/BattleSystem，测试 onEnter 调用 showEntity 创建敌方实体；测试 onUpdate 在 isBattleOver()=true 时调用 changeProcedure；测试 onLeave 调用 hideAllEntities"
+          green: "实现 EnemyGenerator 工厂方法和 BattleProcedure 战斗循环"
+          refactor: "确保 EnemyGenerator 与 BattleProcedure 解耦，BattleProcedure 只调用 EnemyGenerator.generate()"
+
+      - task_id: t17
+        title: "结算与游戏结束流程"
+        agent: gem-implementer
+        description: |
+          创建两个简单的 Procedure：
+
+          1. **procedures/SettleProcedure.ts**：
+             继承 ProcedureBase：
+             - onEnter: 从 context 获取 battleResult
+               - 胜利：不扣 HP，奖励金币 = BASE_INCOME + 存活棋子数
+               - 失败：扣 HP = 剩余敌方棋子数 × 5，奖励基础金币
+               - 发射 ROUND_END 事件、HP_CHANGED 事件、GOLD_CHANGED 事件
+               - HP > 0 → 切换到 PrepareProcedure
+               - HP <= 0 → 切换到 GameOverProcedure
+             - 通过 renderer 输出结算日志
+
+          2. **procedures/GameOverProcedure.ts**：
+             继承 ProcedureBase：
+             - onEnter: 输出最终成绩（坚持轮数、最高上阵棋子数）
+             - 发射 GAME_OVER 事件
+             - 等待用户点击「重新开始」→ gameData.reset() → 切换到 PrepareProcedure
+
+          框架 API：ProcedureBase, EventManager.emit
+        files:
+          - "assets/scripts/game/demo3-autochess/procedures/SettleProcedure.ts"
+          - "assets/scripts/game/demo3-autochess/procedures/GameOverProcedure.ts"
+          - "tests/game/demo3-autochess/procedures/settle-gameover.test.ts"
+        dependencies:
+          - t01
+          - t03
+          - t14
+        conflicts_with: []
+        validation_matrix:
+          - test_command: "npx jest --no-coverage --forceExit tests/game/demo3-autochess/procedures/settle-gameover.test.ts"
+            expected: "所有测试通过：胜利不扣 HP 加金、失败扣 HP、HP<=0 切换 GameOver、GameOver reset 后切换 Prepare"
+        tdd_steps:
+          red: "测试胜利时 HP 不变且 gold 增加；测试失败时 HP 减少 = 敌方存活数×5；测试 HP<=0 后切换到 GameOverProcedure；测试 GameOverProcedure 调用 gameData.reset()"
+          green: "实现两个 Procedure 的 onEnter 逻辑"
+          refactor: "统一结算公式常量（如 HP_DAMAGE_PER_ENEMY = 5）"
+
+      - task_id: t18
+        title: "自走棋 HTML 渲染器"
+        agent: gem-implementer
+        description: |
+          创建 assets/scripts/game/demo3-autochess/ui/AutoChessRenderer.ts：
+
+          使用 HtmlRenderer（来自 shared/）实现自走棋专用渲染：
+
+          - constructor(renderer: HtmlRenderer): 保存 renderer 引用
+
+          - renderBoard(boardPieces: Map<string, ChessPieceRuntimeState>, allPieces: Map<number, ChessPieceRuntimeState>): void
+            使用 renderer.updateLog('board', ...) 原地更新 4×4 ASCII 棋盘：
+            ```
+            === 战斗棋盘 (Round N) ===
+              1    2    3    4
+            ┌────┬────┬────┬────┐
+            │ E1 │    │ E2 │    │ 4
+            ├────┼────┼────┼────┤
+            │    │ E3 │    │    │ 3
+            ...
+            ```
+            每个格子显示棋子简称（P1/E1）+ 星级
+
+          - renderShop(slots: ShopSlot[]): void
+            渲染商店面板：每个槽位显示棋子名、种族、费用
+
+          - renderStatus(gameData: AutoChessGameData, synergies: ActiveSynergy[]): void
+            使用 StatusPanel 更新：HP、金币、回合数、激活羁绊
+
+          - renderBenchPieces(bench: ChessPieceRuntimeState[]): void
+            渲染备战席棋子列表
+
+          - setupPrepareButtons(callbacks: { onBuy: (i: number) => void; onPlace: (r: number, c: number) => void; onRefresh: () => void; onReady: () => void; onLock: () => void }): void
+            创建准备阶段的按钮组
+
+          - setupBattleButtons(callbacks: { onSpeedUp: (scale: number) => void }): void
+            创建战斗阶段的加速按钮
+
+          - clearButtons(): void
+
+          依赖：HtmlRenderer, LOG_COLORS from '@game/shared/HtmlRenderer'
+        files:
+          - "assets/scripts/game/demo3-autochess/ui/AutoChessRenderer.ts"
+          - "tests/game/demo3-autochess/AutoChessRenderer.test.ts"
+        dependencies:
+          - t01
+          - t03
+        conflicts_with: []
+        validation_matrix:
+          - test_command: "npx jest --no-coverage --forceExit tests/game/demo3-autochess/AutoChessRenderer.test.ts"
+            expected: "所有测试通过：renderBoard 生成正确 ASCII 格式、renderShop 包含所有槽位、renderStatus 更新面板值"
+        tdd_steps:
+          red: "使用 jsdom 环境，测试 renderBoard 输出包含 4 行网格线；测试 renderShop 包含棋子名和费用；测试 renderStatus 更新 HP/金币面板值"
+          green: "实现 AutoChessRenderer 所有渲染方法"
+          refactor: "提取棋盘格式化为 _formatCell 方法，确保颜色使用 LOG_COLORS 常量"
+
+  # ─── Wave 5: Main Entry & Integration Test ──────────
+  - wave: 5
+    description: "主入口类与集成测试——AutoChessDemo 串联全部系统和流程 + 端到端集成验证。"
+    tasks:
+      - task_id: t19
+        title: "AutoChessDemo 主入口类"
+        agent: gem-implementer
+        description: |
+          创建 assets/scripts/game/demo3-autochess/AutoChessDemo.ts：
+
+          继承 DemoBase，作为 Demo 3 的主入口类（参考 TurnBasedRpgDemo）：
+
+          - 属性：_gameData, _boardSystem, _shopSystem, _mergeSystem, _synergySystem, _battleSystem, _renderer
+
+          - constructor(): super('Auto-chess Lite Demo')，初始化 gameData
+
+          - setupProcedures(): void
+            1. 获取各模块引用：eventMgr, timerMgr, fsmMgr, procMgr, entityMgr, audioMgr, dtMgr
+            2. 创建系统实例：BoardSystem, ShopSystem, MergeSystem, SynergySystem, BattleSystem
+            3. 创建 AutoChessRenderer(this.htmlRenderer)
+            4. 覆盖 EntityFactory：entityMgr.setEntityFactory(new AutoChessEntityFactory())
+            5. 构建 IAutoChessProcedureContext
+            6. 初始化 ProcedureManager：
+               procMgr.initialize([LaunchProcedure, PreloadProcedure, PrepareProcedure, BattleProcedure, SettleProcedure, GameOverProcedure])
+            7. 写入 FSM 共享数据 AUTO_CHESS_CONTEXT_KEY
+            8. 启动 LaunchProcedure
+
+          - setupDataTables(): void
+            使用 MockDataTableParser.registerData 注册：
+            - chess_piece_config → CHESS_PIECE_DATA
+            - synergy_config → SYNERGY_DATA
+
+          - 注册战斗事件监听（通过 EventManager.on）在 renderer 上输出彩色日志
+
+          更新 index.ts 桶文件导出所有公开类型和类。
+          更新 main.ts 使用 AutoChessDemo。
+
+          框架 API：DemoBase, GameModule, ProcedureManager.initialize/startProcedure
+        files:
+          - "assets/scripts/game/demo3-autochess/AutoChessDemo.ts"
+          - "assets/scripts/game/demo3-autochess/index.ts"
+          - "assets/scripts/game/demo3-autochess/main.ts"
+          - "tests/game/demo3-autochess/AutoChessDemo.test.ts"
+        dependencies:
+          - t01
+          - t02
+          - t03
+          - t04
+          - t05
+          - t06
+          - t07
+          - t08
+          - t09
+          - t13
+          - t14
+          - t15
+          - t16
+          - t17
+          - t18
+        conflicts_with:
+          - t04
+        validation_matrix:
+          - test_command: "npx jest --no-coverage --forceExit tests/game/demo3-autochess/AutoChessDemo.test.ts"
+            expected: "所有测试通过：bootstrap 注册模块、setupProcedures 初始化系统和流程、setupDataTables 注册配置表"
+        tdd_steps:
+          red: "测试 new AutoChessDemo() 不抛异常；测试 bootstrap → setupProcedures 注册 6 个 Procedure；测试 setupDataTables 注册 2 张表"
+          green: "实现 AutoChessDemo 类的所有方法，串联全部系统"
+          refactor: "确保事件监听在 stop() 时清理，更新 index.ts 导出"
+
+      - task_id: t20
+        title: "集成测试"
+        agent: gem-implementer
+        description: |
+          创建 tests/integration/demo3-autochess.integration.test.ts，验证全流程：
+
+          1. **完整游戏循环测试**：
+             - bootstrap → 启动 → Preload → Prepare → 模拟买棋 → 准备完毕 → Battle → Settle → 下一轮
+             - 验证 round 递增、gold 变化正确
+
+          2. **棋子合成集成测试**：
+             - 购买 3 个同名 ★1 棋子 → 验证自动合成为 ★2 → 属性翻倍
+
+          3. **ObjectPool 复用测试**：
+             - 运行一轮战斗 → 所有实体回收 → 下一轮实体从池中复用
+             - 验证 EntityManager.getEntitiesByGroup 在战斗后为空
+
+          4. **羁绊激活集成测试**：
+             - 放置 3 个 warrior 棋子 → 验证 warrior 羁绊激活 → ATK+20% 生效
+
+          5. **Game Over 测试**：
+             - 持续战斗直到 HP <= 0 → 验证切换到 GameOverProcedure → reset 后可重新开始
+
+          6. **Entity 峰值测试**：
+             - 同时管理 16 个棋子实体（8 player + 8 enemy）→ 无泄漏 → 战斗结束全部回收
+
+          测试策略：使用 DemoBase.bootstrap() 真实注册模块，通过 GameModule.update() 驱动帧更新
+        files:
+          - "tests/integration/demo3-autochess.integration.test.ts"
+        dependencies:
+          - t19
+        conflicts_with: []
+        validation_matrix:
+          - test_command: "npx jest --no-coverage --forceExit tests/integration/demo3-autochess.integration.test.ts"
+            expected: "所有集成测试通过：完整循环、合成、ObjectPool 复用、羁绊、Game Over、Entity 峰值"
+        tdd_steps:
+          red: "编写 6 个 describe 块，每个测试一个集成场景"
+          green: "通过真实模块注册和 update 驱动，验证各场景端到端正确"
+          refactor: "提取 setupDemo / simulateRound 辅助函数减少重复"
+
+planning_pass: 1
+planning_history:
+  - pass: 1
+    reason: "初始计划创建"
+    timestamp: "2026-04-23"

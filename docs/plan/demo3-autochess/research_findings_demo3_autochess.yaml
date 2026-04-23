@@ -1,0 +1,529 @@
+plan_id: demo3-autochess
+objective: "Demo 3 — Auto-chess Lite（自走棋）开发前期调研"
+focus_area: "demo3-autochess 全模块就绪与架构调研"
+created_at: "2026-04-23"
+created_by: "gem-researcher"
+status: completed
+
+tldr: |
+  - Demo 3 目录（demo3-autochess/）和测试目录均不存在，需要从头创建
+  - EntityManager 已完善，API 足以支撑棋子大量管理（registerGroup / showEntity / hideEntity / getEntitiesByGroup），EntityGroup 内建等待池复用机制
+  - ObjectPool（泛型单类型）与 ReferencePool（全局多类型管理器）均可用；EntityGroup 自身已内建对象池（waitingList），无需额外 ObjectPool 管理棋子实体
+  - FsmManager 支持 createFsm/destroyFsm，可为每个棋子创建独立 AI FSM（Idle→MoveTo→Attack→Dead）
+  - DemoBase 已注册 EntityManager 并注入 MockEntityFactory，开箱可用
+  - 需新增 esbuild 构建脚本和 dist/demo3/index.html
+
+research_metadata:
+  methodology: "hybrid retrieval: semantic_search + grep_search + read_file，逐层分析框架 API 和 Demo 参考结构"
+  scope: "框架 entity/objectpool/fsm/timer/procedure 模块 API，Demo 1/2 文件结构参考，设计文档 Section 6 全文，DemoBase 模块注册与 Mock 注入"
+  confidence: high
+  coverage: 95
+  decision_blockers: 0
+  research_blockers: 0
+
+# ═══════════════════════════════════════════════════════
+# 1. Demo 3 设计文档摘要
+# ═══════════════════════════════════════════════════════
+
+demo3_design_summary:
+  core_gameplay: |
+    简化版自走棋：
+    - 准备阶段（买棋/布阵）→ 战斗阶段（自动对战）→ 结算 → 下一回合
+    - 棋盘 4×4，玩家方 2 行 + 敌方 2 行
+    - 商店每轮随机 3~5 棋子
+    - 3 个同名 ★1 → 合成 ★2（属性翻倍）
+    - 2~3 种羁绊效果（如战士×3 ATK+20%）
+    - 棋子 AI 自动寻找最近敌人攻击
+    - PvE：每轮随机生成 AI 对手
+    - 玩家 100 HP，输了扣 HP，HP ≤ 0 则 Game Over
+
+  covered_modules:
+    deep_use:
+      - EventManager（棋子购买/放置/合成/攻击/回合切换事件）
+      - ObjectPool（棋子 Entity 回收复用）
+      - FSM（棋子 AI FSM + 游戏阶段 FSM）
+      - ProcedureManager（Launch→Preload→Prepare→Battle→Settle 循环）
+      - EntityManager（大量棋子 Entity，Group: player_chess / enemy_chess）
+      - TimerManager（准备阶段 30s 倒计时 + AI 行动间隔 + 战斗加速 timeScale）
+      - DataTableManager（棋子配置表 + 羁绊配置表 + 商店池配置）
+    standard_use:
+      - Core, DI/IoC, ResourceManager, UIManager, NetworkManager
+      - AudioManager, SceneManager, Logger, DebugManager
+      - LocalizationManager, HotUpdateManager
+
+  procedure_flow: "Launch → Preload → Prepare -(倒计时结束)→ Battle -(一方全灭)→ Settle -(HP>0)→ Prepare / -(HP≤0)→ GameOver -(重新开始)→ Prepare"
+
+  fsm_design:
+    game_phase_fsm:
+      states: [PreparePhase, BattlePhase, SettlePhase]
+      transitions:
+        - from: PreparePhase
+          to: BattlePhase
+          trigger: "倒计时结束"
+        - from: BattlePhase
+          to: SettlePhase
+          trigger: "一方全灭"
+        - from: SettlePhase
+          to: PreparePhase
+          trigger: "继续"
+    chess_ai_fsm:
+      states: [IdleState, MoveToState, AttackState, DeadState]
+      transitions:
+        - { from: Idle, to: MoveTo, trigger: "发现目标" }
+        - { from: Idle, to: Attack, trigger: "已在攻击范围" }
+        - { from: MoveTo, to: Attack, trigger: "到达攻击范围" }
+        - { from: Attack, to: Idle, trigger: "目标死亡" }
+        - { from: "*", to: Dead, trigger: "自身HP<=0" }
+
+  datatable_schemas:
+    chess_piece_config:
+      fields: [id, name, race, hp, atk, atkSpeed, range, cost, star2Mult]
+    synergy_config:
+      fields: [id, race, threshold, effect, value, desc]
+
+  integration_test_points:
+    - "棋子合成：购买 3 个同名 → 自动合成 ★2，属性翻倍"
+    - "ObjectPool 复用：战斗结束后棋子回收，下轮复用"
+    - "AI FSM 循环：Idle→MoveTo→Attack 正确循环，目标死亡后重新寻找"
+    - "羁绊计算：达到阈值后正确激活效果"
+    - "Entity 数量峰值：同时 8~16 个棋子 Entity 无泄漏"
+    - "倒计时准确：30s 到时自动切换战斗阶段"
+
+# ═══════════════════════════════════════════════════════
+# 2. 现有文件检查
+# ═══════════════════════════════════════════════════════
+
+existing_files:
+  demo3_source_dir:
+    path: "assets/scripts/game/demo3-autochess/"
+    exists: false
+    note: "目录不存在，需要从头创建"
+  demo3_test_dir:
+    path: "tests/game/demo3-autochess/"
+    exists: false
+  demo3_integration_test:
+    path: "tests/integration/demo3-autochess*"
+    exists: false
+  demo3_e2e_test:
+    path: "tests/e2e/demo3-autochess*"
+    exists: false
+
+# ═══════════════════════════════════════════════════════
+# 3. 参考 Demo 结构（Demo 1 & Demo 2）
+# ═══════════════════════════════════════════════════════
+
+reference_demo_structure:
+  demo1_idle:
+    root: "assets/scripts/game/demo1-idle/"
+    files:
+      - IdleClickerDemo.ts     # 主入口类（extends DemoBase）
+      - index.ts               # 浏览器入口（new Demo → start()）
+      - data/                  # 数据行类型 + 运行时状态
+        - AchievementConfigRow.ts
+        - BuildingConfigRow.ts
+        - IdleGameData.ts
+        - UpgradeCurveRow.ts
+      - events/
+        - IdleEvents.ts        # EventKey 定义
+      - fsm/
+        - BuildingFsmDefs.ts
+        - BuildingFsmStates.ts
+      - procedures/
+        - LaunchProcedure.ts
+        - MainProcedure.ts
+        - OfflineSettleProcedure.ts
+        - PreloadProcedure.ts
+        - ProcedureContext.ts
+        - SettingsProcedure.ts
+      - systems/
+        - AchievementSystem.ts
+        - BuildingSystem.ts
+        - OfflineRewardSystem.ts
+        - SaveSystem.ts
+      - ui/                    # (目录存在但文件通过 UIManager 管理)
+    build_script: "esbuild assets/scripts/game/demo1-idle/index.ts --bundle ..."
+    serve_port: 3001
+
+  demo2_rpg:
+    root: "assets/scripts/game/demo2-rpg/"
+    files:
+      - TurnBasedRpgDemo.ts    # 主入口类（extends DemoBase）
+      - index.ts               # 模块导出
+      - main.ts                # 浏览器入口
+      - data/
+        - CharacterConfigRow.ts
+        - MonsterConfigRow.ts
+        - RpgGameData.ts
+        - SkillConfigRow.ts
+        - StageConfigRow.ts
+      - events/
+        - RpgEvents.ts
+      - fsm/
+        - BattleFsmDefs.ts
+        - CharacterFsmDefs.ts
+        - battle/
+        - character/
+      - procedures/
+        - LaunchProcedure.ts
+        - PreloadProcedure.ts
+        - LobbyProcedure.ts
+        - BattlePrepProcedure.ts
+        - BattleProcedure.ts
+        - SettleProcedure.ts
+        - RpgProcedureContext.ts
+      - systems/
+        - BattleSystem.ts
+        - BuffSystem.ts
+        - DamageCalculator.ts
+        - EnemyAI.ts
+      - ui/
+    build_script: "esbuild assets/scripts/game/demo2-rpg/main.ts --bundle ..."
+    serve_port: 3002
+
+  demo3_planned_structure:
+    root: "assets/scripts/game/demo3-autochess/"
+    files:
+      - AutoChessDemo.ts        # 主入口类（extends DemoBase）
+      - index.ts                # 模块导出
+      - main.ts                 # 浏览器入口
+      - data/
+        - ChessPieceConfigRow.ts  # 棋子配置行
+        - SynergyConfigRow.ts     # 羁绊配置行
+        - AutoChessGameData.ts    # 运行时状态（金币、HP、棋盘、商店等）
+      - events/
+        - AutoChessEvents.ts      # EventKey 定义
+      - fsm/
+        - GamePhaseFsmDefs.ts     # 游戏阶段 FSM 定义
+        - ChessAiFsmDefs.ts       # 棋子 AI FSM 定义
+        - phase/                  # 游戏阶段 FSM 状态
+        - ai/                     # 棋子 AI FSM 状态
+      - procedures/
+        - AutoChessProcedureContext.ts
+        - LaunchProcedure.ts
+        - PreloadProcedure.ts
+        - PrepareProcedure.ts
+        - BattleProcedure.ts
+        - SettleProcedure.ts
+        - GameOverProcedure.ts
+      - systems/
+        - ShopSystem.ts           # 商店刷新/购买/锁定
+        - BoardSystem.ts          # 棋盘管理（4×4 网格）
+        - SynergySystem.ts        # 羁绊计算
+        - MergeSystem.ts          # 棋子合成（3→1 升星）
+        - BattleSystem.ts         # 自动战斗驱动
+        - EnemyGenerator.ts       # AI 对手棋阵生成
+      - entities/
+        - ChessPieceEntity.ts     # 棋子实体（extends EntityBase）
+      - ui/
+
+# ═══════════════════════════════════════════════════════
+# 4. 框架模块 API 就绪情况
+# ═══════════════════════════════════════════════════════
+
+entity_manager_api:
+  status: "✅ 完善"
+  file: "assets/scripts/framework/entity/EntityManager.ts"
+  interface: "assets/scripts/framework/interfaces/IEntityManager.ts"
+  key_apis:
+    - name: "setEntityFactory(factory: IEntityFactory)"
+      desc: "策略注入实体工厂（DemoBase 已自动注入 MockEntityFactory）"
+    - name: "registerGroup(groupName: string)"
+      desc: "注册实体分组（如 player_chess / enemy_chess）"
+    - name: "showEntity(groupName, data?, callbacks?): EntityBase"
+      desc: "从分组取出实体（优先复用等待池），返回 EntityBase 实例"
+    - name: "hideEntity(entity: EntityBase)"
+      desc: "回收实体到分组等待池"
+    - name: "hideAllEntities(groupName?)"
+      desc: "隐藏指定分组或全部分组的活跃实体"
+    - name: "getEntitiesByGroup(groupName): readonly EntityBase[]"
+      desc: "获取指定分组的所有活跃实体"
+    - name: "hasEntity(entityId): boolean"
+      desc: "查询实体是否活跃"
+  entity_base_lifecycle: "onShow(data?) → onUpdate(dt) → onHide()"
+  entity_group_internals:
+    desc: "EntityGroup 内建对象池：activeList + waitingList，showEntity 优先从 waitingList pop 复用"
+    pool_mechanism: "EntityGroup.showEntity() 先检查 _waitingList.length > 0 则 pop 复用，否则通过 factory.createEntity() 新建"
+  grouping_support: "✅ 完全支持 player_chess / enemy_chess 分组"
+  entity_id_auto_increment: "✅ EntityManager._nextEntityId 自增，全局唯一"
+
+object_pool_api:
+  status: "✅ 完善"
+  files:
+    - "assets/scripts/framework/objectpool/ObjectPool.ts (泛型单类型池)"
+    - "assets/scripts/framework/objectpool/ReferencePool.ts (全局多类型池管理器)"
+  key_apis:
+    ObjectPool:
+      - "acquire(): T — 从池中获取对象（无则 new）"
+      - "release(obj: T) — 回收对象入池（防重复入池）"
+      - "preload(count) — 预热指定数量的对象"
+      - "clear() — 清空池中空闲对象"
+      - "stats — 获取 freeCount/usedCount/totalCreated"
+    ReferencePool:
+      - "acquire<T>(ctor): T — 按类型自动路由到对应池"
+      - "release<T>(obj: T) — 按类型回收"
+  note_for_demo3: |
+    EntityGroup 自身已内建等待池，棋子 Entity 的复用由 EntityManager.hideEntity → EntityGroup.hideEntity → _waitingList 自动管理。
+    独立的 ObjectPool / ReferencePool 可用于非 Entity 类的池化对象（如伤害飘字、特效等），
+    但棋子 Entity 的复用不需要额外使用 ObjectPool。
+
+fsm_api:
+  status: "✅ 完善"
+  file: "assets/scripts/framework/fsm/FsmManager.ts"
+  key_apis:
+    - name: "createFsm<T>(name, owner, ...states): IFsm<T>"
+      desc: "创建 FSM，传入名称 + 持有者 + 状态列表"
+    - name: "destroyFsm(name): boolean"
+      desc: "销毁 FSM"
+    - name: "getFsm(name): IFsm<unknown> | undefined"
+      desc: "获取 FSM 实例"
+    - name: "hasFsm(name): boolean"
+      desc: "检查 FSM 是否存在"
+  fsm_instance_api:
+    - "start<TState>(stateType) — 启动 FSM，进入初始状态"
+    - "changeState<TState>(stateType) — 切换到指定状态"
+    - "getData<V>(key) / setData<V>(key, value) — 共享数据存取"
+  state_interface: |
+    IFsmState<T>:
+      onInit(fsm) — 状态机创建时
+      onEnter(fsm) — 进入状态
+      onUpdate(fsm, dt) — 每帧更新
+      onLeave(fsm) — 离开状态
+      onDestroy(fsm) — 状态销毁
+  note_for_demo3: |
+    需为每个棋子创建独立 AI FSM（名称如 chess_ai_1, chess_ai_2...），
+    战斗结束时 destroyFsm 清理。
+    游戏阶段 FSM 全局一个即可。
+
+timer_api:
+  status: "✅ 完善"
+  file: "assets/scripts/framework/timer/TimerManager.ts"
+  key_apis:
+    - name: "addTimer(delay, callback, options?): number"
+      desc: "添加定时器，返回 ID"
+    - name: "removeTimer(id): boolean"
+      desc: "移除定时器"
+    - name: "removeTimersByTag(tag): number"
+      desc: "按标签批量移除"
+    - name: "removeAllTimers()"
+      desc: "移除所有定时器"
+    - name: "pauseTimer(id) / resumeTimer(id)"
+      desc: "暂停/恢复定时器"
+    - name: "timeScale (getter/setter)"
+      desc: "全局时间缩放（战斗加速用）"
+  options:
+    - "repeat: 0(一次) | N(N次) | -1(无限)"
+    - "initialDelay: 首次触发延迟"
+    - "useTimeScale: 是否受缩放影响"
+    - "tag: 标签（批量操作）"
+  note_for_demo3: |
+    准备阶段 30s 倒计时：addTimer(1, callback, { repeat: 29, tag: 'prepare' })
+    AI 行动间隔：addTimer(0.5, aiTick, { repeat: -1, tag: 'battle' })
+    战斗加速：timerManager.timeScale = 2 / 4
+
+# ═══════════════════════════════════════════════════════
+# 5. Mock 策略就绪情况
+# ═══════════════════════════════════════════════════════
+
+mock_readiness:
+  MockEntityFactory:
+    exists: true
+    path: "assets/scripts/game/shared/MockEntityFactory.ts"
+    provides:
+      - "MockEntity（extends EntityBase，追踪生命周期调用）"
+      - "MockEntityFactory（implements IEntityFactory，支持 enablePooling）"
+    note: |
+      MockEntityFactory 创建的是 MockEntity（只有通用的 calls 追踪和 lastShowData）。
+      Demo 3 需要自定义 ChessPieceEntity（extends EntityBase），携带棋子属性（hp, atk, race, star, position 等）。
+      有两种方案：
+      1. 直接使用 MockEntityFactory，在 showEntity 的 data 参数中传入棋子配置，ChessPieceEntity 在 onShow 中初始化
+      2. 创建 Demo3EntityFactory（implements IEntityFactory），按 groupName 创建不同类型的 Entity
+      推荐方案 1：遵循现有框架约定，EntityFactory 创建通用 Entity，业务数据通过 data 注入。
+      但 MockEntity 的属性太少，需要自定义 ChessPieceEntity。
+      → 需新建 ChessPieceEntity + 可能需要自定义 Demo3EntityFactory
+
+  MockResourceLoader:
+    exists: true
+    ready: true
+  MockAudioPlayer:
+    exists: true
+    ready: true
+  MockSceneLoader:
+    exists: true
+    ready: true
+  MockUIFormFactory:
+    exists: true
+    ready: true
+  MockDataTableParser:
+    exists: true
+    ready: true
+  MockNetworkSocket:
+    exists: true
+    ready: true
+  MockHotUpdateAdapter:
+    exists: true
+    ready: true
+
+# ═══════════════════════════════════════════════════════
+# 6. DemoBase EntityManager 集成情况
+# ═══════════════════════════════════════════════════════
+
+demo_base_entity_support:
+  registered: true
+  priority: 180
+  factory_injected: "MockEntityFactory（DemoBase.bootstrap() 中 entityManager.setEntityFactory(new MockEntityFactory())）"
+  note: |
+    DemoBase 已完整注册 EntityManager 并注入 MockEntityFactory。
+    Demo 3 如需自定义 EntityFactory，需在子类 bootstrap 后重新调用 setEntityFactory()。
+    参考 Demo 2 做法：在 TurnBasedRpgDemo.ts 中直接获取 EntityManager 并使用。
+    EntityManager 无 getEntityFactory 方法，但可以重新 setEntityFactory 覆盖。
+
+# ═══════════════════════════════════════════════════════
+# 7. esbuild 配置
+# ═══════════════════════════════════════════════════════
+
+esbuild_config:
+  current_scripts:
+    demo1_build: "esbuild assets/scripts/game/demo1-idle/index.ts --bundle --outfile=dist/demo1/demo1.js --platform=browser --format=iife --tsconfig=tsconfig.json --alias:@framework=./assets/scripts/framework --alias:@game=./assets/scripts/game --alias:@utils=./assets/scripts/utils --alias:@runtime=./assets/scripts/runtime"
+    demo1_serve: "npm run demo1:build && npx serve dist/demo1 -p 3001"
+    demo2_build: "esbuild assets/scripts/game/demo2-rpg/main.ts --bundle --outfile=dist/demo2/demo2.js --platform=browser --format=iife --tsconfig=tsconfig.json --alias:@framework=./assets/scripts/framework --alias:@game=./assets/scripts/game --alias:@utils=./assets/scripts/utils --alias:@runtime=./assets/scripts/runtime"
+    demo2_serve: "npx serve dist/demo2 -p 3002"
+  needs_for_demo3:
+    - script: "demo3:build"
+      value: "esbuild assets/scripts/game/demo3-autochess/main.ts --bundle --outfile=dist/demo3/demo3.js --platform=browser --format=iife --tsconfig=tsconfig.json --alias:@framework=./assets/scripts/framework --alias:@game=./assets/scripts/game --alias:@utils=./assets/scripts/utils --alias:@runtime=./assets/scripts/runtime"
+    - script: "demo3:serve"
+      value: "npx serve dist/demo3 -p 3003"
+    - script: "demo3:dev"
+      value: "npm run demo3:build && npm run demo3:serve"
+    - file: "dist/demo3/index.html"
+      note: "需要创建 HTML 入口文件，引用 demo3.js"
+
+# ═══════════════════════════════════════════════════════
+# 8. 潜在框架缺口分析
+# ═══════════════════════════════════════════════════════
+
+potential_framework_gaps:
+  - id: GAP-ENTITY-CUSTOM-TYPE
+    module: EntityManager
+    description: |
+      EntityManager.showEntity() 返回 EntityBase，业务层需要类型断言为 ChessPieceEntity。
+      EntityGroup 使用 IEntityFactory.createEntity(groupName) 创建实体，
+      工厂接口返回 EntityBase 而非泛型类型。
+    current_workaround: "业务层每次 showEntity 后需手动 as ChessPieceEntity 类型断言"
+    ideal_solution: "泛型 showEntity<T extends EntityBase>(groupName, data?): T，或 registerGroup 时绑定实体类型"
+    severity: nice-to-have
+    affected_demos: [demo2, demo3]
+
+  - id: GAP-ENTITY-FIND-BY-DATA
+    module: EntityManager
+    description: |
+      无法按业务数据查询实体（如"找到所有 race=warrior 的棋子"），
+      只能 getEntitiesByGroup 后手动 filter。
+    current_workaround: "业务层 getEntitiesByGroup + filter"
+    ideal_solution: "EntityManager.findEntities(groupName, predicate) 或 EntityGroup.find(predicate)"
+    severity: nice-to-have
+    affected_demos: [demo3]
+
+  - id: GAP-FSM-BATCH-DESTROY
+    module: FsmManager
+    description: |
+      战斗结束需要销毁所有棋子的 AI FSM（可能 8~16 个），
+      目前只能逐个 destroyFsm(name)，没有批量销毁或按前缀销毁的 API。
+    current_workaround: "业务层维护 FSM 名称列表，循环 destroyFsm"
+    ideal_solution: "FsmManager.destroyFsmsByPrefix(prefix) 或 destroyAll()"
+    severity: nice-to-have
+    affected_demos: [demo3]
+
+  - id: GAP-NO-GRID-SYSTEM
+    module: none
+    description: |
+      框架没有网格/棋盘系统。4×4 棋盘的位置管理、距离计算、最近敌人查找需要自行实现。
+    current_workaround: "在 BoardSystem 中自行实现 4×4 网格管理和距离计算"
+    ideal_solution: "未来可以开发 fbi-grid-system 插件（设计文档已提及）"
+    severity: important
+    affected_demos: [demo3, demo4]
+    note: "这是预期的框架边界，不是缺陷。设计文档已标记 fbi-grid-system 为插件发现方向。"
+
+# ═══════════════════════════════════════════════════════
+# 9. 关键架构要点
+# ═══════════════════════════════════════════════════════
+
+patterns_found:
+  - category: architecture
+    pattern: "Demo 主入口 extends DemoBase"
+    description: "每个 Demo 继承 DemoBase，实现 setupProcedures() 和 setupDataTables()，main.ts 作为浏览器入口"
+    examples:
+      - file: TurnBasedRpgDemo.ts
+        location: "assets/scripts/game/demo2-rpg/TurnBasedRpgDemo.ts"
+        snippet: "export class TurnBasedRpgDemo extends DemoBase { ... abstract setupProcedures/setupDataTables }"
+    prevalence: common
+
+  - category: architecture
+    pattern: "Procedure Context 共享数据"
+    description: "每个 Demo 定义自己的 ProcedureContext 接口和 context key，Procedure 间通过 fsm.setData/getData 传递上下文"
+    examples:
+      - file: RpgProcedureContext.ts
+        location: "assets/scripts/game/demo2-rpg/procedures/RpgProcedureContext.ts"
+        snippet: "export const RPG_PROCEDURE_CONTEXT_KEY = 'rpg_context'"
+    prevalence: common
+
+  - category: architecture
+    pattern: "Events 文件集中定义 EventKey"
+    description: "每个 Demo 在 events/ 目录下定义所有 EventKey"
+    examples:
+      - file: RpgEvents.ts
+        location: "assets/scripts/game/demo2-rpg/events/RpgEvents.ts"
+      - file: IdleEvents.ts
+        location: "assets/scripts/game/demo1-idle/events/IdleEvents.ts"
+    prevalence: common
+
+  - category: architecture
+    pattern: "Systems 目录封装业务逻辑"
+    description: "核心业务逻辑封装在 systems/ 目录下的类中，Procedure 和 FSM 调用 System 方法"
+    examples:
+      - file: BattleSystem.ts
+        location: "assets/scripts/game/demo2-rpg/systems/BattleSystem.ts"
+    prevalence: common
+
+  - category: naming
+    pattern: "Demo 文件命名：PascalCase + Demo 名称前缀"
+    description: "Demo 主类文件为 PascalCase（如 TurnBasedRpgDemo.ts），数据行文件为 PascalCase + ConfigRow 后缀"
+    prevalence: common
+
+  - category: structure
+    pattern: "每个 Demo 目录结构统一"
+    description: "data/ events/ fsm/ procedures/ systems/ ui/ 六个子目录"
+    prevalence: common
+
+# ═══════════════════════════════════════════════════════
+# 10. 开放问题与缺口
+# ═══════════════════════════════════════════════════════
+
+open_questions:
+  - question: "ChessPieceEntity 是否需要自定义 EntityFactory？"
+    context: |
+      MockEntityFactory 创建的 MockEntity 只有通用追踪属性，
+      Demo 3 的棋子需要 hp/atk/race/star/position 等业务属性。
+      两种方案：
+      1. 创建 ChessPieceEntity(extends EntityBase) + Demo3EntityFactory(implements IEntityFactory)
+      2. 在 DemoBase 注入的 MockEntityFactory 基础上，创建 ChessPieceEntity 并让 factory 按 groupName 返回不同类型
+      Demo 2 中的实体使用了 MockEntity，业务属性通过 data 参数和外部对象管理。
+    type: nice_to_know
+    affects: []
+
+  - question: "战斗加速（timeScale）是否影响准备阶段倒计时？"
+    context: |
+      TimerManager.timeScale 是全局的，战斗阶段设置 timeScale=2/4 会影响所有使用 useTimeScale 的定时器。
+      准备阶段倒计时应不受战斗加速影响，需要设置 useTimeScale: false，
+      或在战斗结束后重置 timeScale = 1。
+    type: nice_to_know
+    affects: []
+
+gaps:
+  - area: "Demo 3 代码目录"
+    description: "demo3-autochess 源码和测试目录均不存在，需要从头创建"
+    impact: research_blocker
+    affects: []
+  - area: "esbuild 构建脚本"
+    description: "package.json 中缺少 demo3:build / demo3:serve / demo3:dev 脚本和 dist/demo3/index.html"
+    impact: research_blocker
+    affects: []
