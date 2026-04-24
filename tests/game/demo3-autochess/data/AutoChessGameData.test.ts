@@ -136,8 +136,8 @@ describe('AutoChessGameData', () => {
             expect(gameData.hp).toBe(INITIAL_HP);
         });
 
-        it('round 应为 1', () => {
-            expect(gameData.round).toBe(1);
+        it('round 应为 0', () => {
+            expect(gameData.round).toBe(0);
         });
 
         it('boardPieces 应为空 Map', () => {
@@ -214,7 +214,7 @@ describe('AutoChessGameData', () => {
             // 验证
             expect(gameData.gold).toBe(INITIAL_GOLD);
             expect(gameData.hp).toBe(INITIAL_HP);
-            expect(gameData.round).toBe(1);
+            expect(gameData.round).toBe(0);
             expect(gameData.boardPieces.size).toBe(0);
             expect(gameData.benchPieces).toEqual([]);
             expect(gameData.shopSlots).toEqual([]);

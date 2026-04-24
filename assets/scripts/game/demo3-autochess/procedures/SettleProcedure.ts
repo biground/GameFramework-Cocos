@@ -114,10 +114,7 @@ export class SettleProcedure extends ProcedureBase {
             }
         }
 
-        // 回合递增
-        gameData.round++;
-
-        // 决定下一个流程
+        // 决定下一个流程（回合递增由 PrepareProcedure.onEnter 负责）
         if (gameData.hp <= 0) {
             Logger.info(TAG, 'HP 耗尽，进入游戏结束流程');
             this.changeProcedure(fsm, GameOverProcedure);

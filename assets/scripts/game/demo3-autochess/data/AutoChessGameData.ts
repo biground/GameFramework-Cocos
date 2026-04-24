@@ -108,8 +108,8 @@ export class AutoChessGameData {
     /** 当前生命值 */
     hp: number = INITIAL_HP;
 
-    /** 当前回合（从 1 开始） */
-    round: number = 1;
+    /** 当前回合（从 0 开始，PrepareProcedure 进入时递增为 1） */
+    round: number = 0;
 
     /** 棋盘棋子映射：'row,col' → pieceId */
     boardPieces: Map<string, number> = new Map();
@@ -138,7 +138,7 @@ export class AutoChessGameData {
     reset(): void {
         this.gold = INITIAL_GOLD;
         this.hp = INITIAL_HP;
-        this.round = 1;
+        this.round = 0;
         this.boardPieces = new Map();
         this.benchPieces = [];
         this.shopSlots = [];

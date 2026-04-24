@@ -139,7 +139,7 @@ describe('SettleProcedure', () => {
             expect(fsm.changeState).toHaveBeenCalledWith(PrepareProcedure);
         });
 
-        it('胜利时 round 递增', () => {
+        it('胜利时 round 不递增（由 PrepareProcedure 负责）', () => {
             const { ctx, gameData } = createTestContext();
             gameData.round = 5;
 
@@ -154,7 +154,7 @@ describe('SettleProcedure', () => {
             const proc = new SettleProcedure();
             proc.onEnter(fsm);
 
-            expect(gameData.round).toBe(6);
+            expect(gameData.round).toBe(5);
         });
     });
 
@@ -331,9 +331,7 @@ describe('GameOverProcedure', () => {
         // gameData 应已重置
         expect(gameData.gold).toBe(10); // INITIAL_GOLD
         expect(gameData.hp).toBe(100); // INITIAL_HP
-        expect(gameData.round).toBe(1);
-
-        // 应切换到 PrepareProcedure
+        expect(gameData.round).toBe(0);
         expect(fsm.changeState).toHaveBeenCalledWith(PrepareProcedure);
     });
 

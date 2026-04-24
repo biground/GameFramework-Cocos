@@ -10,7 +10,7 @@
 import { ProcedureBase } from '../../../framework/procedure/ProcedureBase';
 import { IFsm } from '../../../framework/fsm/FsmDefs';
 import { Logger } from '../../../framework/debug/Logger';
-import { AutoChessEvents, BASE_INCOME, REFRESH_COST, PREPARE_TIME_SECONDS } from '../AutoChessDefs';
+import { AutoChessEvents, REFRESH_COST, PREPARE_TIME_SECONDS } from '../AutoChessDefs';
 import { IAutoChessProcedureContext, AUTO_CHESS_CONTEXT_KEY } from './AutoChessProcedureContext';
 import { AutoChessGameData } from '../data/AutoChessGameData';
 import { ChessPieceConfigRow } from '../data/ChessPieceConfigRow';
@@ -110,32 +110,45 @@ export class PrepareProcedure extends ProcedureBase {
         this._gameData.round++;
         Logger.info(TAG, `准备阶段开始 — 第 ${this._gameData.round} 回合`);
 
-        // 2. 增加收入
-        const oldGold = this._gameData.gold;
-        this._gameData.gold += BASE_INCOME;
-        this._eventManager.emit(AutoChessEvents.GOLD_CHANGED, {
-            oldGold,
-            newGold: this._gameData.gold,
-        });
-        Logger.info(TAG, `收入 +${BASE_INCOME} 金币，当前 ${this._gameData.gold}`);
-
-        // 3. 刷新商店（如未锁定）
+        // 2. 刷新商店（如未锁定）
         if (!this._shopSystem.isLocked) {
             const configs = (this._dataTableManager?.getAllRows?.('chess_piece_config') ??
                 []) as unknown as ChessPieceConfigRow[];
             this._shopSystem.refreshShop(configs);
         }
 
-        // 4. 发射 ROUND_START 事件
+        // 3. 发射 ROUND_START 事件
         this._eventManager.emit(AutoChessEvents.ROUND_START, {
             round: this._gameData.round,
         });
 
-        // 5. 创建 30s 倒计时
+        // 4. 创建 30s 倒计时
         this._timerId = this._timerManager!.addTimer(PREPARE_TIME_SECONDS, () =>
             this.onPrepareComplete(),
         );
         Logger.info(TAG, `倒计时已启动: ${PREPARE_TIME_SECONDS}s`);
+
+        // 5. 设置准备阶段操作按钮
+        const rendererObj = this._renderer as Record<string, unknown> | null;
+        if (rendererObj && typeof rendererObj['setupPrepareButtons'] === 'function') {
+            (
+                rendererObj as {
+                    setupPrepareButtons: (cbs: {
+                        onBuy: (slotIndex: number) => void;
+                        onPlace: (row: number, col: number) => void;
+                        onRefresh: () => void;
+                        onReady: () => void;
+                        onLock: () => void;
+                    }) => void;
+                }
+            ).setupPrepareButtons({
+                onBuy: (slotIndex: number) => this.handleBuyPiece(slotIndex),
+                onPlace: (row: number, col: number) => this._handleAutoPlace(row, col),
+                onRefresh: () => this.handleRefreshShop(),
+                onReady: () => this.onPrepareComplete(),
+                onLock: () => this._handleToggleLock(),
+            });
+        }
 
         // 6. 渲染
         this._renderer?.log?.(`=== 第 ${this._gameData.round} 回合准备阶段 ===`);
@@ -325,6 +338,34 @@ export class PrepareProcedure extends ProcedureBase {
     }
 
     // ─── 私有方法 ──────────────────────────────────────
+
+    /**
+     * 自动放置：将备战席第一个棋子放到指定位置
+     *
+     * @param row 行号
+     * @param col 列号
+     */
+    private _handleAutoPlace(row: number, col: number): void {
+        if (!this._gameData || this._gameData.benchPieces.length === 0) {
+            return;
+        }
+        const firstBench = this._gameData.benchPieces[0];
+        this.handlePlacePiece(firstBench.id, row, col);
+    }
+
+    /**
+     * 切换商店锁定状态
+     */
+    private _handleToggleLock(): void {
+        if (!this._shopSystem) {
+            return;
+        }
+        if (this._shopSystem.isLocked) {
+            this._shopSystem.unlockShop();
+        } else {
+            this._shopSystem.lockShop();
+        }
+    }
 
     /**
      * 检查并执行合成

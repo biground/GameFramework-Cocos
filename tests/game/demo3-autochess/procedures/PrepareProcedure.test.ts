@@ -7,7 +7,6 @@ import { IFsm } from '@framework/fsm/FsmDefs';
 import { EventManager } from '@framework/event/EventManager';
 import {
     AutoChessEvents,
-    BASE_INCOME,
     REFRESH_COST,
     PREPARE_TIME_SECONDS,
 } from '@game/demo3-autochess/AutoChessDefs';
@@ -183,16 +182,16 @@ describe('PrepareProcedure', () => {
 
         it('应增加回合计数（round++）', () => {
             const { ctx, gameData } = createTestContext();
-            gameData.round = 1;
+            gameData.round = 0;
             const fsm = createMockFsm({ [AUTO_CHESS_CONTEXT_KEY]: ctx });
 
             const proc = new PrepareProcedure();
             proc.onEnter(fsm);
 
-            expect(gameData.round).toBe(2);
+            expect(gameData.round).toBe(1);
         });
 
-        it('应增加 BASE_INCOME 金币', () => {
+        it('onEnter 不应改变金币（收入由 SettleProcedure 负责）', () => {
             const { ctx, gameData } = createTestContext();
             gameData.gold = 10;
             const fsm = createMockFsm({ [AUTO_CHESS_CONTEXT_KEY]: ctx });
@@ -200,7 +199,7 @@ describe('PrepareProcedure', () => {
             const proc = new PrepareProcedure();
             proc.onEnter(fsm);
 
-            expect(gameData.gold).toBe(10 + BASE_INCOME);
+            expect(gameData.gold).toBe(10);
         });
 
         it('商店未锁定时应调用 shopSystem.refreshShop', () => {
@@ -227,15 +226,15 @@ describe('PrepareProcedure', () => {
 
         it('应发射 ROUND_START 事件', () => {
             const { ctx, eventManager, gameData } = createTestContext();
-            gameData.round = 1;
+            gameData.round = 0;
             const fsm = createMockFsm({ [AUTO_CHESS_CONTEXT_KEY]: ctx });
 
             const proc = new PrepareProcedure();
             proc.onEnter(fsm);
 
-            // round 在 onEnter 内已 +1，所以事件数据是 round=2
+            // round 在 onEnter 内已 +1，所以事件数据是 round=1
             expect(eventManager.emit).toHaveBeenCalledWith(AutoChessEvents.ROUND_START, {
-                round: 2,
+                round: 1,
             });
         });
 
@@ -253,18 +252,26 @@ describe('PrepareProcedure', () => {
             );
         });
 
-        it('应发射 GOLD_CHANGED 事件', () => {
-            const { ctx, eventManager, gameData } = createTestContext();
-            gameData.gold = 10;
+        it('renderer 有 setupPrepareButtons 时应调用按钮设置', () => {
+            const { ctx, renderer } = createTestContext();
+            // 给 renderer 添加 setupPrepareButtons mock
+            (renderer as Record<string, unknown>).setupPrepareButtons = jest.fn();
             const fsm = createMockFsm({ [AUTO_CHESS_CONTEXT_KEY]: ctx });
 
             const proc = new PrepareProcedure();
             proc.onEnter(fsm);
 
-            expect(eventManager.emit).toHaveBeenCalledWith(AutoChessEvents.GOLD_CHANGED, {
-                oldGold: 10,
-                newGold: 10 + BASE_INCOME,
-            });
+            expect(
+                (renderer as Record<string, jest.Mock>).setupPrepareButtons,
+            ).toHaveBeenCalledTimes(1);
+            const mockCalls = (renderer as Record<string, jest.Mock>).setupPrepareButtons.mock
+                .calls as unknown[][];
+            const callbacks = mockCalls[0][0] as Record<string, unknown>;
+            expect(callbacks).toHaveProperty('onBuy');
+            expect(callbacks).toHaveProperty('onPlace');
+            expect(callbacks).toHaveProperty('onRefresh');
+            expect(callbacks).toHaveProperty('onReady');
+            expect(callbacks).toHaveProperty('onLock');
         });
     });
 
@@ -292,7 +299,7 @@ describe('PrepareProcedure', () => {
             const proc = new PrepareProcedure();
             proc.onEnter(fsm);
 
-            // 金币在 onEnter 中已加 BASE_INCOME
+            // onEnter 不再改变金币
             const goldAfterEnter = gameData.gold;
 
             proc.handleBuyPiece(0);
