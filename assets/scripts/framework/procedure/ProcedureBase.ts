@@ -1,5 +1,6 @@
 import { FsmState } from '../fsm/FsmState';
 import { IFsm, Constructor, IFsmState } from '../fsm/FsmDefs';
+import { Logger } from '../debug/Logger';
 
 /**
  * 流程基类
@@ -33,5 +34,21 @@ export abstract class ProcedureBase extends FsmState<unknown> {
         procedureType: Constructor<T>,
     ): void {
         this.changeState(fsm, procedureType);
+    }
+
+    /**
+     * 从 FSM 数据中获取流程上下文（带 null 检查和错误日志）
+     * @param fsm FSM 实例
+     * @param key 上下文数据键
+     * @returns 类型安全的上下文对象
+     * @throws 如果上下文不存在
+     */
+    protected getContext<T>(fsm: IFsm<unknown>, key: string): T {
+        const ctx = fsm.getData<T>(key);
+        if (!ctx) {
+            Logger.error('ProcedureBase', `流程上下文 [${key}] 不存在`);
+            throw new Error(`[ProcedureBase] 流程上下文 [${key}] 不存在`);
+        }
+        return ctx;
     }
 }

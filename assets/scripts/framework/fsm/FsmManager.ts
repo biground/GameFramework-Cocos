@@ -24,7 +24,7 @@ export class FsmManager extends ModuleBase implements IFsmManager {
     private static readonly TAG = 'FsmManager';
 
     /** 状态机映射表：name → Fsm 实例 */
-    private _fsmMap: Map<string, Fsm<unknown>> = new Map();
+    private _fsmMap: Map<string, Fsm<unknown, Record<string, unknown>>> = new Map();
 
     /** 模块名称 */
     public get moduleName(): string {
@@ -68,12 +68,17 @@ export class FsmManager extends ModuleBase implements IFsmManager {
     /**
      * 创建有限状态机
      * @template T 状态机持有者类型
+     * @template TBlackboard 黑板数据类型，默认 Record<string, unknown>
      * @param name 状态机名称（同名状态机不可重复创建）
      * @param owner 状态机持有者
      * @param states 状态机包含的状态列表（至少一个）
      * @returns 创建的状态机实例
      */
-    public createFsm<T>(name: string, owner: T, ...states: IFsmState<T>[]): IFsm<T> {
+    public createFsm<T, TBlackboard = Record<string, unknown>>(
+        name: string,
+        owner: T,
+        ...states: IFsmState<T, TBlackboard>[]
+    ): IFsm<T, TBlackboard> {
         if (this._fsmMap.has(name)) {
             Logger.error(FsmManager.TAG, `已存在同名状态机: "${name}"`);
             throw new Error(`[FsmManager] 已存在同名状态机: "${name}"`);
@@ -82,8 +87,8 @@ export class FsmManager extends ModuleBase implements IFsmManager {
             Logger.error(FsmManager.TAG, `创建状态机 "${name}" 时状态列表不能为空`);
             throw new Error(`[FsmManager] 创建状态机 "${name}" 时状态列表不能为空`);
         }
-        const fsm = new Fsm<T>(name, owner, states);
-        this._fsmMap.set(name, fsm as unknown as Fsm<unknown>);
+        const fsm = new Fsm<T, TBlackboard>(name, owner, states);
+        this._fsmMap.set(name, fsm as unknown as Fsm<unknown, Record<string, unknown>>);
         Logger.debug(FsmManager.TAG, `创建状态机: ${name}, states=${states.length}`);
         return fsm;
     }

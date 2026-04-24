@@ -22,6 +22,25 @@ abstract class ProcedureBase extends FsmState<unknown>
   onLeave(fsm): void         // 离开流程
   onDestroy(fsm): void       // 流程销毁
   protected changeProcedure<T>(fsm, procedureType): void  // 便捷切换方法
+  protected getContext<T>(fsm, key): T  // 从 FSM 数据中获取类型安全的上下文
+```
+
+## getContext 便捷方法
+
+`ProcedureBase.getContext<T>(fsm, key)` 封装了 `fsm.getData<T>(key)` 并添加 null 检查，
+失败时通过 Logger 输出错误并抛出异常，避免流程中散落的空值判断。
+
+### 用法
+
+```typescript
+class BattleProcedure extends ProcedureBase {
+    onEnter(fsm: IFsm<unknown>): void {
+        // 获取流程上下文（类型安全 + 自动空值守卫）
+        const ctx = this.getContext<IBattleContext>(fsm, 'battleContext');
+        // ctx 保证非空，可直接使用
+        ctx.renderer.showBattleUI();
+    }
+}
 ```
 
 ## 设计决策
