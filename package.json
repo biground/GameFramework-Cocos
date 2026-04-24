@@ -9,16 +9,7 @@
         "test": "jest --config jest.config.js",
         "test:watch": "jest --watch",
         "test:coverage": "jest --coverage",
-        "prepare": "husky",
-        "demo1:build": "esbuild assets/scripts/game/demo1-idle/index.ts --bundle --outfile=dist/demo1/demo1.js --platform=browser --format=iife --tsconfig=tsconfig.json --alias:@framework=./assets/scripts/framework --alias:@game=./assets/scripts/game --alias:@utils=./assets/scripts/utils --alias:@runtime=./assets/scripts/runtime",
-        "demo1:serve": "npm run demo1:build && npx serve dist/demo1 -p 3001",
-        "demo2:build": "esbuild assets/scripts/game/demo2-rpg/main.ts --bundle --outfile=dist/demo2/demo2.js --platform=browser --format=iife --tsconfig=tsconfig.json --alias:@framework=./assets/scripts/framework --alias:@game=./assets/scripts/game --alias:@utils=./assets/scripts/utils --alias:@runtime=./assets/scripts/runtime",
-        "demo2:serve": "npx serve dist/demo2 -p 3002",
-        "demo2:dev": "npm run demo2:build && npm run demo2:serve",
-        "demo3:build": "esbuild assets/scripts/game/demo3-autochess/main.ts --bundle --outfile=dist/demo3/demo3.js --platform=browser --format=iife --tsconfig=tsconfig.json --alias:@framework=./assets/scripts/framework --alias:@game=./assets/scripts/game --alias:@utils=./assets/scripts/utils --alias:@runtime=./assets/scripts/runtime",
-        "demo3:serve": "npm run demo3:build && npx serve dist/demo3 -p 3003",
-        "demo3:dev": "npm run demo3:build && npm run demo3:serve",
-        "test:e2e": "npx playwright test"
+        "prepare": "husky"
     },
     "keywords": [
         "cocos-creator",
@@ -35,7 +26,6 @@
         "@types/jest": "^29.5.14",
         "@typescript-eslint/eslint-plugin": "^7.0.0",
         "@typescript-eslint/parser": "^7.0.0",
-        "esbuild": "^0.28.0",
         "eslint": "^8.57.0",
         "eslint-config-prettier": "^9.1.0",
         "eslint-plugin-prettier": "^5.1.0",
