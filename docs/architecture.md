@@ -12,7 +12,8 @@
 ```
 ┌──────────────────────────────────────┐
 │           Game Layer（业务层）          │
-│      assets/scripts/game/            │
+│  各 demo worktree 分支的              │
+│  assets/scripts/game/               │
 │    具体的游戏逻辑、UI、战斗等           │
 ├──────────────────────────────────────┤
 │         Runtime Layer（适配层）         │
@@ -23,6 +24,9 @@
 │      assets/scripts/framework/       │
 │    纯 TypeScript，不依赖任何引擎 API    │
 └──────────────────────────────────────┘
+```
+
+> **注意**：Game 层已从 main 分支分离到独立的 git worktree 分支中（`.worktrees/demo1`、`.worktrees/demo2`、`.worktrees/demo3`），main 分支为纯框架仓库。
 ```
 
 ## 核心原则

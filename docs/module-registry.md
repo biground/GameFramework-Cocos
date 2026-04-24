@@ -3,6 +3,8 @@
 > **Agent 提示**：当你需要修改或创建模块时，必须先读此文件了解全局依赖关系。
 > 当你完成一个模块后，必须更新此文件。
 
+> **Demo Worktree 分离**：main 分支为纯框架仓库，Demo 业务代码已分离到独立的 git worktree 分支中（`feature/demo1-idle`、`feature/demo2-rpg`、`feature/demo3-autochess`）。框架模块开发和测试在 main 分支上进行，Demo 相关开发在对应 worktree 中进行。
+
 ## 模块依赖关系图
 
 ```

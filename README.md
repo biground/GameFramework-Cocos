@@ -110,12 +110,48 @@ assets/scripts/
 │   ├── hotupdate/    # 热更新
 │   └── interfaces/   # 模块接口定义
 ├── runtime/          # 适配层（桥接引擎 API）
-└── game/             # 业务层
+└── utils/            # 工具函数
 packages/
 ├── fbi-ecs/          # ECS 插件
 ├── fbi-timer-heap/   # 最小堆定时器
 └── fbi-timer-wheel/  # 时间轮定时器
+tests/                # 测试目录（镜像 framework/ 结构）
+├── __mocks__/        # Cocos Creator cc 模块全局 Mock
+└── {module}/         # 各模块单元测试
 ```
+
+> **注意**：Demo 业务代码（Game 层）已分离到独立的 git worktree 分支中，详见 [Demo 项目](#demo-项目)。
+
+## Demo 项目
+
+Demo 业务代码（Game 层）已从 main 分支分离到独立的 git worktree 分支中，main 分支保持纯框架仓库。
+
+| Demo | 分支 | Worktree 路径 | 说明 |
+| --- | --- | --- | --- |
+| Demo 1 — Idle Clicker | `feature/demo1-idle` | `.worktrees/demo1` | 放置类挂机游戏 |
+| Demo 2 — Turn-based RPG | `feature/demo2-rpg` | `.worktrees/demo2` | 回合制 RPG |
+| Demo 3 — Auto Chess | `feature/demo3-autochess` | `.worktrees/demo3` | 自走棋 |
+
+### 切换到 Demo Worktree
+
+```bash
+# 查看所有 worktree
+git worktree list
+
+# 进入某个 demo worktree
+cd .worktrees/demo1
+
+# 在 worktree 中运行 demo
+npm run demo1:serve     # Idle Clicker Demo（端口 3001）
+npm run demo2:serve     # Turn-based RPG Demo（端口 3002）
+npm run demo3:serve     # Auto Chess Demo（端口 3003）
+
+# 运行 E2E 测试（在 demo2 worktree 中）
+cd .worktrees/demo2
+npm run test:e2e
+```
+
+每个 worktree 分支包含 `assets/scripts/game/`（shared + demo 代码）和对应的测试文件。
 
 ## 文档
 
