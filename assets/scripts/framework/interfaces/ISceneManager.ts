@@ -14,7 +14,7 @@ export interface ISceneManager {
     /**
      * 设置场景加载器（策略注入）
      * 必须在加载场景之前调用
-     * @param loader 场景加载器实现
+     * @param loader 场景加载器实现，不能为 null/undefined，否则抛错
      */
     setSceneLoader(loader: ISceneLoader): void;
 

@@ -37,6 +37,12 @@ export class UIManager extends ModuleBase implements IUIManager {
      */
     private readonly _openForms: Map<string, UIFormBase[]> = new Map();
 
+    /**
+     * 正在创建中的表单名集合（去重用）
+     * 非 allowMultiple 表单在 factory.createForm 回调返回前，重复 openForm 会被忽略。
+     */
+    private readonly _pendingForms: Set<string> = new Set();
+
     /** 表单工厂（由 Runtime 层注入） */
     private _factory: IUIFormFactory | null = null;
 
@@ -68,6 +74,7 @@ export class UIManager extends ModuleBase implements IUIManager {
         this._formConfigs.clear();
         this._groups.clear();
         this._openForms.clear();
+        this._pendingForms.clear();
     }
 
     // ─── IUIManager 实现 ──────────────────────────────
@@ -104,7 +111,14 @@ export class UIManager extends ModuleBase implements IUIManager {
     }
 
     /**
-     * 打开表单
+     * 打开表单（异步）
+     * 内部流程：
+     * 1. 校验注册/去重/factory；
+     * 2. 调 factory.createForm(callbacks)，等待 Factory 完成资源加载与实例化；
+     * 3. onSuccess：入栈、onCover 通知、onOpen、状态更新、上抛 callbacks.onSuccess；
+     * 4. onFailure：Logger.error，不入栈，上抛 callbacks.onFailure。
+     *
+     * openForm 对调用方返回 void，实际入栈与 onOpen 发生在 Factory 回调时。
      */
     public openForm(formName: string, data?: unknown, callbacks?: OpenFormCallbacks): void {
         // 1. 检查是否已注册
@@ -114,10 +128,16 @@ export class UIManager extends ModuleBase implements IUIManager {
             throw new Error(`[UIManager] 表单 "${formName}" 未注册，请先调用 registerForm`);
         }
 
-        // 2. 非 allowMultiple 时，已打开则忽略
-        if (!config.allowMultiple && (this._openForms.get(formName)?.length ?? 0) > 0) {
-            Logger.debug(UIManager.TAG, `表单已打开, 忽略: ${formName}`);
-            return;
+        // 2. 非 allowMultiple 时，已打开或正在创建则忽略（去重）
+        if (!config.allowMultiple) {
+            if ((this._openForms.get(formName)?.length ?? 0) > 0) {
+                Logger.debug(UIManager.TAG, `表单已打开, 忽略: ${formName}`);
+                return;
+            }
+            if (this._pendingForms.has(formName)) {
+                Logger.debug(UIManager.TAG, `表单正在创建, 忽略重复调用: ${formName}`);
+                return;
+            }
         }
 
         // 3. 检查 factory
@@ -126,30 +146,58 @@ export class UIManager extends ModuleBase implements IUIManager {
             throw new Error('[UIManager] 未设置 UIFormFactory，请先调用 setUIFormFactory');
         }
 
-        // 4. 通过 factory 创建表单实例
-        const form = this._factory.createForm(formName, config, null);
+        if (!config.allowMultiple) {
+            this._pendingForms.add(formName);
+        }
+
+        // 4. 异步创建
+        this._factory.createForm(formName, config, {
+            onSuccess: (form: UIFormBase) => {
+                this._pendingForms.delete(formName);
+                this._onFormCreated(formName, config, form, data, callbacks);
+            },
+            onFailure: (error: Error) => {
+                this._pendingForms.delete(formName);
+                Logger.error(
+                    UIManager.TAG,
+                    `打开表单失败: ${formName}, ${error?.message ?? error}`,
+                );
+                callbacks?.onFailure?.(formName, error);
+            },
+        });
+    }
+
+    /**
+     * Factory 成功回调后的入栈与生命周期触发
+     */
+    private _onFormCreated(
+        formName: string,
+        config: UIFormConfig,
+        form: UIFormBase,
+        data: unknown,
+        callbacks: OpenFormCallbacks | undefined,
+    ): void {
         const group = this._getGroup(config.layer);
 
-        // 5. 通知旧栈顶 onCover()
+        // 通知旧栈顶 onCover()
         const pauseCovered = config.pauseCoveredForm !== false; // 默认 true
         if (pauseCovered && group.length > 0) {
             const topForm = group[group.length - 1];
             topForm.onCover();
         }
 
-        // 6. 推入栈 + 记录
+        // 推入栈 + 记录
         group.push(form);
         const instances = this._openForms.get(formName) ?? [];
         instances.push(form);
         this._openForms.set(formName, instances);
         form._setOpen(true);
 
-        // 7. 调用 onOpen
+        // 调用 onOpen
         form.onOpen(data);
 
         Logger.debug(UIManager.TAG, `打开表单: ${formName}`);
 
-        // 8. 成功回调
         callbacks?.onSuccess?.(formName, form);
     }
 

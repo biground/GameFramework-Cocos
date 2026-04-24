@@ -1,6 +1,7 @@
 import { UIManager } from '@framework/ui/UIManager';
 import { UIFormBase } from '@framework/ui/UIFormBase';
-import { IUIFormFactory, UIFormConfig, UILayer } from '@framework/ui/UIDefs';
+import { IUIFormFactory, UIFormConfig, UIFormCreateCallbacks, UILayer } from '@framework/ui/UIDefs';
+import { Logger } from '@framework/debug/Logger';
 
 // ─── Mock 工具 ──────────────────────────────────────
 
@@ -53,15 +54,57 @@ class MockUIForm extends UIFormBase {
 
 /**
  * Mock UIFormFactory：根据注册配置创建 MockUIForm
+ *
+ * 默认同步模式：createForm 立即调 callbacks.onSuccess。
+ * 设置 deferred=true 后，createForm 把请求压入 pending，需手动调 resolvePending/rejectPending。
+ * 设置 failureToThrow 后，createForm 立即调 callbacks.onFailure。
  */
 class MockUIFormFactory implements IUIFormFactory {
     readonly created: MockUIForm[] = [];
     readonly destroyed: UIFormBase[] = [];
+    readonly pending: Array<{
+        formName: string;
+        config: UIFormConfig;
+        callbacks: UIFormCreateCallbacks;
+    }> = [];
 
-    createForm(formName: string, config: UIFormConfig, _asset: unknown): UIFormBase {
+    /** createForm 被调用的次数（含所有模式） */
+    createFormCalls = 0;
+
+    /** 若为 true，createForm 不立即回调，需手动调 resolvePending/rejectPending */
+    deferred = false;
+
+    /** 若非 null，createForm 立即回调 onFailure 并抛出该错误 */
+    failureToThrow: Error | null = null;
+
+    createForm(formName: string, config: UIFormConfig, callbacks: UIFormCreateCallbacks): void {
+        this.createFormCalls++;
+        if (this.failureToThrow) {
+            callbacks.onFailure(this.failureToThrow);
+            return;
+        }
+        if (this.deferred) {
+            this.pending.push({ formName, config, callbacks });
+            return;
+        }
         const form = new MockUIForm(formName, config.layer);
         this.created.push(form);
+        callbacks.onSuccess(form);
+    }
+
+    /** 手动完成 deferred 模式下的某次 createForm 请求 */
+    resolvePending(index = 0): MockUIForm {
+        const p = this.pending[index];
+        const form = new MockUIForm(p.formName, p.config.layer);
+        this.created.push(form);
+        p.callbacks.onSuccess(form);
         return form;
+    }
+
+    /** 手动失败 deferred 模式下的某次 createForm 请求 */
+    rejectPending(index = 0, error: Error = new Error('mock failure')): void {
+        const p = this.pending[index];
+        p.callbacks.onFailure(error);
     }
 
     destroyForm(form: UIFormBase): void {
@@ -224,6 +267,84 @@ describe('UIManager', () => {
             manager.closeForm('DamageNum');
             expect(factory.destroyed.length).toBe(2);
             expect(manager.hasForm('DamageNum')).toBe(false); // 全部关闭
+        });
+    });
+
+    // ─── 异步 Factory 行为 ─────────────────────────────
+
+    describe('openForm 异步 Factory 行为', () => {
+        beforeEach(() => {
+            manager.registerForm('MainPanel', { path: 'ui/main', layer: UILayer.Normal });
+        });
+
+        it('factory.onSuccess 前不入栈；回调后才 hasForm/触发 onOpen', () => {
+            factory.deferred = true;
+            const onSuccess = jest.fn();
+            manager.openForm('MainPanel', { id: 1 }, { onSuccess });
+
+            // 回调前：pending 有一项，栈空，onSuccess 未触发
+            expect(factory.pending.length).toBe(1);
+            expect(manager.hasForm('MainPanel')).toBe(false);
+            expect(onSuccess).not.toHaveBeenCalled();
+
+            // 回调后：表单入栈 + onOpen + 外部 onSuccess
+            const form = factory.resolvePending(0);
+            expect(manager.hasForm('MainPanel')).toBe(true);
+            expect(form.calls).toContain('onOpen');
+            expect(form.lastOpenData).toEqual({ id: 1 });
+            expect(onSuccess).toHaveBeenCalledWith('MainPanel', form);
+        });
+
+        it('factory 回调 onFailure 时，form 不入栈且记录 error 日志', () => {
+            factory.failureToThrow = new Error('prefab 加载失败');
+            const errorSpy = jest.spyOn(Logger, 'error').mockImplementation(() => {});
+            const onFailure = jest.fn();
+
+            manager.openForm('MainPanel', undefined, { onFailure });
+
+            expect(manager.hasForm('MainPanel')).toBe(false);
+            expect(factory.created.length).toBe(0);
+            expect(onFailure).toHaveBeenCalledWith('MainPanel', expect.any(Error));
+            expect(errorSpy).toHaveBeenCalled();
+            const tagArg = errorSpy.mock.calls[0][0];
+            const msgArg = errorSpy.mock.calls[0][1];
+            expect(tagArg).toBe('UIManager');
+            expect(String(msgArg)).toContain('prefab 加载失败');
+
+            errorSpy.mockRestore();
+        });
+
+        it('openForm 同一 formName 连续两次（创建中），只 createForm 一次', () => {
+            factory.deferred = true;
+            manager.openForm('MainPanel');
+            manager.openForm('MainPanel'); // 正在创建，应被忽略
+
+            expect(factory.createFormCalls).toBe(1);
+            expect(factory.pending.length).toBe(1);
+
+            // 回调后仍然只有一个实例
+            factory.resolvePending(0);
+            expect(factory.created.length).toBe(1);
+
+            // 第三次（已打开）也应被忽略
+            manager.openForm('MainPanel');
+            expect(factory.createFormCalls).toBe(1);
+        });
+
+        it('失败回调清除 pending，后续可重新尝试打开', () => {
+            factory.failureToThrow = new Error('第一次失败');
+            const errorSpy = jest.spyOn(Logger, 'error').mockImplementation(() => {});
+
+            manager.openForm('MainPanel');
+            expect(factory.createFormCalls).toBe(1);
+
+            // 清除失败，再开一次应能真正创建
+            factory.failureToThrow = null;
+            manager.openForm('MainPanel');
+            expect(factory.createFormCalls).toBe(2);
+            expect(manager.hasForm('MainPanel')).toBe(true);
+
+            errorSpy.mockRestore();
         });
     });
 
