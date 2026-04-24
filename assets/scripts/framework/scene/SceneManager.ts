@@ -74,9 +74,13 @@ export class SceneManager extends ModuleBase implements ISceneManager {
 
     /**
      * 设置场景加载器
-     * @param loader 场景加载器实现
+     * @param loader 场景加载器实现，不能为 null/undefined，否则抛错
      */
     public setSceneLoader(loader: ISceneLoader): void {
+        if (!loader) {
+            Logger.error(SceneManager.TAG, 'loader 不能为空');
+            throw new Error('[SceneManager] loader 不能为空');
+        }
         this._sceneLoader = loader;
     }
 

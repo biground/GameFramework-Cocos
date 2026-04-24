@@ -28,10 +28,12 @@ export interface IUIManager {
     registerForm(formName: string, config: UIFormConfig): void;
 
     /**
-     * 打开表单
-     * - 已打开（非 allowMultiple）：忽略，直接返回
-     * - allowMultiple=true：每次调用创建新实例，closeForm 按 LIFO 顺序关闭
-     * - 资源加载由注入的 IUIFormFactory 实现负责
+     * 打开表单（异步）
+     * - 资源加载与实例化由注入的 IUIFormFactory 负责，UIManager 通过 Factory 的
+     *   onSuccess/onFailure 回调完成入栈与通知。
+     * - 已打开（非 allowMultiple）或创建中：忽略，直接返回。
+     * - allowMultiple=true：每次调用创建新实例，closeForm 按 LIFO 顺序关闭。
+     * - openForm 对调用方返回 void；如需在表单真正打开后执行动作，使用 callbacks.onSuccess。
      *
      * @param formName 表单名称
      * @param data 传递给 onOpen 的业务数据（可选）

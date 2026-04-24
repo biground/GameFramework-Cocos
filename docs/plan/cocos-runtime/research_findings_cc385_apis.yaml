@@ -1,0 +1,470 @@
+plan_id: cocos-runtime
+objective: 调研 Cocos Creator 3.8.5 引擎侧资源 / 场景 / UI 关键 API，为 packages/fbi-cc-385 runtime 策略实现做准备
+focus_area: cc385_api_surface
+created_at: 2026-04-24
+created_by: gem-researcher
+status: completed
+
+tldr: |
+  - 资源加载统一入口是 `assetManager.loadAny` / `bundle.load`，`resources` 是 `Bundle` 的默认实例（对应 assets/resources/），签名支持 path + 类型构造器 + onProgress + onComplete。
+  - 3.x 资源生命周期走 **引用计数**：`Asset.addRef()` / `decRef(autoRelease=true)`；业务层应持有资源期间 addRef，释放时 decRef，框架 ResourceManager 的 refCount 应与此对齐。
+  - 场景切换用 `director.loadScene(sceneName, onLaunched?)`（自动查 bundle），事件 `Director.EVENT_BEFORE_SCENE_LOADING` / `EVENT_BEFORE_SCENE_LAUNCH` / `EVENT_AFTER_SCENE_LAUNCH`。
+  - UI 实例化使用 `instantiate(prefab: Prefab): Node`（来自 cocos/serialization/instantiate.ts），根节点获取用 `director.getScene().getChildByName('Canvas')`，Cocos 3.x 没有 UI 层级枚举，层级靠 siblingIndex；`Layers` 是射线/掩码用途，不是 UI 栈。
+  - 所有关键符号从 `'cc'` 一个入口导入。
+
+research_metadata:
+  methodology: list_dir 定位目录 → grep_search 定位符号 → read_file 精读签名与 JSDoc
+  scope: asset-manager、director、scene-graph、serialization、2d/framework
+  confidence: high
+  coverage: 80
+  decision_blockers: 0
+  research_blockers: 0
+
+files_analyzed:
+  - file: asset-manager.ts
+    path: cocos-engine/cocos/asset/asset-manager/asset-manager.ts
+    purpose: 资源管理总入口，导出为 `assetManager` 单例，提供 loadAny / preloadAny / loadRemote / loadBundle / releaseAsset / releaseUnusedAssets / releaseAll
+    key_elements:
+      - element: loadAny
+        type: method
+        location: asset-manager.ts:536-542
+        description: "签名 (requests, options?, onProgress?, onComplete?) => void；onProgress(finished, total, item: RequestItem)；onComplete(err, data)"
+      - element: preloadAny
+        type: method
+        location: asset-manager.ts:584
+        description: 只下载不解析，后续仍需 loadAny 完成解析
+      - element: loadRemote
+        type: method
+        location: asset-manager.ts:633-635
+        description: 远程 URL 加载，通过扩展名或 options.ext 判断类型
+      - element: loadBundle
+        type: method
+        location: asset-manager.ts:691-693
+        description: 加载 Bundle（分包），回调 (err, Bundle)
+      - element: releaseAsset
+        type: method
+        location: asset-manager.ts:738
+        description: 强制释放指定资源及其依赖，调用 releaseManager.tryRelease(asset, true)
+      - element: releaseUnusedAssets
+        type: method
+        location: asset-manager.ts:752
+        description: 对缓存里所有资源尝试释放（只释放 refCount=0 的），非强制
+      - element: releaseAll
+        type: method
+        location: asset-manager.ts:766
+        description: 强制释放所有缓存资源（慎用）
+    language: typescript
+
+  - file: bundle.ts
+    path: cocos-engine/cocos/asset/asset-manager/bundle.ts
+    purpose: Bundle 类，提供按路径加载；`resources` 是默认实例，对应 assets/resources 目录
+    key_elements:
+      - element: Bundle.load
+        type: method
+        location: bundle.ts:225-249
+        description: |
+          签名重载 (paths, type?, onProgress?, onComplete?) => void；内部转调 assetManager.loadAny，
+          附带 options = { __requestType__: PATH, type, bundle, __outputAsArray__ }
+      - element: Bundle.preload / preloadDir / loadDir
+        type: method
+        location: bundle.ts:290-420
+        description: 按目录/路径批量预加载与加载
+      - element: Bundle.loadScene
+        type: method
+        location: bundle.ts:443-495
+        description: "(sceneName, options?, onProgress?, onComplete) => void；回调 data 为 SceneAsset，含 .scene (Scene)"
+      - element: resources (export)
+        type: variable
+        location: bundle.ts (export const resources) + asset-manager/index.ts:29
+        description: 默认 Bundle 实例，对应 assets/resources/
+    language: typescript
+
+  - file: asset.ts
+    path: cocos-engine/cocos/asset/assets/asset.ts
+    purpose: 所有资源基类，暴露引用计数 API
+    key_elements:
+      - element: refCount (getter)
+        type: accessor
+        location: asset.ts:300
+        description: 当前引用计数
+      - element: addRef
+        type: method
+        location: asset.ts:315
+        description: 引用 +1，阻止自动释放
+      - element: decRef
+        type: method
+        location: asset.ts:330
+        description: 引用 -1，默认 autoRelease=true，归零时 releaseManager.tryRelease(this)
+    language: typescript
+
+  - file: director.ts
+    path: cocos-engine/cocos/game/director.ts
+    purpose: 运行时主循环 / 场景切换 / 生命周期事件枢纽
+    key_elements:
+      - element: loadScene
+        type: method
+        location: director.ts:407
+        description: "(sceneName: string, onLaunched?, onUnloaded?) => boolean；内部查找 assetManager.bundles 并调 bundle.loadScene → runSceneImmediate；正在加载中再次调用会 warn 并返回 false"
+      - element: preloadScene
+        type: method
+        location: director.ts:447+
+        description: 预加载场景，后续仍需 loadScene 启动
+      - element: runScene
+        type: method
+        location: director.ts:388
+        description: 传入 Scene 或 SceneAsset，延后到 EVENT_END_FRAME 后调 runSceneImmediate
+      - element: runSceneImmediate
+        type: method
+        location: director.ts:276-378
+        description: 立即切换场景（emit BEFORE_SCENE_LAUNCH → 建立场景 → emit AFTER_SCENE_LAUNCH）
+      - element: getScene
+        type: method
+        location: director.ts:512
+        description: "返回 Scene | null；文档示例：`director.getScene().getChildByName('Canvas')` 获取 Canvas 根节点"
+      - element: EVENT_BEFORE_SCENE_LOADING
+        type: const
+        location: director.ts:83
+        description: 'director_before_scene_loading'
+      - element: EVENT_BEFORE_SCENE_LAUNCH
+        type: const
+        location: director.ts:90
+        description: 'director_before_scene_launch'
+      - element: EVENT_AFTER_SCENE_LAUNCH
+        type: const
+        location: director.ts:97
+        description: 'director_after_scene_launch'
+    language: typescript
+
+  - file: instantiate.ts
+    path: cocos-engine/cocos/serialization/instantiate.ts
+    purpose: 通用对象克隆 / Prefab 实例化
+    key_elements:
+      - element: instantiate(prefab)
+        type: function
+        location: instantiate.ts:62
+        description: "重载 1：`(prefab: Prefab) => Node` —— Prefab 实例化为 Node"
+      - element: instantiate<T>(original)
+        type: function
+        location: instantiate.ts:81
+        description: "重载 2：`<T>(original: T) => T` —— 深克隆普通对象或 Node"
+    language: typescript
+
+  - file: prefab.ts
+    path: cocos-engine/cocos/scene-graph/prefab/prefab.ts
+    purpose: Prefab Asset 定义
+    key_elements:
+      - element: class Prefab extends Asset
+        type: class
+        location: prefab.ts:75
+        description: 从 scene-graph/index.ts 导出，cc 命名空间统一导出
+    language: typescript
+
+  - file: canvas.ts
+    path: cocos-engine/cocos/2d/framework/canvas.ts
+    purpose: UI 根组件，挂在 Canvas 节点上，继承 RenderRoot2D
+    key_elements:
+      - element: class Canvas extends RenderRoot2D
+        type: class
+        location: canvas.ts:59
+        description: 场景中每个 Canvas 节点必须挂此组件；Cocos 3.x 不提供 UILayer 枚举，UI 层级靠 Canvas 下的子节点 siblingIndex 管理
+    language: typescript
+
+  - file: ui-transform.ts
+    path: cocos-engine/cocos/2d/framework/ui-transform.ts
+    purpose: UI 节点的尺寸 / 锚点组件（2D 对齐、事件命中）
+    key_elements:
+      - element: class UITransform extends Component
+        type: class
+        location: ui-transform.ts:55
+    language: typescript
+
+  - file: node.ts
+    path: cocos-engine/cocos/scene-graph/node.ts
+    purpose: 场景节点，UI / 3D 通用
+    key_elements:
+      - element: getChildByName
+        type: method
+        location: node.ts:545
+        description: 按 name 查找直接子节点，未命中返回 null
+      - element: setSiblingIndex
+        type: method
+        location: node.ts:624
+        description: 设置在父节点 children 数组中的顺序（UI 栈效果的关键）
+      - element: layer (getter/setter)
+        type: accessor
+        location: node.ts:1766-1781
+        description: "Node.layer 是 BitMask 类型（射线检测 / 物理用），不是 UI 层级；默认 `Layers.Enum.DEFAULT`，UI 节点一般为 `Layers.Enum.UI_2D`"
+    language: typescript
+
+  - file: layers.ts
+    path: cocos-engine/cocos/scene-graph/layers.ts
+    purpose: 提供节点 layer 枚举（射线 / 物理用途，非 UI 栈）
+    key_elements:
+      - element: Layers.Enum
+        type: const
+        location: layers.ts:65
+        description: "内置：NONE, IGNORE_RAYCAST, GIZMOS, EDITOR, UI_3D, SCENE_GIZMO, UI_2D, PROFILER, DEFAULT, ALL"
+    language: typescript
+
+  - file: asset-manager/index.ts
+    path: cocos-engine/cocos/asset/asset-manager/index.ts
+    purpose: 资源模块导出聚合
+    key_elements:
+      - element: export assetManager, AssetManager
+        type: export
+        location: index.ts:28
+      - element: export resources
+        type: export
+        location: index.ts:29
+    language: typescript
+
+patterns_found:
+  - category: api_shape
+    pattern: callback-first-with-overloads
+    description: 所有加载类 API 全部是 callback 风格（不是 Promise），支持 (path, type?, onProgress?, onComplete?) 重载组合
+    examples:
+      - file: bundle.ts
+        location: "225-249"
+        snippet: "public load<T extends Asset>(paths, type?, onProgress?, onComplete?): void"
+    prevalence: common
+
+  - category: lifecycle
+    pattern: reference-counting
+    description: "资源通过 Asset.addRef / decRef 管理生命周期；autoRelease=true 时 decRef 归零触发 releaseManager.tryRelease"
+    examples:
+      - file: asset.ts
+        location: "315-340"
+        snippet: "addRef(): Asset { this._ref++; return this; }  decRef(autoRelease=true)"
+    prevalence: common
+
+  - category: event
+    pattern: director-scene-events
+    description: 场景切换通过 Director 的 emit 事件通知（BEFORE_SCENE_LOADING / BEFORE_SCENE_LAUNCH / AFTER_SCENE_LAUNCH），可供 SceneManager 监听
+    examples:
+      - file: director.ts
+        location: "83-97, 353, 375"
+        snippet: "this.emit(Director.EVENT_BEFORE_SCENE_LAUNCH, scene); ... this.emit(Director.EVENT_AFTER_SCENE_LAUNCH, scene);"
+    prevalence: common
+
+related_architecture:
+  components_relevant_to_domain:
+    - component: assetManager (singleton)
+      responsibility: 资源加载 / 缓存 / 释放总入口
+      location: cocos/asset/asset-manager/asset-manager.ts
+      relationship_to_domain: CocosResourceLoader 策略必须桥接 assetManager / resources
+    - component: director (singleton)
+      responsibility: 主循环 + 场景切换 + 生命周期事件
+      location: cocos/game/director.ts
+      relationship_to_domain: CocosSceneLoader 策略通过 director.loadScene 实现框架 ISceneLoader
+    - component: instantiate (function)
+      responsibility: Prefab → Node 实例化
+      location: cocos/serialization/instantiate.ts
+      relationship_to_domain: CocosUIRenderer 用它把 Prefab 变成 Node，再 addChild 到 Canvas
+    - component: Canvas Node
+      responsibility: UI 根容器
+      location: 场景里手动搭建，通过 director.getScene().getChildByName('Canvas') 拿
+      relationship_to_domain: CocosUIRenderer 的挂载锚点
+  data_flow_involving_domain: |
+    框架 ResourceManager.load(path) → runtime CocosResourceLoader.loadAsset(path, callbacks) →
+    resources.load(path, type, onProgress, (err, asset) => { asset.addRef(); callbacks.onLoad(asset); })
+
+related_technology_stack:
+  languages_used_in_domain: [TypeScript]
+  frameworks_used_in_domain:
+    - name: Cocos Creator
+      usage_in_domain: 3.8.5 运行时 API
+
+import_paths:
+  everything_from_cc:
+    - assetManager
+    - resources
+    - AssetManager
+    - Asset
+    - Bundle
+    - SpriteFrame
+    - Texture2D
+    - AudioClip
+    - JsonAsset
+    - TextAsset
+    - SceneAsset
+    - Prefab
+    - director
+    - Director
+    - Scene
+    - Node
+    - instantiate
+    - Canvas
+    - UITransform
+    - Component
+    - Layers
+  example: |
+    import { assetManager, resources, Asset, Prefab, SpriteFrame, director, Director, instantiate, Node, UITransform, Layers } from 'cc';
+
+scene_api:
+  load:
+    entry: director.loadScene
+    signature: "(sceneName: string, onLaunched?: (err, scene) => void, onUnloaded?: () => void) => boolean"
+    file: cocos/game/director.ts:407
+    notes: "返回 boolean（正在加载返回 false）；内部自动在 assetManager.bundles 里找包含该场景的 bundle"
+  preload:
+    entry: director.preloadScene
+    signature: "(sceneName: string, onLoaded?: (err) => void) => void"
+    file: cocos/game/director.ts:447
+  run_scene_immediate:
+    entry: director.runSceneImmediate
+    signature: "(scene: Scene | SceneAsset, onBeforeLoadScene?, onLaunched?) => void"
+  events:
+    - Director.EVENT_BEFORE_SCENE_LOADING ('director_before_scene_loading')
+    - Director.EVENT_BEFORE_SCENE_LAUNCH ('director_before_scene_launch')
+    - Director.EVENT_AFTER_SCENE_LAUNCH ('director_after_scene_launch')
+
+ui_api:
+  instantiate:
+    entry: instantiate
+    signature: "(prefab: Prefab) => Node  |  <T>(original: T) => T"
+    file: cocos/serialization/instantiate.ts:62
+  prefab_type:
+    path: cocos/scene-graph/prefab/prefab.ts (class Prefab extends Asset)
+    export: 从 'cc' 导入
+  canvas_pattern: |
+    const canvasNode = director.getScene()?.getChildByName('Canvas');
+    canvasNode?.addChild(uiNode);
+    // Canvas 组件挂在该节点上；Canvas 节点通常只有 1 个
+  layer_management: |
+    Cocos Creator 3.x 没有 Unity 风格的 UILayer 枚举。
+    UI 栈 / 覆盖顺序依赖两种机制：
+    (1) Canvas 下每个顶层 UI 节点用 node.setSiblingIndex(n) 控制前后；
+    (2) 或在 Canvas 下建多个容器节点（Background/Normal/Popup/Toast），业务层把不同层 UI 放到对应容器。
+    注意：Node.layer（Layers.Enum）是 BitMask，用于射线/物理遮罩，不能当 UI 栈用；UI 节点 layer 一般是 Layers.Enum.UI_2D。
+
+resource_api:
+  load:
+    entry: resources.load / bundle.load / assetManager.loadAny
+    signature: |
+      // resources.load (= Bundle.load) 推荐入口
+      (paths: string | string[], type?: Constructor<Asset> | null,
+       onProgress?: (finished: number, total: number, item: RequestItem) => void,
+       onComplete?: (err: Error | null, data: Asset | Asset[]) => void) => void
+    source_file: cocos/asset/asset-manager/bundle.ts:225-249
+    notes: "resources 是默认 Bundle（BuiltinBundleName.RESOURCES='resources'），对应 assets/resources 目录；其他 bundle 需先 assetManager.loadBundle"
+  preload:
+    entry: resources.preload / resources.preloadDir
+    signature: "同 load，但 onComplete 拿到的是 RequestItem[]，不是 Asset"
+  remote:
+    entry: assetManager.loadRemote
+    signature: "<T extends Asset>(url: string, options?: { ext?: string }, onComplete?: (err, data: T) => void) => void"
+    source_file: cocos/asset/asset-manager/asset-manager.ts:633-635
+  load_bundle:
+    entry: assetManager.loadBundle
+    signature: "(nameOrUrl: string, options?: { version?: string }, onComplete?: (err, bundle: Bundle) => void) => void"
+  release:
+    entry: assetManager.releaseAsset(asset) / releaseUnusedAssets() / releaseAll()
+    signature: "(asset: Asset) => void"
+    source_file: cocos/asset/asset-manager/asset-manager.ts:738-766
+    reference_counting: |
+      YES — 双层机制：
+      1) Asset 自身持有 _ref：业务层 addRef() / decRef(autoRelease=true)；decRef 归零时 releaseManager.tryRelease(this)
+      2) assetManager 的 releaseManager 还会跟踪资源的依赖关系；releaseAsset(asset) 强制释放并清理依赖；
+         releaseUnusedAssets() 只释放 refCount=0 的。
+      框架 ResourceManager 的 owner/refCount 应与 Asset.addRef/decRef 配合，避免双层计数错乱：
+      建议 Runtime 策略只在 "owner 第一次 load" 时 addRef，"owner 最后一次 release" 时 decRef。
+  types:
+    Asset: cocos/asset/assets/asset.ts
+    SpriteFrame: cocos/asset/assets/（由 2d 扩展，'cc' 导出）
+    Prefab: cocos/scene-graph/prefab/prefab.ts
+    SceneAsset: cocos/asset/assets/scene-asset.ts
+    JsonAsset / TextAsset / AudioClip / Texture2D: cocos/asset/assets/*.ts
+
+pitfalls:
+  - area: reference_counting_double_bookkeeping
+    description: |
+      框架 ResourceManager 已经维护 refCount+owners，Cocos Asset 也维护 _ref。
+      若两边都 addRef/decRef 会双重计数。方案：Runtime 策略只转发第一次/最后一次，不每 load 一次都 addRef。
+    impact: decision_blocker
+  - area: callback_only
+    description: cc 资源 API 全部是 callback，框架 ResourceManager 的 Promise 包装需要在策略层显式封装
+    impact: nice_to_know
+  - area: release_side_effects
+    description: "releaseAsset 会释放依赖（例如释放 Prefab 会释放其引用的 Texture2D / SpriteFrame），若场景仍在用会出现黑块 + GL 报错；生产环境优先用 decRef + releaseUnusedAssets"
+    impact: decision_blocker
+  - area: editor_vs_runtime
+    description: EDITOR 环境下 `assets` 用 WeakCache、`references` 有值（调试用）；运行时 `references` 为 null。编写 Runtime 策略时不要依赖 references
+    impact: nice_to_know
+  - area: scene_loading_concurrency
+    description: director.loadScene 正在加载时再次调用会返回 false 并 warnID(1208)，需要框架 SceneManager 做互斥
+    impact: decision_blocker
+  - area: no_ui_layer_enum
+    description: 不存在 Unity 风格的 UILayer 枚举。框架 UIManager 的 Background/Normal/Popup/Toast 分层必须在 runtime 层自己搭建容器节点或用 siblingIndex 实现
+    impact: decision_blocker
+  - area: canvas_node_discovery
+    description: "getChildByName('Canvas') 硬编码节点名；若设计场景时 Canvas 改名会失败。建议运行时通过 `director.getScene().getComponentInChildren(Canvas)?.node` 查找更稳"
+    impact: nice_to_know
+
+cc_api_summary_for_runtime:
+  resource_loader_recipe: |
+    // packages/fbi-cc-385/src/CocosResourceLoader.ts
+    import { resources, assetManager, Asset, Constructor } from 'cc';
+    class CocosResourceLoader implements IResourceLoader {
+      loadAsset(path, callbacks) {
+        resources.load(path, null,
+          (f, t) => callbacks.onProgress?.(f / t),
+          (err, asset) => {
+            if (err) return callbacks.onError(err);
+            asset.addRef();                  // 仅首次引用
+            callbacks.onLoad(asset);
+          });
+      }
+      releaseAsset(asset) { asset.decRef(true); }
+    }
+
+  scene_loader_recipe: |
+    // packages/fbi-cc-385/src/CocosSceneLoader.ts
+    import { director, Director } from 'cc';
+    class CocosSceneLoader implements ISceneLoader {
+      load(name, onDone) {
+        const ok = director.loadScene(name, (err) => onDone(err ?? null));
+        if (!ok) onDone(new Error('scene is already loading'));
+      }
+      onBeforeLaunch(cb) { director.on(Director.EVENT_BEFORE_SCENE_LAUNCH, cb); }
+      onAfterLaunch(cb)  { director.on(Director.EVENT_AFTER_SCENE_LAUNCH, cb); }
+    }
+
+  ui_renderer_recipe: |
+    // packages/fbi-cc-385/src/CocosUIRenderer.ts
+    import { director, instantiate, Prefab, Node, Layers } from 'cc';
+    class CocosUIRenderer implements IUIRenderer {
+      private layerContainers = new Map<UILayer, Node>(); // Background/Normal/Popup/Toast 容器节点
+      mount(prefab: Prefab, layer: UILayer): Node {
+        const canvas = director.getScene()!.getChildByName('Canvas')!;
+        const container = this.getOrCreateLayerContainer(canvas, layer); // 按 siblingIndex 排序
+        const node = instantiate(prefab);
+        node.layer = Layers.Enum.UI_2D;
+        container.addChild(node);
+        return node;
+      }
+      unmount(node: Node) { node.destroy(); }
+    }
+
+open_questions:
+  - question: Runtime 策略与框架 ResourceManager 的引用计数是否需要完全对齐（1:1），还是 Runtime 只转发第一次/最后一次？
+    context: 框架已有 owners/refCount；Cocos Asset 也有 _ref。双层计数容易错位。
+    type: decision_blocker
+    affects: [cocos-resource-loader-impl]
+  - question: 场景加载失败 / 取消的回滚策略（回到前一场景？）要不要在 SceneManager 接口里统一
+    context: director.loadScene 并发返回 false 没有 error payload
+    type: decision_blocker
+    affects: [cocos-scene-loader-impl]
+  - question: UI 分层容器节点是"运行时动态建"还是"预制场景里固定搭好"？
+    context: 前者 Runtime 独立完成，后者依赖美术配合
+    type: decision_blocker
+    affects: [cocos-ui-renderer-impl]
+
+gaps:
+  - area: loadBundle 远程 CDN 的版本号 / MD5 策略
+    description: 远程 bundle 热更流程未调研（需要看 hotupdate 目录），若 Runtime 要支持远程 bundle 需补充
+    impact: nice_to_know
+    affects: [cocos-resource-loader-impl]
+  - area: 原生 jsb 分支
+    description: "*.jsb.ts 变体未深入阅读（native 平台代码）；若 demo 只跑浏览器端，可先不处理"
+    impact: nice_to_know
+    affects: [cocos-resource-loader-impl]

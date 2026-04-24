@@ -1,0 +1,527 @@
+plan_id: cocos-runtime
+objective: 摸底 Resource/Scene/UI 三个模块在框架侧的策略注入现状，为 packages/fbi-cc-385 适配插件提供基线
+focus_area: framework_status
+created_at: 2026-04-24
+created_by: gem-researcher
+status: completed
+
+tldr: |
+    - Resource/Scene/UI 三个模块的策略注入接口**全部已存在**且命名规范统一（IResourceLoader / ISceneLoader / IUIFormFactory），注入入口分别为 setResourceLoader / setSceneLoader / setUIFormFactory。
+    - @fbi/core 目前**仅作源码存在**（根 package.json 里不存在此名字），插件通过 peerDependency `"@fbi/core": ">=0.1.0"` 声明意图，实际解析依赖根 tsconfig + jest moduleNameMapper 的 `@framework/*` 别名；**没有 npm workspaces / pnpm / lerna**。
+    - 现有 runtime 层样例仅 i18n（LocalizedLabel / LocalizedSprite）——属于"cc 组件 + 静态 GameEntry.getModule 访问"风格，**没有 IResourceLoader 等策略实现的参考样例**，fbi-cc-385 需要从零实现。
+    - tests/__mocks__/cc.ts 非常简陋（约 40 行，仅 _decorator/Component/Node/Label/Sprite/SpriteFrame/resources.load 空桩），不够 fbi-cc-385 单测使用——需要显著扩展或插件包内自备 mock。
+    - 关键决策点：fbi-cc-385 是作为 packages/ 下的源码插件（与 fbi-ecs 同构，peerDep @fbi/core），还是放在 assets/scripts/runtime/ 下（与现有 i18n runtime 同路径）——两套布局目前在项目中共存，需在 brainstorm/plan 阶段裁决。
+
+research_metadata:
+    methodology: 直接 read_file 三模块的 Defs/interfaces 文件 + grep_search 注入入口 + 参考 fbi-ecs/i18n runtime 样例 + 根 package.json / tsconfig / jest.config 结构验证
+    scope: assets/scripts/framework/{resource,scene,ui} + framework/interfaces + assets/scripts/runtime + packages/fbi-ecs + 根 tsconfig/jest/package.json + tests/__mocks__/cc.ts
+    confidence: high
+    coverage: 90
+    decision_blockers: 2
+    research_blockers: 0
+
+files_analyzed:
+    - file: IResourceManager.ts
+      path: assets/scripts/framework/interfaces/IResourceManager.ts
+      purpose: ResourceManager 对外契约
+      key_elements:
+          - element: IResourceManager.setResourceLoader(loader: IResourceLoader)
+            type: method
+            location: IResourceManager.ts:24
+            description: 注入入口；必须在 loadAsset 之前调用
+      language: typescript
+      lines: 80
+
+    - file: ResourceDefs.ts
+      path: assets/scripts/framework/resource/ResourceDefs.ts
+      purpose: 资源策略接口与数据结构定义
+      key_elements:
+          - element: IResourceLoader
+            type: interface
+            location: ResourceDefs.ts:~74
+            description: 策略接口，方法 `loadAsset(path, callbacks): void` 和 `releaseAsset(path): void`
+          - element: LoadAssetCallbacks
+            type: interface
+            location: ResourceDefs.ts:~45
+            description: onSuccess(path, asset: unknown) / onFailure(path, Error) / onProgress(path, 0~1)
+          - element: PreloadCallbacks
+            type: interface
+            location: ResourceDefs.ts:~60
+            description: 批量预加载回调
+          - element: LoadState
+            type: enum
+            location: ResourceDefs.ts:1
+            description: None/Loading/Loaded/Failed
+      language: typescript
+      lines: 120
+
+    - file: ResourceManager.ts
+      path: assets/scripts/framework/resource/ResourceManager.ts
+      purpose: 默认资源管理器实现
+      key_elements:
+          - element: setResourceLoader
+            type: method
+            location: ResourceManager.ts:67
+            description: public setResourceLoader(loader: IResourceLoader): void；loader null 时 Logger.error + throw
+          - element: loadAsset guard
+            type: runtime_check
+            location: ResourceManager.ts:93
+            description: 未设置 loader 时抛 `[ResourceManager] 未设置 ResourceLoader，请先调用 setResourceLoader`
+      language: typescript
+      lines: unknown
+
+    - file: ISceneManager.ts
+      path: assets/scripts/framework/interfaces/ISceneManager.ts
+      purpose: SceneManager 对外契约
+      key_elements:
+          - element: setSceneLoader(loader: ISceneLoader)
+            type: method
+            location: ISceneManager.ts:19
+          - element: loadScene(sceneName, options?: LoadSceneOptions)
+            type: method
+            location: ISceneManager.ts:28
+          - element: currentScene / isLoading
+            type: getter
+            location: ISceneManager.ts:33,38
+      language: typescript
+      lines: 42
+
+    - file: SceneDefs.ts
+      path: assets/scripts/framework/scene/SceneDefs.ts
+      purpose: 场景策略接口与事件定义
+      key_elements:
+          - element: ISceneLoader
+            type: interface
+            location: SceneDefs.ts:~37
+            description: loadScene(sceneName, callbacks: LoadSceneCallbacks) / unloadScene(sceneName)
+          - element: LoadSceneCallbacks
+            type: interface
+            location: SceneDefs.ts:~11
+            description: onProgress(0~1) / onSuccess(sceneName) / onFailure(sceneName, errorStr)
+          - element: SceneEvents
+            type: const
+            location: SceneDefs.ts:~65
+            description: EventKey 定义 SCENE_LOADING / SCENE_LOADED / SCENE_UNLOADED（注：当前 SceneManager 尚未集成 EventManager）
+      language: typescript
+      lines: 68
+
+    - file: SceneManager.ts
+      path: assets/scripts/framework/scene/SceneManager.ts
+      purpose: 默认场景管理器
+      key_elements:
+          - element: setSceneLoader
+            type: method
+            location: SceneManager.ts:79
+          - element: loadScene guard
+            type: runtime_check
+            location: SceneManager.ts:97
+            description: 未设置 loader 时仅 Logger.warn（**与 Resource/UI 的 throw 行为不一致**）
+      language: typescript
+
+    - file: IUIManager.ts
+      path: assets/scripts/framework/interfaces/IUIManager.ts
+      purpose: UIManager 对外契约
+      key_elements:
+          - element: setUIFormFactory(factory: IUIFormFactory)
+            type: method
+            location: IUIManager.ts:20
+          - element: openForm / closeForm / closeAllForms / registerForm / getForm / hasForm
+            type: method
+            location: IUIManager.ts:33-73
+
+    - file: UIDefs.ts
+      path: assets/scripts/framework/ui/UIDefs.ts
+      purpose: UI 策略接口、层级、配置
+      key_elements:
+          - element: IUIFormFactory
+            type: interface
+            location: UIDefs.ts:~66
+            description: createForm(formName, config: UIFormConfig, asset: unknown): UIFormBase / destroyForm(form): void
+          - element: UILayer
+            type: enum
+            location: UIDefs.ts:7
+            description: Background=0 / Normal=100 / Fixed=200 / Popup=300 / Toast=400
+          - element: UIFormConfig
+            type: interface
+            location: UIDefs.ts:25
+            description: path / layer / allowMultiple? / pauseCoveredForm?
+      language: typescript
+      lines: 110
+
+    - file: UIFormBase.ts
+      path: assets/scripts/framework/ui/UIFormBase.ts
+      purpose: UI 表单抽象基类（生命周期钩子）
+      key_elements:
+          - element: onOpen / onClose / onCover / onReveal / onUpdate
+            type: method
+            location: UIFormBase.ts:44-80
+            description: **抽象类，不依赖 cc.Component**；fbi-cc-385 的 Factory 需要桥接 cc.Node/Prefab 到 UIFormBase 子类
+
+    - file: UIManager.ts
+      path: assets/scripts/framework/ui/UIManager.ts
+      purpose: 默认 UI 管理器
+      key_elements:
+          - element: setUIFormFactory
+            type: method
+            location: UIManager.ts:78
+          - element: openForm guard
+            type: runtime_check
+            location: UIManager.ts:125
+            description: 未设置 factory 时 Logger.error + throw
+
+    - file: package.json (fbi-ecs)
+      path: packages/fbi-ecs/package.json
+      purpose: 参考插件包的包声明形态
+      key_elements:
+          - element: shape
+            type: config
+            location: fbi-ecs/package.json:1
+            description: |
+                {
+                  "name": "@fbi/ecs",
+                  "version": "0.1.0",
+                  "main": "src/index.ts",  // 直接指向 src/，**无 dist 构建产物**
+                  "peerDependencies": { "@fbi/core": ">=0.1.0" }
+                }
+                注意：**无 tsconfig.json、无独立 jest.config、无 types 字段、无 devDependencies**
+
+    - file: index.ts (fbi-ecs)
+      path: packages/fbi-ecs/src/index.ts
+      purpose: barrel 导出模式
+      key_elements:
+          - element: re-export everything
+            type: pattern
+            location: index.ts:1-28
+            description: 从各 module re-export 所有公共符号
+
+    - file: LocalizedLabel.ts
+      path: assets/scripts/runtime/i18n/LocalizedLabel.ts
+      purpose: 现成 cc 适配示例
+      key_elements:
+          - element: import cc
+            type: pattern
+            location: LocalizedLabel.ts:1
+            description: `import { _decorator, Component, Label } from 'cc'`
+          - element: bridge pattern
+            type: pattern
+            location: LocalizedLabel.ts:12-32
+            description: cc.Component 子类 + `GameEntry.getModule<XxxManager>('XxxName')` 静态访问框架模块 + 订阅 EventManager 事件
+          - element: 缺口
+            type: observation
+            description: **这是"cc 组件用框架模块"场景，不是"cc loader 实现框架策略接口"场景**；fbi-cc-385 的 IResourceLoader 等实现类需要独立设计
+
+    - file: LocalizedSprite.ts
+      path: assets/scripts/runtime/i18n/LocalizedSprite.ts
+      purpose: 同上，附带 resources 加载样例
+      key_elements:
+          - element: import resources from cc
+            type: pattern
+            location: LocalizedSprite.ts:1
+            description: `import { _decorator, Component, Sprite, SpriteFrame, resources } from 'cc'`；直接使用 cc.resources.load，未走 ResourceManager（runtime 层样例内部未 dogfood 框架资源系统）
+
+    - file: cc.ts (mock)
+      path: tests/__mocks__/cc.ts
+      purpose: Jest 环境下 cc 模块的最小桩
+      key_elements:
+          - element: 覆盖范围
+            type: surface
+            location: cc.ts:1-40
+            description: 仅 _decorator, Component, Node, Label, Sprite, SpriteFrame, resources.load (jest.fn())；**未 mock** AssetManager/director/Prefab/Scene/Asset/instantiate/loadScene/任何 async 资源接口
+
+    - file: jest.config.js (root)
+      path: jest.config.js
+      purpose: 根 jest 配置
+      key_elements:
+          - element: roots
+            type: config
+            description: `['<rootDir>/tests', '<rootDir>/packages']`——插件测试直接放在 packages/xxx/tests/ 下即可被发现
+          - element: moduleNameMapper
+            type: config
+            description: '^cc$' → tests/__mocks__/cc.ts；`@framework/* / @runtime/* / @game/* / @utils/*` 别名
+          - element: 缺口
+            type: observation
+            description: **没有 @fbi/ecs 等插件名的 moduleNameMapper**——插件内部相对 import 必须用 `../../../assets/scripts/framework/...` 或 @framework 别名，而非 `@fbi/core`
+
+    - file: tsconfig.json (root)
+      path: tsconfig.json
+      purpose: 根 ts 配置
+      key_elements:
+          - element: paths
+            type: config
+            description: 同 jest moduleNameMapper 的别名；**未声明 @fbi/* 路径**
+          - element: include
+            type: config
+            description: `['assets/scripts/**/*.ts', 'tests/**/*.ts', 'tools/**/*.ts', 'packages/**/*.ts', ...]`——packages 源码随主项目一起编译
+
+    - file: package.json (root)
+      path: package.json
+      purpose: 根包
+      key_elements:
+          - element: name
+            type: field
+            description: `"framework-blaze-ignite"`（**不是 @fbi/core**）
+          - element: workspaces
+            type: field
+            description: **不存在**；无 npm workspaces 声明
+
+patterns_found:
+    - category: architecture
+      pattern: 策略注入（Strategy Injection via setter）
+      description: 三个模块均通过 `set{模块}Loader/Factory` setter 接收引擎适配策略；loader/factory null 时 Resource/UI throw、Scene 仅 warn
+      examples:
+          - file: ResourceManager.ts
+            location: "67, 93-94"
+            snippet: public setResourceLoader(loader: IResourceLoader) { if (!loader) { Logger.error + throw } }
+          - file: UIManager.ts
+            location: "78, 125-126"
+            snippet: public setUIFormFactory(factory: IUIFormFactory) { ... }
+          - file: SceneManager.ts
+            location: "79, 97"
+            snippet: public setSceneLoader(loader: ISceneLoader) { ... if (!this._loader) Logger.warn (**未 throw**) }
+      prevalence: common
+    - category: architecture
+      pattern: 回调驱动（Callback-based async）
+      description: 三个模块的策略接口**全部回调风格**（非 Promise/async），fbi-cc-385 实现时需把 cc 的 Promise/callback API 适配为此回调协议
+      examples:
+          - file: ResourceDefs.ts
+            location: ~74
+            snippet: "loadAsset(path: string, callbacks: LoadAssetCallbacks): void"
+          - file: SceneDefs.ts
+            location: ~37
+            snippet: "loadScene(sceneName: string, callbacks: LoadSceneCallbacks): void"
+      prevalence: common
+    - category: naming
+      pattern: 接口命名不统一
+      description: Resource/Scene 用 "Loader" 后缀，UI 用 "Factory"（因为 UI 需要 createForm 既含资源加载又含实例化）
+      examples:
+          - file: ResourceDefs.ts
+            location: ~74
+            snippet: IResourceLoader
+          - file: UIDefs.ts
+            location: ~66
+            snippet: IUIFormFactory
+      prevalence: occasional
+    - category: structure
+      pattern: 插件包的极简布局（fbi-ecs 参考）
+      description: 无 tsconfig、无 dist、main 直指 src/index.ts；依靠根 tsconfig 的 include 统一编译
+      examples:
+          - file: packages/fbi-ecs/package.json
+            location: ":1"
+            snippet: '{ "name": "@fbi/ecs", "main": "src/index.ts", "peerDependencies": { "@fbi/core": ">=0.1.0" } }'
+      prevalence: common
+
+related_architecture:
+    components_relevant_to_domain:
+        - component: ResourceManager (default impl)
+          responsibility: 缓存/引用计数/owner 归属；调用注入的 IResourceLoader 做真实加载
+          location: assets/scripts/framework/resource/ResourceManager.ts
+          relationship_to_domain: fbi-cc-385 需实现 IResourceLoader 并在启动期调用 `resourceManager.setResourceLoader(new CocosResourceLoader())`
+        - component: SceneManager (default impl)
+          responsibility: 切场景去重 + 事件广播
+          location: assets/scripts/framework/scene/SceneManager.ts
+          relationship_to_domain: fbi-cc-385 需实现 ISceneLoader（封装 cc.director.loadScene + 进度监听）
+        - component: UIManager (default impl)
+          responsibility: 分层栈 + cover/reveal 通知；资源由 factory 侧负责
+          location: assets/scripts/framework/ui/UIManager.ts
+          relationship_to_domain: fbi-cc-385 需实现 IUIFormFactory；**资源加载职责在 factory 内部**（ResourceDefs 注释暗示 factory 自行调 cc.resources）
+        - component: UIFormBase (abstract class, 非 cc.Component)
+          responsibility: 定义 onOpen/onClose/onCover/onReveal/onUpdate 钩子
+          location: assets/scripts/framework/ui/UIFormBase.ts
+          relationship_to_domain: **关键桥接点**——业务层继承 UIFormBase，但实际实例又需要挂在 cc.Node 上；fbi-cc-385 Factory 需解决"cc.Prefab → UIFormBase 实例"的双向绑定策略（常见：业务类同时继承 UIFormBase + 持有 cc.Node 引用）
+    interfaces_used_by_domain:
+        - interface: IResourceLoader
+          location: ResourceDefs.ts
+          usage_pattern: setter 注入，单例生命周期
+        - interface: ISceneLoader
+          location: SceneDefs.ts
+          usage_pattern: setter 注入
+        - interface: IUIFormFactory
+          location: UIDefs.ts
+          usage_pattern: setter 注入；factory 内部可能还需要持有 IResourceManager 引用以加载 prefab（框架未强制，由 factory 决定）
+    data_flow_involving_domain: |
+        业务层 → XxxManager（默认实现） → 注入的 ILoader/IFactory → cc 引擎 API
+                        ↑ 引用计数/栈/缓存在 Manager 层  ↑ fbi-cc-385 责任边界
+    key_relationships_to_domain:
+        - from: ResourceManager
+          to: IResourceLoader
+          relationship: composes (通过 setter 注入的单例)
+        - from: SceneManager
+          to: ISceneLoader
+          relationship: composes
+        - from: UIManager
+          to: IUIFormFactory
+          relationship: composes
+        - from: IUIFormFactory.createForm
+          to: IResourceManager (potentially)
+          relationship: "factory 通常需要调用 ResourceManager 加载 prefab——这是 fbi-cc-385 内部的协作点"
+
+related_technology_stack:
+    languages_used_in_domain:
+        - TypeScript 5.4+ (strict)
+    frameworks_used_in_domain:
+        - name: Cocos Creator 3.8.5（目标适配引擎）
+          usage_in_domain: fbi-cc-385 **尚未存在**；需要桥接 cc.resources / cc.director / cc.instantiate / cc.Prefab / cc.Node / cc.Scene
+    libraries_used_in_domain:
+        - name: jest + ts-jest
+          purpose_in_domain: 单元测试
+        - name: reflect-metadata
+          purpose_in_domain: 已在根项目；插件若不用装饰器元数据可不依赖
+    external_apis_used_in_domain:
+        - name: cc 模块（Cocos Creator Runtime）
+          integration_point: 仅在 runtime/* 或未来 packages/fbi-cc-385/ 内部；framework/* 严禁 import cc
+
+related_conventions:
+    naming_patterns_in_domain: |
+        - 接口：I{模块名}Loader / I{模块名}Factory（Resource/Scene 用 Loader，UI 用 Factory）
+        - 实现：{Engine}{模块名}Loader（推测；如 CocosResourceLoader）
+        - 注入方法：set{模块名}{Loader|Factory}
+    structure_of_domain: |
+        framework/{module}/
+          ├── {Module}Manager.ts      # 默认实现（纯 TS）
+          ├── {Module}Defs.ts         # 类型 + 策略接口
+          └── README.md
+        framework/interfaces/I{Module}Manager.ts  # 对外契约
+    error_handling_in_domain: |
+        - Resource/UI：loader 未注入时 Logger.error + throw `[模块名] ...` 中文错误
+        - Scene：loader 未注入时仅 Logger.warn（**不一致，可能需统一**）
+    testing_in_domain: |
+        - framework 层测试在 tests/{module}/，不涉及 cc mock
+        - 插件测试可放 packages/xxx/tests/（jest roots 已包含）
+    documentation_in_domain: |
+        - 每模块必有 README.md
+        - IResourceLoader / IUIFormFactory 的 JSDoc 内已给出 cc 实现示例代码（非常有利于 fbi-cc-385 开发）
+
+related_dependencies:
+    internal:
+        - component: framework/resource
+          relationship_to_domain: fbi-cc-385 实现其 IResourceLoader
+          direction: outbound
+        - component: framework/scene
+          relationship_to_domain: fbi-cc-385 实现其 ISceneLoader
+          direction: outbound
+        - component: framework/ui
+          relationship_to_domain: fbi-cc-385 实现其 IUIFormFactory（内部可能反向依赖 framework/resource）
+          direction: outbound
+        - component: framework/debug/Logger
+          relationship_to_domain: fbi-cc-385 需使用 Logger 代替 console
+          direction: outbound
+    external:
+        - name: cc (Cocos Creator 3.8.5)
+          purpose_for_domain: 引擎 API；peerDependency（运行时由 Cocos 项目提供，测试环境用 __mocks__/cc.ts）
+        - name: "@fbi/core"
+          purpose_for_domain: 以 peerDependency 形式声明；**但项目中根 package.json 并未发布 @fbi/core，而是通过根 tsconfig include + jest moduleNameMapper 让源码互相可见**
+
+fbi_core_distribution:
+    form: source_only
+    how_to_depend: |
+        现有 fbi-ecs / fbi-timer-* 的实践：
+        1. package.json 声明 `"peerDependencies": { "@fbi/core": ">=0.1.0" }` — **纯意图声明，实际没解析路径**
+        2. 插件内部 import 框架符号时**不写 `from '@fbi/core'`**，而写相对路径或 `@framework/*` 别名
+        3. 根 tsconfig `include: ["packages/**/*.ts"]` 让插件源码参与主工程编译
+        4. 根 jest.config `roots: ["<rootDir>/packages"]` 让插件测试参与主工程测试
+        结论：fbi-cc-385 只需按 fbi-ecs 模板建目录、声明同样的 peerDep，**暂时不需要配置 @fbi/core 的 path alias**；import 写 `@framework/resource/ResourceDefs` 即可
+
+        若将来真要 npm publish 独立安装：需增加 npm workspaces（根 package.json 加 `"workspaces": ["packages/*"]`）并让 `@fbi/core` 成为主包真名，工作量不小，当前阶段不紧迫。
+    monorepo_setup: "no — 无 npm/pnpm/yarn workspaces，无 lerna/turbo；单仓但非严格 monorepo，依赖根 tsconfig/jest 的 path+roots 做伪 monorepo"
+
+package_reference:
+    example_package: fbi-ecs
+    package_json_shape: |
+        {
+          "name": "@fbi/{plugin}",
+          "version": "0.1.0",
+          "description": "...",
+          "main": "src/index.ts",           // 注意：直接指向 .ts 源文件，无 types 字段
+          "peerDependencies": { "@fbi/core": ">=0.1.0" },
+          "keywords": [...]
+        }
+        省略字段：types、files、exports、scripts、devDependencies、dependencies
+    tsconfig_shape: "不存在——依赖根 tsconfig 的 include"
+    jest_shape: "不存在独立 jest.config——依赖根 jest.config 的 roots: ['packages'] 和 testMatch"
+    build_output: "无 dist 构建产物；main 直指 src/index.ts；运行时（Cocos）会由其自身构建流程编译"
+    export_pattern: |
+        src/index.ts 使用 barrel re-export：
+        export { A, B, C } from './XxxDefs';
+        export { XxxManager } from './XxxManager';
+
+existing_runtime_example:
+    file: assets/scripts/runtime/i18n/LocalizedLabel.ts + LocalizedSprite.ts
+    pattern_summary: |
+        **场景类型**：cc 组件消费框架模块（不是策略实现）。
+        - `import { _decorator, Component, Label } from 'cc'`（唯一允许依赖 cc 的层）
+        - @ccclass 装饰，继承 cc.Component
+        - 通过 `GameEntry.getModule<XxxManager>('XxxName')` 静态访问
+        - 订阅 EventManager 事件响应语言切换
+        - **注意 LocalizedSprite 直接 `cc.resources.load`，未 dogfood ResourceManager**——说明历史上策略注入尚未强制贯通
+        **缺失**：IResourceLoader / ISceneLoader / IUIFormFactory 的 cc 实现样例项目中**暂无**；必须由 fbi-cc-385 从 ResourceDefs/UIDefs JSDoc 提供的示例片段开始实现。
+
+cc_mock_coverage:
+    file: tests/__mocks__/cc.ts
+    covered_symbols:
+        - _decorator.ccclass
+        - _decorator.property
+        - Component (含 node, getComponent)
+        - Node
+        - Label (string)
+        - Sprite (spriteFrame, isValid)
+        - SpriteFrame
+        - resources.load (jest.fn())
+    needs_extension_for:
+        - "resources.release"
+        - "resources.preload"
+        - "director.loadScene"
+        - "director.preloadScene"
+        - "Prefab"
+        - "instantiate"
+        - "Asset / AssetManager"
+        - "Canvas / UITransform（UI 定位常用）"
+        - "sys.Language"
+        - "error / warn 信号"
+    recommendation: |
+        fbi-cc-385 建议在 packages/fbi-cc-385/__mocks__/cc.ts 内**自备更完整的 mock**（本地优先于根 mock），并考虑把通用能力提回根 mock；不要污染根 mock 以免影响其他模块单测。
+
+testing_patterns:
+    framework: jest + ts-jest
+    coverage_areas:
+        - 策略注入 setter 的 guard 行为（null 检查、重复注入）
+        - loader/factory 回调→framework 事件的转译
+    test_organization: "packages/fbi-cc-385/tests/{resource,scene,ui}-loader.test.ts"
+    mock_patterns:
+        - "通过 jest.fn() 模拟 cc.resources.load 的 error/progress/asset 三态"
+        - "同步回调可在 jest.fn() 的 mockImplementation 内立即触发"
+
+open_questions:
+    - question: fbi-cc-385 最终应放在 packages/ 下还是 assets/scripts/runtime/ 下？
+      context: "项目现存两种 runtime：(a) packages/fbi-*/ 插件模式（fbi-ecs/fbi-timer-*）(b) assets/scripts/runtime/i18n/ 引擎组件模式。两者目前各司其职：前者是纯 TS 可替换模块，后者是继承 cc.Component 的业务组件。IResourceLoader 等属于前者性质，但与 cc 强绑定又更像后者位置。"
+      type: decision_blocker
+      affects: [T-plan-structure, T-impl-scaffold]
+    - question: 是否需要把 fbi-cc-385 自动在 GameEntry 启动时注入？
+      context: "现有默认模块通过 GameModule.register 自动注册，但 IResourceLoader 等策略实例需要业务代码手动 setXxxLoader。fbi-cc-385 可以提供一个便利函数 `installCocosRuntime(gameEntry)`，或者进一步暴露一个 IPlugin 适配器"
+      type: research
+      affects: [T-api-design]
+    - question: UIFormBase 与 cc.Component 的桥接策略
+      context: "UIFormBase 是纯 TS 抽象类；业务 UI 表单通常既是 cc.Component（为了挂节点）又要实现 UIFormBase 钩子。常见方案：(1) 让业务类同时继承 cc.Component 和 UIFormBase（TS 不支持多继承，需要 mixin）(2) 让业务类继承 cc.Component，通过组合持有一个 UIFormBase 适配器 (3) fbi-cc-385 提供 CocosUIFormBase = cc.Component 子类并在内部代理到 UIFormBase 钩子。"
+      type: decision_blocker
+      affects: [T-ui-factory-impl]
+    - question: SceneManager 的 warn-vs-throw 不一致是否需要先在框架侧统一？
+      context: "Resource/UI 在 loader 未注入时 throw，Scene 仅 warn。做 fbi-cc-385 时若先注入再调用没问题，但容易掩盖配置错误"
+      type: nice_to_know
+      affects: [T-pre-cleanup]
+
+gaps:
+    - area: 策略实现样例
+      description: 框架内无任何 IResourceLoader/ISceneLoader/IUIFormFactory 的 cc 参考实现；fbi-cc-385 是首个实现者
+      impact: nice_to_know
+      affects: [T-impl-scaffold]
+    - area: cc mock 覆盖率
+      description: tests/__mocks__/cc.ts 非常薄，无法支持 fbi-cc-385 的 loader 单测
+      impact: research_blocker
+      affects: [T-test-setup]
+    - area: 插件包对 "@fbi/core" 的真实解析路径
+      description: 当前 peerDep 纯意图声明，插件源码不 import "@fbi/core"；fbi-cc-385 需要 import 框架接口时建议用相对路径 `../../../assets/scripts/framework/resource/ResourceDefs` 或在根 tsconfig.paths 增加 `@fbi/core` alias 指向 framework/（后者更干净）
+      impact: decision_blocker
+      affects: [T-plan-structure]
+    - area: fbi-cc-385 是否需要构建产物（dist）
+      description: 现有 fbi-* 都无 dist，main 指向 src/*.ts；但 Cocos 项目加载插件时能否直接吃 .ts 取决于 Cocos 的 TS 编译配置。需要 brainstorm 阶段确认发布形态
+      impact: nice_to_know
+      affects: [T-build-strategy]

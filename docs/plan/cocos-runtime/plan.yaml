@@ -1,0 +1,796 @@
+plan_id: cocos-runtime
+version: 1.0.0
+complexity: medium
+objective: 在 assets/scripts/runtime/cc-385/ 下实现 Cocos Creator 3.8.5 的 Resource/Scene/UI 三策略适配器，提供 installCocosRuntime 统一入口，并通过 worktree 内的最小 CC 项目做人工端到端验证
+created_at: 2026-04-24
+created_by: gem-planner
+status: pending_approval
+research_confidence: high
+
+planning_pass: 1
+planning_history:
+  - pass: 1
+    date: 2026-04-24
+    summary: 初版（已纳入 review 发现的 3 blocking 修复 + 关键 important）
+
+plan_metrics:
+  total_tasks: 19
+  wave_1_task_count: 3
+  max_parallelism: 6
+  total_dependencies: 22
+  risk_score: medium
+  adr_count: 7
+  risks_count: 6
+
+tldr: |
+    为 CC 3.8.5 实现 Resource/Scene/UI 三策略适配器，落地在 assets/scripts/runtime/cc-385/。
+    先扩展 cc mock + 框架层改造（IUIFormFactory 回调化、SceneManager guard 统一 throw），
+    再并行实现三个 loader/factory（TDD Red/Green），组装 install.ts + UIFormBase 桥接（组合模式），
+    最后在独立 worktree 内用 CC 3.8.5 项目做人工验证，输出截图与日志。
+
+open_questions: []
+
+adrs:
+  - id: ADR-001
+    title: 适配代码位置选择 runtime/cc-385/ 而非 packages/
+    decision: 放在 assets/scripts/runtime/cc-385/，与现有 i18n runtime 同层，避免 npm workspaces 配置
+    rationale: 当前仓库无 workspaces，packages/ 下插件靠 @framework/* 别名解析；runtime/ 路径与 i18n 现例一致
+  - id: ADR-002
+    title: UI 分层使用 Map<number, Node> + registerLayer 懒建
+    decision: Canvas 下动态创建层节点，首次访问或 registerLayer 时创建；无"默认层 vs 自定义层"特判
+    rationale: 简化分层实现，支持任意 zIndex 扩展
+  - id: ADR-003
+    title: 引用计数仅转发 owner 首次/末次
+    decision: Runtime 侧在 owner 首次 load 调 asset.addRef，末次 release 调 asset.decRef(true)
+    rationale: 框架层已按 owner 维护 refCount，Runtime 仅桥接到 cc Asset；IResourceLoader JSDoc 追加契约说明
+  - id: ADR-004
+    title: installCocosRuntime(gameEntry) 统一入口 + isInited 校验
+    decision: 导出 installCocosRuntime，内部校验 gameEntry.isInited，拿 3 个 Manager 并注入 3 个策略实现
+    rationale: 入口集中便于调用方；未来可升级为 DI 装饰器自动注册
+  - id: ADR-005
+    title: SceneManager guard 统一到 throw
+    decision: 将 SceneManager.setSceneLoader 的 null warn 改为 throw，与 Resource/UI 风格一致
+    rationale: 统一 fail-fast；precondition 是 grep worktree 分支确认无影响
+  - id: ADR-006
+    title: Canvas 跨场景失效采用双策略查找 + 事件订阅
+    decision: CocosUIFormFactory 不缓存 Canvas；订阅 EVENT_BEFORE_SCENE_LOADING 清 layerNodes、EVENT_AFTER_SCENE_LAUNCH 置 _canvas=null；查找时 Component 定位优先 + 名字兜底
+    rationale: CC 切场景会销毁旧 Canvas；懒查 + 事件双保险防止持有失效引用
+  - id: ADR-007
+    title: IUIFormFactory.createForm 回调签名 + Factory 内部持有 IResourceManager
+    decision: createForm 改为 (formName, config, callbacks) 回调签名；CocosUIFormFactory 构造期注入 IResourceManager，内部按 config.path 加载 Prefab（owner=ui:${formName}）
+    rationale: UIManager.openForm 传 null asset 的缺陷需在框架层修；Factory 持有资源管理器使 UI 加载路径收敛，UIFormBase 改为组合模式（extends cc.Component，持有 _uiForm）
+
+risks:
+  - id: RISK-001
+    title: TDD 节奏失控
+    likelihood: medium
+    impact: medium
+    mitigation: 每个 loader/factory 拆 red/green 两个子任务，red 先跑红再进入 green
+  - id: RISK-002
+    title: 引用计数双重记账
+    likelihood: medium
+    impact: high
+    mitigation: Red 测试包含 "load→release→load→release 后 Asset._ref 回 0" 用例
+  - id: RISK-003
+    title: 场景并发加载
+    likelihood: low
+    impact: medium
+    mitigation: SceneLoader 单 flight + listener 闭包校验 sceneName
+  - id: RISK-004
+    title: UIFormBase 组合模式学习成本
+    likelihood: medium
+    impact: low
+    mitigation: README 写清组合模式用法 + 提供示例
+  - id: RISK-005
+    title: CC 编辑器环境集成成本
+    likelihood: high
+    impact: high
+    mitigation: w4-t0 输出 CC_PRECONDITION.md（Dashboard 安装、3.8.5 版本、外置 SSD 规避、paths 别名 spike）
+  - id: RISK-006
+    title: Canvas 跨场景失效
+    likelihood: medium
+    impact: high
+    mitigation: 订阅 Director EVENT_BEFORE_SCENE_LOADING / EVENT_AFTER_SCENE_LAUNCH 清理缓存
+
+implementation_specification:
+  code_structure: |
+    assets/scripts/runtime/cc-385/
+      ├── CocosResourceLoader.ts
+      ├── CocosSceneLoader.ts
+      ├── CocosUIFormFactory.ts
+      ├── CocosUIFormBase.ts
+      ├── install.ts
+      ├── index.ts
+      └── README.md
+    tests/runtime/cc-385/
+      ├── cocos-resource-loader.test.ts
+      ├── cocos-scene-loader.test.ts
+      ├── cocos-ui-form-factory.test.ts
+      ├── cocos-ui-form-base.test.ts
+      └── install.test.ts
+  affected_areas:
+    - assets/scripts/runtime/cc-385/（新）
+    - tests/runtime/cc-385/（新）
+    - tests/__mocks__/cc.ts（扩展）
+    - assets/scripts/framework/interfaces/IUIManager.ts
+    - assets/scripts/framework/ui/UIDefs.ts
+    - assets/scripts/framework/ui/UIManager.ts
+    - assets/scripts/framework/interfaces/ISceneManager.ts
+    - assets/scripts/framework/scene/SceneManager.ts
+    - tests/ui/ui-manager.test.ts
+    - tests/scene/scene-manager.test.ts
+    - docs/module-registry.md
+    - docs/architecture.md
+    - docs/plan/cocos-runtime/CC_PRECONDITION.md（新）
+    - docs/plan/cocos-runtime/VALIDATION.md（新）
+  component_details:
+    - component: CocosResourceLoader
+      responsibility: 实现 IResourceLoader；按 path 调 resources.load 并 addRef，releaseAsset 调 decRef(true)
+      interfaces:
+        - loadAsset(path, callbacks): void
+        - releaseAsset(path): void
+    - component: CocosSceneLoader
+      responsibility: 实现 ISceneLoader；单 flight 加载 + loadScene 完成回调 + 失败兜底
+      interfaces:
+        - loadScene(sceneName, callbacks): void
+    - component: CocosUIFormFactory
+      responsibility: 实现 IUIFormFactory；构造期注入 IResourceManager；createForm 异步回调化；管理 layer 节点；订阅场景事件做 Canvas 失效处理
+      interfaces:
+        - createForm(formName, config, callbacks): void
+        - destroyForm(form): void
+        - registerLayer(zIndex, name?): void
+    - component: CocosUIFormBase
+      responsibility: cc.Component 桥接；静态 __IS_UI_FORM__=true；持有 _uiForm: UIFormBase；暴露 getUIForm()
+      interfaces:
+        - getUIForm(): UIFormBase
+    - component: installCocosRuntime
+      responsibility: 校验 gameEntry.isInited；获取 Resource/Scene/UI Manager 并注入三策略
+      interfaces:
+        - installCocosRuntime(gameEntry): void
+  dependencies:
+    - component: CocosUIFormFactory
+      relationship: 构造期依赖 IResourceManager（加载 Prefab）
+    - component: installCocosRuntime
+      relationship: 依赖 GameEntry 和三个 Manager 接口
+  integration_points:
+    - UIManager.openForm 改异步；调用 factory.createForm(name, config, callbacks)
+    - SceneManager.setSceneLoader guard 统一 throw（与 Resource/UI 对齐）
+    - tests/__mocks__/cc.ts 扩展（resources/director/instantiate/Prefab/Asset/Canvas/UITransform/Node.components/makeCanvasMock）
+
+contracts:
+  - from_task: w1-t1
+    to_task: w2-t1-red
+    interface: tests/__mocks__/cc.ts 导出 resources.load / Prefab / Asset(addRef/decRef) / makeCanvasMock
+    format: Jest mock module
+  - from_task: w1-t1
+    to_task: w2-t2-red
+    interface: tests/__mocks__/cc.ts 导出 director.loadScene / EVENT_BEFORE_SCENE_LOADING / EVENT_AFTER_SCENE_LAUNCH
+    format: Jest mock module
+  - from_task: w1-t1
+    to_task: w2-t3-red
+    interface: tests/__mocks__/cc.ts 导出 instantiate / Canvas / UITransform / Node(components/addComponent/getComponent) / makeCanvasMock
+    format: Jest mock module
+  - from_task: w1-t3
+    to_task: w2-t3-red
+    interface: IUIFormFactory.createForm(formName, config, callbacks) 回调签名 + UIManager.openForm 异步
+    format: TypeScript interface
+  - from_task: w2-t1-green
+    to_task: w3-t2
+    interface: CocosResourceLoader 类可 new 并实现 IResourceLoader
+    format: TypeScript class
+  - from_task: w2-t2-green
+    to_task: w3-t2
+    interface: CocosSceneLoader 类可 new 并实现 ISceneLoader
+    format: TypeScript class
+  - from_task: w2-t3-green
+    to_task: w3-t2
+    interface: CocosUIFormFactory 类可 new(resourceManager) 并实现 IUIFormFactory
+    format: TypeScript class
+  - from_task: w3-t1
+    to_task: w2-t3-green
+    interface: CocosUIFormBase 静态 __IS_UI_FORM__=true + getUIForm()
+    format: TypeScript class（注：w2-t3 Red 可用 mock 对象模拟此标记，green 不强依赖 w3-t1）
+  - from_task: w3-t2
+    to_task: w3-t3
+    interface: installCocosRuntime 导出
+    format: TypeScript function
+  - from_task: w4-t0
+    to_task: w4-t1
+    interface: CC_PRECONDITION.md 前置条件清单
+    format: Markdown
+  - from_task: w4-t1
+    to_task: w4-t2
+    interface: .worktrees/cocos-runtime-demo 分支
+    format: git worktree
+  - from_task: w4-t2
+    to_task: w4-t3
+    interface: CC 3.8.5 项目 + 最小场景（Splash → Home）
+    format: Cocos Creator project
+
+tasks:
+  # ──────────────── Wave 1：基础设施 ────────────────
+  - id: w1-t1
+    title: 扩展 tests/__mocks__/cc.ts 覆盖 Resource/Scene/UI 所需 API
+    wave: 1
+    agent: gem-implementer
+    prototype: false
+    priority: high
+    status: pending
+    dependencies: []
+    conflicts_with: []
+    context_files:
+      - path: tests/__mocks__/cc.ts
+        description: 当前 cc mock（约 40 行）
+    files_to_modify:
+      - tests/__mocks__/cc.ts
+    description: |
+      扩展 cc mock：resources.load 两种重载分派（path+callback / path+type+callback / path+type+progress+complete）、
+      director.loadScene + EVENT_BEFORE_SCENE_LOADING + EVENT_AFTER_SCENE_LAUNCH、instantiate、Prefab、
+      Asset（含 addRef/decRef/_ref 可读）、Canvas、UITransform、Node（含 components[]/addComponent/getComponent/setSiblingIndex）、
+      导出 makeCanvasMock 工厂函数。同步加一个 sanity 测试验证 mock 本身。
+    estimated_effort: medium
+    estimated_files: 2
+    estimated_lines: 220
+    verification:
+      - npx jest tests/__mocks__/cc.test.ts --no-coverage
+      - npm run lint -- tests/__mocks__/cc.ts
+    acceptance_criteria:
+      - resources.load 三种重载均可分派并触发回调
+      - Asset.addRef/decRef 正确增减 _ref 计数
+      - director 两个 scene 事件可 emit/on
+      - makeCanvasMock() 返回带 UITransform 的 Canvas 节点
+    failure_modes:
+      - scenario: resources.load 重载分派遗漏某种签名
+        likelihood: medium
+        impact: high
+        mitigation: sanity 测试逐一覆盖三种签名
+    tech_stack:
+      - TypeScript
+      - Jest
+
+  - id: w1-t2
+    title: SceneManager guard 统一 throw
+    wave: 1
+    agent: gem-implementer
+    prototype: false
+    priority: medium
+    status: pending
+    dependencies: []
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/framework/scene/SceneManager.ts
+        description: 当前 setSceneLoader null 是 warn
+      - path: assets/scripts/framework/interfaces/ISceneManager.ts
+        description: 接口注释需同步
+    files_to_modify:
+      - assets/scripts/framework/interfaces/ISceneManager.ts
+      - assets/scripts/framework/scene/SceneManager.ts
+      - tests/scene/scene-manager.test.ts
+    description: |
+      setSceneLoader(null) 从 Logger.warn 改为 Logger.error + throw Error('[SceneManager] loader 不能为空')，
+      对齐 Resource/UI 风格。Precondition：grep .worktrees/demo{1,2,3} 确认无 null 传入。
+      同步更新接口 JSDoc 和对应测试。
+    estimated_effort: small
+    estimated_files: 3
+    estimated_lines: 40
+    verification:
+      - grep -r "setSceneLoader(null" .worktrees/ || echo "no null usage"
+      - npx jest tests/scene/scene-manager.test.ts --no-coverage
+    acceptance_criteria:
+      - setSceneLoader(null) 抛出 '[SceneManager] loader 不能为空'
+      - 现有 scene-manager 测试全部通过
+      - 接口 JSDoc 注释同步更新
+    failure_modes:
+      - scenario: demo worktree 存在传 null 的残留代码
+        likelihood: low
+        impact: medium
+        mitigation: grep 验证；如有则先修改调用方
+    tech_stack:
+      - TypeScript
+
+  - id: w1-t3
+    title: 框架层改造 IUIFormFactory 回调签名 + UIManager.openForm 异步化
+    wave: 1
+    agent: gem-implementer
+    prototype: false
+    priority: high
+    status: pending
+    dependencies: []
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/framework/ui/UIDefs.ts
+        description: IUIFormFactory 当前签名
+      - path: assets/scripts/framework/ui/UIManager.ts
+        description: openForm 当前实现（传 null asset 的缺陷）
+      - path: assets/scripts/framework/interfaces/IUIManager.ts
+        description: IUIManager 接口
+      - path: tests/ui/ui-manager.test.ts
+        description: 现有 UI 测试
+    files_to_modify:
+      - assets/scripts/framework/ui/UIDefs.ts
+      - assets/scripts/framework/interfaces/IUIManager.ts
+      - assets/scripts/framework/ui/UIManager.ts
+      - tests/ui/ui-manager.test.ts
+    description: |
+      严格 TDD（Red→Green 一次任务内完成）：
+      1) Red：先改 tests/ui/ui-manager.test.ts 期望 openForm 异步 + Factory 回调签名；
+      2) Green：IUIFormFactory.createForm 改 (formName, config, callbacks: {onSuccess(form: UIFormBase), onFailure(err: Error)}): void；
+         UIManager.openForm 改异步：调 factory.createForm，成功回调里完成入栈 + onOpen；
+      3) 移除原先 load asset 再 createForm 的路径（Factory 自己加载 Prefab）。
+    estimated_effort: medium
+    estimated_files: 4
+    estimated_lines: 180
+    verification:
+      - npx jest tests/ui/ui-manager.test.ts --no-coverage
+      - npx tsc --noEmit
+    acceptance_criteria:
+      - IUIFormFactory.createForm 为 (name, config, callbacks): void 回调签名
+      - UIManager.openForm 异步，成功回调入栈并触发 onOpen
+      - 失败回调日志记录并不入栈
+      - 现有 UI 测试全部绿
+    failure_modes:
+      - scenario: 异步化打破现有同步调用方
+        likelihood: medium
+        impact: high
+        mitigation: 全仓 grep openForm 调用点；Red 测试覆盖异步时序
+    tech_stack:
+      - TypeScript
+
+  # ──────────────── Wave 2：三策略（TDD Red/Green） ────────────────
+  - id: w2-t1-red
+    title: CocosResourceLoader Red（写失败测试）
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    priority: high
+    status: pending
+    dependencies: [w1-t1]
+    conflicts_with: []
+    files_to_modify:
+      - tests/runtime/cc-385/cocos-resource-loader.test.ts
+    description: |
+      写至少 7 条 Red 测试：loadAsset 成功 / 失败 / 进度；releaseAsset 正确 decRef；
+      "load→release→load→release 后 Asset._ref 回 0"；并发 load 同路径；beforeEach(jest.clearAllMocks())。
+    estimated_effort: medium
+    estimated_files: 1
+    estimated_lines: 180
+    verification:
+      - npx jest tests/runtime/cc-385/cocos-resource-loader.test.ts --no-coverage（应红）
+    acceptance_criteria:
+      - 至少 7 条测试全部 red（实现未写，模块不存在/方法未实现）
+      - 包含引用计数往返为 0 的用例
+    failure_modes:
+      - scenario: mock 不足以覆盖测试场景
+        likelihood: low
+        impact: medium
+        mitigation: w1-t1 验收覆盖
+    tech_stack:
+      - TypeScript
+      - Jest
+
+  - id: w2-t1-green
+    title: CocosResourceLoader Green（实现至全绿）
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    priority: high
+    status: pending
+    dependencies: [w2-t1-red]
+    conflicts_with: []
+    files_to_modify:
+      - assets/scripts/runtime/cc-385/CocosResourceLoader.ts
+    description: |
+      实现 IResourceLoader：loadAsset 用 resources.load(path, null, onProgress, (err, asset) => { asset.addRef(); callbacks.onSuccess(path, asset); })；
+      releaseAsset 通过内部 path→asset 映射找到 asset 调 decRef(true)；失败走 onFailure。
+    estimated_effort: medium
+    estimated_files: 1
+    estimated_lines: 120
+    verification:
+      - npx jest tests/runtime/cc-385/cocos-resource-loader.test.ts --no-coverage（应绿）
+    acceptance_criteria:
+      - w2-t1-red 全部测试通过
+      - 无 console 调用（走 Logger）
+    failure_modes:
+      - scenario: addRef/decRef 时机错误导致双重记账
+        likelihood: medium
+        impact: high
+        mitigation: red 测试已覆盖往返为 0
+    tech_stack:
+      - TypeScript
+
+  - id: w2-t2-red
+    title: CocosSceneLoader Red
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    priority: medium
+    status: pending
+    dependencies: [w1-t1]
+    conflicts_with: []
+    files_to_modify:
+      - tests/runtime/cc-385/cocos-scene-loader.test.ts
+    description: |
+      Red 测试覆盖：loadScene 成功 / 失败；重复加载同一场景单 flight；
+      并发加载不同场景时 listener 闭包校验 sceneName；beforeEach(jest.clearAllMocks())。
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 120
+    verification:
+      - npx jest tests/runtime/cc-385/cocos-scene-loader.test.ts --no-coverage（应红）
+    acceptance_criteria:
+      - 至少 4 条测试 red
+    failure_modes: []
+    tech_stack:
+      - TypeScript
+      - Jest
+
+  - id: w2-t2-green
+    title: CocosSceneLoader Green
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    priority: medium
+    status: pending
+    dependencies: [w2-t2-red]
+    conflicts_with: []
+    files_to_modify:
+      - assets/scripts/runtime/cc-385/CocosSceneLoader.ts
+    description: |
+      实现 ISceneLoader：director.loadScene(sceneName, callback)；单 flight（内部 _loadingScene 标记）；
+      listener 闭包捕获 sceneName 防并发错乱。
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 80
+    verification:
+      - npx jest tests/runtime/cc-385/cocos-scene-loader.test.ts --no-coverage（应绿）
+    acceptance_criteria:
+      - w2-t2-red 全绿
+    failure_modes: []
+    tech_stack:
+      - TypeScript
+
+  - id: w2-t3-red
+    title: CocosUIFormFactory Red
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    priority: high
+    status: pending
+    dependencies: [w1-t1, w1-t3]
+    conflicts_with: []
+    files_to_modify:
+      - tests/runtime/cc-385/cocos-ui-form-factory.test.ts
+    description: |
+      Red 测试：构造期注入 IResourceManager；createForm 走 resourceManager.loadAsset 拿 Prefab → instantiate →
+      查找 __IS_UI_FORM__===true 的 Component → 回调 onSuccess(form)；按 config.layer 挂到 layer 节点；
+      registerLayer(zIndex, name?) 懒建；场景切换事件触发 layerNodes 清空 + _canvas=null；destroyForm 销毁节点；
+      Canvas 双策略查找（Component 优先 + 名字兜底）；beforeEach(jest.clearAllMocks())。
+    estimated_effort: large
+    estimated_files: 1
+    estimated_lines: 260
+    verification:
+      - npx jest tests/runtime/cc-385/cocos-ui-form-factory.test.ts --no-coverage（应红）
+    acceptance_criteria:
+      - 测试覆盖：createForm 成功/失败、registerLayer、场景切换失效、destroyForm
+      - 至少 8 条测试 red
+    failure_modes:
+      - scenario: __IS_UI_FORM__ 约定未在 Red 中明确
+        likelihood: low
+        impact: medium
+        mitigation: 测试用 mock 组件携带该静态标记
+    tech_stack:
+      - TypeScript
+      - Jest
+
+  - id: w2-t3-green
+    title: CocosUIFormFactory Green
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    priority: high
+    status: pending
+    dependencies: [w2-t3-red]
+    conflicts_with: []
+    files_to_modify:
+      - assets/scripts/runtime/cc-385/CocosUIFormFactory.ts
+    description: |
+      实现：constructor(resourceManager: IResourceManager)；createForm 按 path 走 resourceManager.loadAsset(`ui:${formName}`, path, ...)，
+      成功后 instantiate(Prefab) → 遍历 components 找 __IS_UI_FORM__ 为 true 的 → 调 getUIForm() → setSiblingIndex(layer 升序)；
+      registerLayer 懒建 Map<number, Node>；订阅 director EVENT_BEFORE_SCENE_LOADING 清 layerNodes，EVENT_AFTER_SCENE_LAUNCH 置 _canvas=null；
+      destroyForm 调 node.destroy。
+    estimated_effort: large
+    estimated_files: 1
+    estimated_lines: 260
+    verification:
+      - npx jest tests/runtime/cc-385/cocos-ui-form-factory.test.ts --no-coverage（应绿）
+    acceptance_criteria:
+      - w2-t3-red 全绿
+      - 无 console（走 Logger）
+    failure_modes:
+      - scenario: Canvas 查找失败场景未兜底
+        likelihood: medium
+        impact: high
+        mitigation: 双策略（Component 优先 + 名字兜底）
+    tech_stack:
+      - TypeScript
+
+  # ──────────────── Wave 3：组装 ────────────────
+  - id: w3-t1
+    title: CocosUIFormBase 组合桥接
+    wave: 3
+    agent: gem-implementer
+    prototype: false
+    priority: high
+    status: pending
+    dependencies: [w1-t1]
+    conflicts_with: []
+    files_to_modify:
+      - assets/scripts/runtime/cc-385/CocosUIFormBase.ts
+      - tests/runtime/cc-385/cocos-ui-form-base.test.ts
+    description: |
+      extends cc.Component（**不** extends UIFormBase），静态 __IS_UI_FORM__=true，
+      持有 _uiForm: UIFormBase，暴露 getUIForm()。Red 测试验证静态标记 + getUIForm 非空。
+    estimated_effort: small
+    estimated_files: 2
+    estimated_lines: 80
+    verification:
+      - npx jest tests/runtime/cc-385/cocos-ui-form-base.test.ts --no-coverage
+    acceptance_criteria:
+      - 静态 __IS_UI_FORM__===true
+      - getUIForm() 返回注入的 UIFormBase 实例
+    failure_modes: []
+    tech_stack:
+      - TypeScript
+
+  - id: w3-t2
+    title: installCocosRuntime 入口
+    wave: 3
+    agent: gem-implementer
+    prototype: false
+    priority: high
+    status: pending
+    dependencies: [w2-t1-green, w2-t2-green, w2-t3-green, w3-t1]
+    conflicts_with: []
+    files_to_modify:
+      - assets/scripts/runtime/cc-385/install.ts
+      - tests/runtime/cc-385/install.test.ts
+    description: |
+      installCocosRuntime(gameEntry)：校验 gameEntry.isInited；取 ResourceManager/SceneManager/UIManager；
+      new CocosResourceLoader / CocosSceneLoader / CocosUIFormFactory(resourceManager)；依次 setXxx 注入。
+      测试覆盖 isInited=false 抛错 + 注入顺序。
+    estimated_effort: small
+    estimated_files: 2
+    estimated_lines: 120
+    verification:
+      - npx jest tests/runtime/cc-385/install.test.ts --no-coverage
+    acceptance_criteria:
+      - gameEntry.isInited=false 时抛错
+      - 三个 setXxx 均被调用
+    failure_modes: []
+    tech_stack:
+      - TypeScript
+
+  - id: w3-t3
+    title: index.ts barrel 导出
+    wave: 3
+    agent: gem-implementer
+    prototype: false
+    priority: low
+    status: pending
+    dependencies: [w3-t2]
+    conflicts_with: []
+    files_to_modify:
+      - assets/scripts/runtime/cc-385/index.ts
+    description: barrel 导出 installCocosRuntime + 三个策略类 + CocosUIFormBase。
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 10
+    verification:
+      - npx tsc --noEmit
+    acceptance_criteria:
+      - import { installCocosRuntime } from 'runtime/cc-385' 可用
+    failure_modes: []
+    tech_stack:
+      - TypeScript
+
+  # ──────────────── Wave 4：人工验证 ────────────────
+  - id: w4-t0
+    title: CC_PRECONDITION.md 前置条件文档
+    wave: 4
+    agent: gem-documentation-writer
+    prototype: false
+    priority: high
+    status: pending
+    dependencies: []
+    conflicts_with: []
+    task_type: documentation
+    audience: developers
+    files_to_modify:
+      - docs/plan/cocos-runtime/CC_PRECONDITION.md
+    description: |
+      记录 Cocos Dashboard 安装、CC 3.8.5 版本锁定、项目建议位置（避开外置 SSD）、
+      路径别名 spike 清单（tsconfig paths、@framework/*、CC 模块解析策略）。
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 120
+    coverage_matrix:
+      - Cocos Dashboard 安装步骤
+      - 3.8.5 版本锁定
+      - 外置 SSD 规避说明
+      - paths 别名 spike 清单
+    verification:
+      - 文档 lint（markdownlint）
+    acceptance_criteria:
+      - 包含 4 项覆盖矩阵条目
+    failure_modes: []
+
+  - id: w4-t1
+    title: 创建 cocos-runtime-demo worktree
+    wave: 4
+    agent: gem-implementer
+    prototype: false
+    priority: medium
+    status: pending
+    dependencies: [w3-t3, w4-t0]
+    conflicts_with: []
+    requires_human_operation: true
+    files_to_modify: []
+    description: |
+      使用 using-git-worktrees 技能创建 .worktrees/cocos-runtime-demo 分支 feature/cocos-runtime-demo。
+      注意外置 SSD 规避（参考 CC_PRECONDITION.md）。
+    estimated_effort: small
+    estimated_files: 0
+    estimated_lines: 0
+    verification:
+      - git worktree list | grep cocos-runtime-demo
+    acceptance_criteria:
+      - worktree 创建成功
+      - 分支名 feature/cocos-runtime-demo
+    failure_modes: []
+
+  - id: w4-t2
+    title: 最小 CC 3.8.5 项目脚手架 + 最小场景
+    wave: 4
+    agent: gem-implementer
+    prototype: true
+    priority: medium
+    status: pending
+    dependencies: [w4-t1]
+    conflicts_with: []
+    requires_human_operation: true
+    files_to_modify: []
+    description: |
+      在 worktree 内通过 Cocos Dashboard 建 3.8.5 项目；最小场景：Splash → Home；
+      Home 场景有一张图（测 Resource）+ 一个按钮弹 UIForm（测 UI）+ 切场景按钮（测 Scene）；
+      引用 runtime/cc-385 的 installCocosRuntime。
+    estimated_effort: large
+    estimated_files: 0
+    estimated_lines: 0
+    verification:
+      - 项目可在 Cocos Creator 内预览
+      - 控制台无红色错误
+    acceptance_criteria:
+      - 点按钮可弹 UIForm
+      - 切场景正常
+      - 图片正确显示
+    failure_modes:
+      - scenario: paths 别名 CC 环境不解析
+        likelihood: medium
+        impact: high
+        mitigation: CC_PRECONDITION.md 的 paths spike 清单
+
+  - id: w4-t3
+    title: 人工端到端验证 + VALIDATION.md
+    wave: 4
+    agent: gem-browser-tester
+    prototype: false
+    priority: high
+    status: pending
+    dependencies: [w4-t2]
+    conflicts_with: []
+    requires_human_operation: true
+    files_to_modify:
+      - docs/plan/cocos-runtime/VALIDATION.md
+    description: |
+      人工跑通 Splash→Home→弹 UIForm→切场景流程；贴 3 张截图 + 控制台日志到 VALIDATION.md。
+    estimated_effort: medium
+    estimated_files: 1
+    estimated_lines: 120
+    validation_matrix:
+      - scenario: Splash 启动
+        steps: ['Cocos 预览', '观察控制台']
+        expected_result: installCocosRuntime 完成日志 + 无红错
+      - scenario: Home 图片加载
+        steps: ['观察 Home 场景']
+        expected_result: 图片显示正常 + 引用计数 +1
+      - scenario: 弹 UIForm
+        steps: ['点按钮']
+        expected_result: UIForm 正确挂层 + onOpen 日志
+      - scenario: 切场景
+        steps: ['点切场景按钮']
+        expected_result: 切换成功 + Canvas 失效事件触发清理
+    verification:
+      - VALIDATION.md 含截图 + 日志
+    acceptance_criteria:
+      - 4 个场景全部通过
+      - 截图与日志齐备
+    failure_modes: []
+
+  # ──────────────── Wave 5：文档 ────────────────
+  - id: w5-t1
+    title: runtime/cc-385/README.md
+    wave: 5
+    agent: gem-documentation-writer
+    prototype: false
+    priority: medium
+    status: pending
+    dependencies: [w4-t3]
+    conflicts_with: []
+    task_type: documentation
+    audience: developers
+    files_to_modify:
+      - assets/scripts/runtime/cc-385/README.md
+      - assets/scripts/framework/resource/ResourceDefs.ts
+    description: |
+      README 含：架构图、引用计数转发策略、UI 层管理、installCocosRuntime 用法、已知限制
+      （仅支持 resources/ 目录、不支持 editor 运行、不保证 jsb 原生一致、不支持 load 中取消）。
+      追加 IResourceLoader JSDoc 的契约说明（owner 首次 addRef / 末次 decRef(true)）。
+    estimated_effort: medium
+    estimated_files: 2
+    estimated_lines: 220
+    coverage_matrix:
+      - 架构图
+      - 引用计数转发契约
+      - UI 层管理说明
+      - installCocosRuntime 示例
+      - 已知限制 4 条
+    verification:
+      - markdownlint
+    acceptance_criteria:
+      - 5 项覆盖矩阵齐全
+      - IResourceLoader JSDoc 追加契约说明
+    failure_modes: []
+
+  - id: w5-t2
+    title: 更新 docs/module-registry.md runtime 章节
+    wave: 5
+    agent: gem-documentation-writer
+    prototype: false
+    priority: low
+    status: pending
+    dependencies: [w4-t3]
+    conflicts_with: []
+    task_type: update
+    files_to_modify:
+      - docs/module-registry.md
+    description: 在 runtime 章节新增 cc-385 条目，列出三策略 + install 入口 + 状态。
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 40
+    verification:
+      - markdownlint
+    acceptance_criteria:
+      - cc-385 条目列出三策略 + install 入口
+    failure_modes: []
+
+  - id: w5-t3
+    title: 更新 docs/architecture.md runtime/cc-385 定位
+    wave: 5
+    agent: gem-documentation-writer
+    prototype: false
+    priority: low
+    status: pending
+    dependencies: [w4-t3]
+    conflicts_with: []
+    task_type: update
+    files_to_modify:
+      - docs/architecture.md
+    description: 架构图/描述中补充 runtime/cc-385 与 framework 三模块的关系。
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 40
+    verification:
+      - markdownlint
+    acceptance_criteria:
+      - 包含 runtime/cc-385 与三模块的连线或描述
+    failure_modes: []

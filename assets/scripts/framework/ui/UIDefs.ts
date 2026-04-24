@@ -54,32 +54,56 @@ export interface UIFormInfo {
 }
 
 /**
+ * UIFormFactory.createForm 的异步回调
+ * Factory 负责资源加载与实例化，加载成功/失败通过回调通知 UIManager
+ */
+export interface UIFormCreateCallbacks {
+    /**
+     * 表单创建成功回调
+     * @param form 已创建的表单实例
+     */
+    onSuccess(form: UIFormBase): void;
+    /**
+     * 表单创建失败回调
+     * @param error 错误信息
+     */
+    onFailure(error: Error): void;
+}
+
+/**
  * UI 表单工厂接口（策略模式）
  * Framework 层定义契约，Runtime 层提供实际实现
+ *
+ * createForm 为异步回调风格：Factory 自己负责加载资源，再回调 onSuccess / onFailure。
  *
  * @example
  * ```typescript
  * // Runtime 层实现
  * class CocosUIFormFactory implements IUIFormFactory {
- *     createForm(formName: string, config: UIFormConfig, asset: unknown): UIFormBase {
- *         const node = cc.instantiate(asset as cc.Prefab);
- *         return node.getComponent(UIFormBase)!;
+ *     createForm(formName: string, config: UIFormConfig, callbacks: UIFormCreateCallbacks): void {
+ *         resourceManager.loadAsset(config.path, {
+ *             onSuccess: (prefab) => {
+ *                 const node = cc.instantiate(prefab as cc.Prefab);
+ *                 callbacks.onSuccess(node.getComponent(UIFormBase)!);
+ *             },
+ *             onFailure: (err) => callbacks.onFailure(err),
+ *         });
  *     }
  *     destroyForm(form: UIFormBase): void {
- *         form.node.destroy();
+ *         // ...
  *     }
  * }
  * ```
  */
 export interface IUIFormFactory {
     /**
-     * 创建表单实例
+     * 创建表单实例（异步，通过回调返回结果）
+     * Factory 实现负责资源加载与实例化。
      * @param formName 表单名称
      * @param config 表单配置
-     * @param asset 已加载的资源（预制体等）
-     * @returns 表单实例
+     * @param callbacks 成功/失败回调
      */
-    createForm(formName: string, config: UIFormConfig, asset: unknown): UIFormBase;
+    createForm(formName: string, config: UIFormConfig, callbacks: UIFormCreateCallbacks): void;
 
     /**
      * 销毁表单实例

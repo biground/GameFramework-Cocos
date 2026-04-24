@@ -197,6 +197,22 @@ describe('SceneManager', () => {
             );
             warnSpy.mockRestore();
         });
+
+        test('setSceneLoader(null) 应抛出错误', () => {
+            const fresh = new SceneManager();
+            fresh.onInit();
+            expect(() => fresh.setSceneLoader(null as unknown as ISceneLoader)).toThrow(
+                '[SceneManager] loader 不能为空',
+            );
+        });
+
+        test('setSceneLoader(undefined) 应抛出错误', () => {
+            const fresh = new SceneManager();
+            fresh.onInit();
+            expect(() => fresh.setSceneLoader(undefined as unknown as ISceneLoader)).toThrow(
+                '[SceneManager] loader 不能为空',
+            );
+        });
     });
 
     // ─── 生命周期 ──────────────────────────────────
