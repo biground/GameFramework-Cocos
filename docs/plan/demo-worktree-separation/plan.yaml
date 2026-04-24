@@ -1,0 +1,1046 @@
+plan_id: demo-worktree-separation
+objective: |
+  将 demo game 代码从 main 分支分离到独立 worktree，main 只保留纯框架代码。
+  每个 demo 在独立分支（feature/demo1-idle, feature/demo2-rpg, feature/demo3-autochess），
+  各含 shared/ + 自己的 demo 代码。
+created_at: "2026-04-24"
+created_by: gem-planner
+status: pending_approval
+research_confidence: high
+
+plan_metrics:
+  wave_1_task_count: 2
+  total_dependencies: 12
+  risk_score: medium
+
+tldr: |
+  5 波执行计划，共 10 个任务：
+  - Wave 1: 清理旧 worktree（demo0 + demo1）和旧分支
+  - Wave 2: 从 main 创建 3 个新分支
+  - Wave 3: 在 main 上 soft 删除所有 demo 代码
+  - Wave 4: 创建 3 个 worktree 并清理各自不需要的 demo（可并行）
+  - Wave 5: 验证 main 框架测试 + 各 worktree demo 测试
+
+open_questions: []
+
+pre_mortem:
+  overall_risk_level: medium
+  critical_failure_modes:
+    - scenario: "worktree remove 失败（锁文件残留或进程占用）"
+      likelihood: medium
+      impact: medium
+      mitigation: "先关闭所有打开该 worktree 的编辑器/终端；失败时手动删除 .worktrees/demoN 目录再 git worktree prune"
+    - scenario: "main 上删除 game/ 后框架测试因隐式依赖而失败"
+      likelihood: low
+      impact: high
+      mitigation: "Wave 3 完成后立即运行 npm test 验证；若失败则 git revert 该 commit 并排查依赖"
+    - scenario: "路径含空格导致 shell 命令失败"
+      likelihood: medium
+      impact: low
+      mitigation: "所有路径必须双引号包裹；使用 cd 进目录后用相对路径操作"
+    - scenario: "exFAT fileMode 变化产生大量脏文件干扰 diff"
+      likelihood: medium
+      impact: low
+      mitigation: "每个 worktree 创建后立即执行 git config core.fileMode false"
+  assumptions:
+    - "main 分支当前无未提交的更改"
+    - "旧 worktree（demo0、demo1）无需保留的未提交工作"
+    - "框架测试（tests/ 下非 game/ 非 e2e/）不依赖 game/ 或 shared/ 中的任何代码"
+    - "不需要 push 任何新分支到远程"
+
+implementation_specification:
+  code_structure: |
+    分离后的结构：
+    - main 分支：assets/scripts/framework/ + runtime/ + utils/，tests/ 下仅框架测试
+    - feature/demo1-idle：main + assets/scripts/game/shared/ + game/demo1-idle/，tests/game/shared/ + demo1-idle/
+    - feature/demo2-rpg：main + assets/scripts/game/shared/ + game/demo2-rpg/，tests/game/shared/ + demo2-rpg/ + e2e/
+    - feature/demo3-autochess：main + assets/scripts/game/shared/ + game/demo3-autochess/，tests/game/shared/ + demo3-autochess/
+  affected_areas:
+    - "assets/scripts/game/ — 从 main 移除，各 worktree 保留子集"
+    - "tests/game/ — 从 main 移除，各 worktree 保留子集"
+    - "tests/e2e/ — 从 main 移除，仅 demo2 worktree 保留"
+    - "dist/ — 从 main 移除全部 demo HTML/JS"
+    - "package.json — main 移除 demo scripts；各 worktree 移除非本 demo 的 scripts"
+    - "playwright.config.ts — 从 main 移除，仅 demo2 worktree 保留"
+    - ".worktrees/ — 删除旧的 demo0、demo1；创建新的 demo1、demo2、demo3"
+  component_details:
+    - component: "main 分支（纯框架）"
+      responsibility: "仅保留框架层、运行时适配层、工具层代码和对应测试"
+      interfaces:
+        - "npm test — 运行全部框架测试"
+        - "npm run lint — ESLint 检查"
+    - component: "feature/demo1-idle worktree"
+      responsibility: "Idle Clicker Demo，包含 shared/ 基础设施 + demo1-idle/ 业务代码"
+      interfaces:
+        - "npm run demo1:build / demo1:serve"
+        - "npm test — 框架 + shared + demo1 测试"
+    - component: "feature/demo2-rpg worktree"
+      responsibility: "Turn-based RPG Demo，包含 shared/ + demo2-rpg/ + E2E 测试"
+      interfaces:
+        - "npm run demo2:build / demo2:serve / demo2:dev"
+        - "npm test — 框架 + shared + demo2 测试"
+        - "npm run test:e2e — Playwright E2E"
+    - component: "feature/demo3-autochess worktree"
+      responsibility: "Auto Chess Demo，包含 shared/ + demo3-autochess/"
+      interfaces:
+        - "npm run demo3:build / demo3:serve / demo3:dev"
+        - "npm test — 框架 + shared + demo3 测试"
+  dependencies:
+    - component: "各 worktree"
+      relationship: "从 main 分支 fork，包含 main 的全部框架代码 + 本 demo 子集"
+  integration_points:
+    - "各 worktree 可通过 git merge main 获取框架更新"
+
+contracts:
+  - from_task: "task-1-cleanup-worktrees"
+    to_task: "task-2-create-branches"
+    interface: "旧 worktree 和旧分支已清理，分支名 feature/demo0-infrastructure 和 feature/demo1-idle-clicker 可用"
+    format: "git worktree list 不再包含 demo0/demo1 条目；git branch 不再包含旧分支"
+  - from_task: "task-2-create-branches"
+    to_task: "task-3-cleanup-main"
+    interface: "3 个新分支已从 main HEAD 创建，包含 main 的完整代码快照"
+    format: "git branch 包含 feature/demo1-idle, feature/demo2-rpg, feature/demo3-autochess"
+  - from_task: "task-3-cleanup-main"
+    to_task: "task-4a-worktree-demo1"
+    interface: "main 已清除 demo 代码并 commit；新分支尚未受影响（在 commit 前已 fork）"
+    format: "main 不含 assets/scripts/game/、tests/game/、tests/e2e/、dist/"
+  - from_task: "task-3-cleanup-main"
+    to_task: "task-4b-worktree-demo2"
+    interface: "同上"
+    format: "同上"
+  - from_task: "task-3-cleanup-main"
+    to_task: "task-4c-worktree-demo3"
+    interface: "同上"
+    format: "同上"
+
+tasks:
+  # ============== Wave 1: 清理旧 worktree ==============
+  - id: "task-1-cleanup-worktrees"
+    title: "清理旧 worktree 和旧分支"
+    description: |
+      删除落后的旧 worktree（demo0、demo1）和对应的本地分支。
+
+      **步骤：**
+
+      1. 确认当前工作目录是主仓库根目录：
+         ```bash
+         cd "/Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos"
+         ```
+
+      2. 删除 demo0 worktree：
+         ```bash
+         git worktree remove .worktrees/demo0 --force
+         ```
+
+      3. 删除 demo1 worktree：
+         ```bash
+         git worktree remove .worktrees/demo1 --force
+         ```
+
+      4. 清理 worktree 引用：
+         ```bash
+         git worktree prune
+         ```
+
+      5. 删除旧的本地分支：
+         ```bash
+         git branch -D feature/demo0-infrastructure
+         git branch -D feature/demo1-idle-clicker
+         ```
+
+      6. 验证清理结果：
+         ```bash
+         git worktree list
+         # 应只显示主仓库一条记录
+         git branch | grep feature
+         # 应无输出
+         ```
+    wave: 1
+    agent: gem-implementer
+    prototype: false
+    priority: high
+    status: pending
+    dependencies: []
+    conflicts_with: []
+    context_files:
+      - path: ".worktrees/demo0"
+        description: "旧的 demo0 worktree 目录（feature/demo0-infrastructure 分支，落后 45 commits）"
+      - path: ".worktrees/demo1"
+        description: "旧的 demo1 worktree 目录（feature/demo1-idle-clicker 分支，落后 33 commits）"
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: small
+        estimated_files: 0
+        estimated_lines: 0
+        focus_area: "git worktree 管理"
+        verification:
+          - "git worktree list 仅显示主仓库一条记录"
+          - "git branch | grep feature 无输出"
+          - "ls .worktrees/ 目录为空或不存在"
+        acceptance_criteria:
+          - ".worktrees/demo0 和 .worktrees/demo1 目录已删除"
+          - "feature/demo0-infrastructure 和 feature/demo1-idle-clicker 本地分支已删除"
+          - "git worktree prune 清理完毕"
+        failure_modes:
+          - scenario: "worktree remove 失败（锁文件或进程占用）"
+            likelihood: medium
+            impact: medium
+            mitigation: "使用 --force 标志；若仍失败，手动 rm -rf .worktrees/demoN 再 git worktree prune"
+        tech_stack:
+          - "git worktree"
+        test_coverage: null
+
+  # ============== Wave 1: 确认 main 状态（与清理并行）==============
+  - id: "task-1b-verify-main-clean"
+    title: "确认 main 分支无未提交更改"
+    description: |
+      在执行任何操作前，确认 main 分支是干净状态。
+
+      **步骤：**
+
+      1. 切换到主仓库并确认在 main 分支：
+         ```bash
+         cd "/Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos"
+         git checkout main
+         git status --short
+         ```
+
+      2. 若有未提交更改，先 stash 或 commit：
+         ```bash
+         # 如果有更改
+         git stash -m "pre-worktree-separation"
+         ```
+
+      3. 确认 core.fileMode 设置：
+         ```bash
+         git config core.fileMode false
+         ```
+
+      4. 记录当前 HEAD（用于后续验证）：
+         ```bash
+         git log --oneline -1
+         ```
+    wave: 1
+    agent: gem-implementer
+    prototype: false
+    priority: high
+    status: pending
+    dependencies: []
+    conflicts_with: []
+    context_files:
+      - path: "package.json"
+        description: "项目配置，包含 demo scripts 需要在后续步骤中修改"
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: small
+        estimated_files: 0
+        estimated_lines: 0
+        focus_area: "前置状态验证"
+        verification:
+          - "git status --short 无输出（干净状态）"
+          - "git config core.fileMode 输出 false"
+        acceptance_criteria:
+          - "main 分支处于干净状态"
+          - "core.fileMode 已设置为 false"
+        failure_modes:
+          - scenario: "存在未提交的更改导致后续分支操作混乱"
+            likelihood: low
+            impact: high
+            mitigation: "先 stash 保存，完成后 stash pop 恢复"
+        tech_stack:
+          - "git"
+        test_coverage: null
+
+  # ============== Wave 2: 创建新分支 ==============
+  - id: "task-2-create-branches"
+    title: "从 main HEAD 创建 3 个 demo 分支"
+    description: |
+      从 main 当前 HEAD 创建 3 个新的 feature 分支，确保每个分支包含完整的代码快照。
+
+      **步骤：**
+
+      1. 确认在 main 分支：
+         ```bash
+         cd "/Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos"
+         git checkout main
+         ```
+
+      2. 创建 3 个分支：
+         ```bash
+         git branch feature/demo1-idle
+         git branch feature/demo2-rpg
+         git branch feature/demo3-autochess
+         ```
+
+      3. 验证分支创建成功：
+         ```bash
+         git branch | grep feature
+         # 应显示：
+         #   feature/demo1-idle
+         #   feature/demo2-rpg
+         #   feature/demo3-autochess
+         ```
+
+      4. 确认所有分支指向同一 commit：
+         ```bash
+         git log --oneline -1 feature/demo1-idle
+         git log --oneline -1 feature/demo2-rpg
+         git log --oneline -1 feature/demo3-autochess
+         git log --oneline -1 main
+         # 四个输出应完全相同
+         ```
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    priority: high
+    status: pending
+    dependencies:
+      - "task-1-cleanup-worktrees"
+      - "task-1b-verify-main-clean"
+    conflicts_with: []
+    context_files: []
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: small
+        estimated_files: 0
+        estimated_lines: 0
+        focus_area: "git 分支创建"
+        verification:
+          - "git branch | grep feature 显示 3 个新分支"
+          - "3 个分支和 main 指向同一 commit hash"
+        acceptance_criteria:
+          - "feature/demo1-idle 分支已创建，指向 main HEAD"
+          - "feature/demo2-rpg 分支已创建，指向 main HEAD"
+          - "feature/demo3-autochess 分支已创建，指向 main HEAD"
+        failure_modes:
+          - scenario: "分支名与旧分支冲突"
+            likelihood: low
+            impact: low
+            mitigation: "旧分支名是 feature/demo1-idle-clicker（不同），不会冲突"
+        tech_stack:
+          - "git branch"
+        test_coverage: null
+
+  # ============== Wave 3: main 上清理 demo 代码 ==============
+  - id: "task-3-cleanup-main"
+    title: "在 main 分支上 soft 删除所有 demo 相关代码"
+    description: |
+      从 main 分支删除所有 demo 相关文件和配置，使 main 成为纯框架仓库。
+      使用 soft 删除（git rm + commit），历史保留。
+
+      **步骤：**
+
+      1. 确认在 main 分支：
+         ```bash
+         cd "/Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos"
+         git checkout main
+         ```
+
+      2. 删除 game 源码目录：
+         ```bash
+         git rm -r assets/scripts/game/
+         ```
+
+      3. 删除 game 测试目录：
+         ```bash
+         git rm -r tests/game/
+         ```
+
+      4. 删除 e2e 测试目录：
+         ```bash
+         git rm -r tests/e2e/
+         ```
+
+      5. 删除 dist 目录下的 demo 产物：
+         ```bash
+         git rm -r dist/
+         ```
+
+      6. 删除 playwright.config.ts（E2E 仅在 demo worktree 使用）：
+         ```bash
+         git rm playwright.config.ts
+         ```
+
+      7. 编辑 package.json，移除 demo 相关 scripts：
+         需要移除的 scripts key：
+         - `demo1:build`
+         - `demo1:serve`
+         - `demo2:build`
+         - `demo2:serve`
+         - `demo2:dev`
+         - `demo3:build`
+         - `demo3:serve`
+         - `demo3:dev`
+         - `test:e2e`
+
+         保留的 scripts：
+         - `lint`, `lint:fix`, `format`, `test`, `test:watch`, `test:coverage`, `prepare`
+
+      8. 提交更改：
+         ```bash
+         git add -A
+         git commit -m "refactor: 从 main 分支移除所有 demo 代码，仅保留纯框架
+
+         - 删除 assets/scripts/game/ 整个目录（shared + demo1/2/3）
+         - 删除 tests/game/ 和 tests/e2e/ 测试目录
+         - 删除 dist/ 目录下的 demo 产物
+         - 删除 playwright.config.ts（E2E 仅在 demo worktree 使用）
+         - 移除 package.json 中 demo 相关 scripts
+
+         Demo 代码已分离到独立 worktree 分支：
+         - feature/demo1-idle
+         - feature/demo2-rpg
+         - feature/demo3-autochess"
+         ```
+
+      9. 验证框架测试通过：
+         ```bash
+         npm test
+         ```
+    wave: 3
+    agent: gem-implementer
+    prototype: false
+    priority: high
+    status: pending
+    dependencies:
+      - "task-2-create-branches"
+    conflicts_with: []
+    context_files:
+      - path: "assets/scripts/game/"
+        description: "game 源码目录，包含 shared/ + demo1-idle/ + demo2-rpg/ + demo3-autochess/ + data/ + procedures/ + ui/"
+      - path: "tests/game/"
+        description: "game 测试目录，包含 shared/ + demo1-idle/ + demo2-rpg/ + demo3-autochess/ + 根目录 Mock 测试"
+      - path: "tests/e2e/"
+        description: "E2E 测试目录，仅包含 demo2-rpg.e2e.test.ts"
+      - path: "dist/"
+        description: "demo 构建产物，包含 demo1/ + demo2/ + demo3/ 子目录"
+      - path: "playwright.config.ts"
+        description: "Playwright E2E 配置文件"
+      - path: "package.json"
+        description: "项目配置，需要移除 9 个 demo 相关 scripts"
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: medium
+        estimated_files: 2
+        estimated_lines: 30
+        focus_area: "main 分支 demo 代码清理"
+        verification:
+          - "ls assets/scripts/game/ 报错（目录不存在）"
+          - "ls tests/game/ 报错（目录不存在）"
+          - "ls tests/e2e/ 报错（目录不存在）"
+          - "ls dist/ 报错（目录不存在）"
+          - "ls playwright.config.ts 报错（文件不存在）"
+          - "grep demo package.json 无匹配（demo scripts 已移除）"
+          - "npm test 全部通过"
+        acceptance_criteria:
+          - "assets/scripts/game/ 目录已从 main 删除"
+          - "tests/game/ 和 tests/e2e/ 已从 main 删除"
+          - "dist/ 目录已从 main 删除"
+          - "playwright.config.ts 已从 main 删除"
+          - "package.json 不再包含 demo 相关 scripts"
+          - "npm test 通过（框架测试无回归）"
+          - "git log 包含描述性的 commit message"
+        failure_modes:
+          - scenario: "框架测试隐式依赖 game/ 或 shared/ 代码导致测试失败"
+            likelihood: low
+            impact: high
+            mitigation: "npm test 失败时 git revert HEAD 回滚；检查 jest.config.js 的 testPathPattern 是否需要调整"
+          - scenario: "package.json 编辑出错导致 JSON 语法错误"
+            likelihood: low
+            impact: medium
+            mitigation: "编辑后先 node -e \"require('./package.json')\" 验证 JSON 合法性"
+        tech_stack:
+          - "git rm"
+          - "sed / node JSON 编辑"
+          - "jest"
+        test_coverage: "npm test 覆盖全部框架测试"
+
+  # ============== Wave 4: 创建 worktree 并清理（3 个可并行）==============
+  - id: "task-4a-worktree-demo1"
+    title: "创建 demo1 worktree 并清理非 demo1 代码"
+    description: |
+      创建 demo1 的 worktree，保留 shared/ + demo1-idle/，删除 demo2/demo3 相关代码。
+
+      **步骤：**
+
+      1. 在主仓库根目录创建 worktree：
+         ```bash
+         cd "/Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos"
+         git worktree add .worktrees/demo1 feature/demo1-idle
+         ```
+
+      2. 进入 worktree 并设置 git config：
+         ```bash
+         cd .worktrees/demo1
+         git config core.fileMode false
+         ```
+
+      3. 删除 demo2 源码和测试：
+         ```bash
+         git rm -r assets/scripts/game/demo2-rpg/
+         git rm -r tests/game/demo2-rpg/
+         ```
+
+      4. 删除 demo3 源码和测试：
+         ```bash
+         git rm -r assets/scripts/game/demo3-autochess/
+         git rm -r tests/game/demo3-autochess/
+         ```
+
+      5. 删除 E2E 测试（属于 demo2）：
+         ```bash
+         git rm -r tests/e2e/
+         ```
+
+      6. 删除 demo2/demo3 的 dist 产物：
+         ```bash
+         git rm -r dist/demo2/
+         git rm -r dist/demo3/
+         ```
+
+      7. 删除 playwright.config.ts（E2E 属于 demo2）：
+         ```bash
+         git rm playwright.config.ts
+         ```
+
+      8. 编辑 package.json，移除 demo2/demo3 相关 scripts：
+         需要移除的 scripts key：
+         - `demo2:build`
+         - `demo2:serve`
+         - `demo2:dev`
+         - `demo3:build`
+         - `demo3:serve`
+         - `demo3:dev`
+         - `test:e2e`
+
+         保留的 scripts：
+         - `lint`, `lint:fix`, `format`, `test`, `test:watch`, `test:coverage`, `prepare`
+         - `demo1:build`, `demo1:serve`
+
+      9. 提交：
+         ```bash
+         git add -A
+         git commit -m "refactor(demo1): 清理非 demo1 代码，保留 shared + demo1-idle
+
+         从 feature/demo1-idle 分支移除：
+         - demo2-rpg 源码和测试
+         - demo3-autochess 源码和测试
+         - E2E 测试和 playwright.config.ts
+         - demo2/demo3 的 dist 产物和 npm scripts"
+         ```
+
+      10. 回到主仓库：
+          ```bash
+          cd "/Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos"
+          ```
+    wave: 4
+    agent: gem-implementer
+    prototype: false
+    priority: high
+    status: pending
+    dependencies:
+      - "task-3-cleanup-main"
+    conflicts_with:
+      - "task-4b-worktree-demo2"
+      - "task-4c-worktree-demo3"
+    context_files:
+      - path: "assets/scripts/game/demo1-idle/"
+        description: "demo1 源码（保留）"
+      - path: "assets/scripts/game/shared/"
+        description: "共享基础设施（保留）"
+      - path: "tests/game/demo1-idle/"
+        description: "demo1 测试（保留）"
+      - path: "tests/game/shared/"
+        description: "shared 测试（保留）"
+      - path: "package.json"
+        description: "需要移除 demo2/3 的 scripts"
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: medium
+        estimated_files: 2
+        estimated_lines: 25
+        focus_area: "demo1 worktree 创建与清理"
+        verification:
+          - "ls .worktrees/demo1/assets/scripts/game/ 仅包含 shared/ demo1-idle/ data/ procedures/ ui/"
+          - "ls .worktrees/demo1/tests/game/ 仅包含 shared/ demo1-idle/ 和根目录 Mock 测试"
+          - "ls .worktrees/demo1/tests/e2e/ 报错（不存在）"
+          - "grep demo2 .worktrees/demo1/package.json 无匹配"
+          - "grep demo3 .worktrees/demo1/package.json 无匹配"
+        acceptance_criteria:
+          - "worktree .worktrees/demo1 已创建在 feature/demo1-idle 分支"
+          - "demo2-rpg 和 demo3-autochess 源码和测试已删除"
+          - "E2E 测试和 playwright.config.ts 已删除"
+          - "package.json 仅保留 demo1 相关 scripts"
+          - "commit 已创建并包含描述性信息"
+        failure_modes:
+          - scenario: "git worktree add 失败（分支已被其他 worktree 使用）"
+            likelihood: low
+            impact: high
+            mitigation: "Wave 1 已清理旧 worktree；若仍失败，检查 git worktree list 确认分支未被占用"
+        tech_stack:
+          - "git worktree"
+          - "git rm"
+          - "sed / node JSON 编辑"
+        test_coverage: null
+
+  - id: "task-4b-worktree-demo2"
+    title: "创建 demo2 worktree 并清理非 demo2 代码"
+    description: |
+      创建 demo2 的 worktree，保留 shared/ + demo2-rpg/ + E2E 测试，删除 demo1/demo3 相关代码。
+
+      **步骤：**
+
+      1. 在主仓库根目录创建 worktree：
+         ```bash
+         cd "/Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos"
+         git worktree add .worktrees/demo2 feature/demo2-rpg
+         ```
+
+      2. 进入 worktree 并设置 git config：
+         ```bash
+         cd .worktrees/demo2
+         git config core.fileMode false
+         ```
+
+      3. 删除 demo1 源码和测试：
+         ```bash
+         git rm -r assets/scripts/game/demo1-idle/
+         git rm -r tests/game/demo1-idle/
+         ```
+
+      4. 删除 demo3 源码和测试：
+         ```bash
+         git rm -r assets/scripts/game/demo3-autochess/
+         git rm -r tests/game/demo3-autochess/
+         ```
+
+      5. 删除 demo1/demo3 的 dist 产物：
+         ```bash
+         git rm -r dist/demo1/
+         git rm -r dist/demo3/
+         ```
+
+      6. 编辑 package.json，移除 demo1/demo3 相关 scripts：
+         需要移除的 scripts key：
+         - `demo1:build`
+         - `demo1:serve`
+         - `demo3:build`
+         - `demo3:serve`
+         - `demo3:dev`
+
+         保留的 scripts：
+         - `lint`, `lint:fix`, `format`, `test`, `test:watch`, `test:coverage`, `prepare`
+         - `demo2:build`, `demo2:serve`, `demo2:dev`
+         - `test:e2e`
+
+      7. 保留 playwright.config.ts（demo2 使用 E2E 测试）。
+
+      8. 提交：
+         ```bash
+         git add -A
+         git commit -m "refactor(demo2): 清理非 demo2 代码，保留 shared + demo2-rpg + E2E
+
+         从 feature/demo2-rpg 分支移除：
+         - demo1-idle 源码和测试
+         - demo3-autochess 源码和测试
+         - demo1/demo3 的 dist 产物和 npm scripts"
+         ```
+
+      9. 回到主仓库：
+          ```bash
+          cd "/Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos"
+          ```
+    wave: 4
+    agent: gem-implementer
+    prototype: false
+    priority: high
+    status: pending
+    dependencies:
+      - "task-3-cleanup-main"
+    conflicts_with:
+      - "task-4a-worktree-demo1"
+      - "task-4c-worktree-demo3"
+    context_files:
+      - path: "assets/scripts/game/demo2-rpg/"
+        description: "demo2 源码（保留）"
+      - path: "assets/scripts/game/shared/"
+        description: "共享基础设施（保留）"
+      - path: "tests/game/demo2-rpg/"
+        description: "demo2 测试（保留）"
+      - path: "tests/game/shared/"
+        description: "shared 测试（保留）"
+      - path: "tests/e2e/"
+        description: "E2E 测试（保留，仅 demo2 使用）"
+      - path: "playwright.config.ts"
+        description: "Playwright 配置（保留）"
+      - path: "package.json"
+        description: "需要移除 demo1/3 的 scripts"
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: medium
+        estimated_files: 2
+        estimated_lines: 20
+        focus_area: "demo2 worktree 创建与清理"
+        verification:
+          - "ls .worktrees/demo2/assets/scripts/game/ 仅包含 shared/ demo2-rpg/ data/ procedures/ ui/"
+          - "ls .worktrees/demo2/tests/game/ 仅包含 shared/ demo2-rpg/ 和根目录 Mock 测试"
+          - "ls .worktrees/demo2/tests/e2e/ 包含 demo2-rpg.e2e.test.ts"
+          - "ls .worktrees/demo2/playwright.config.ts 存在"
+          - "grep demo1 .worktrees/demo2/package.json 无匹配"
+          - "grep demo3 .worktrees/demo2/package.json 无匹配"
+        acceptance_criteria:
+          - "worktree .worktrees/demo2 已创建在 feature/demo2-rpg 分支"
+          - "demo1-idle 和 demo3-autochess 源码和测试已删除"
+          - "E2E 测试和 playwright.config.ts 保留"
+          - "package.json 仅保留 demo2 相关 scripts + test:e2e"
+          - "commit 已创建并包含描述性信息"
+        failure_modes:
+          - scenario: "git worktree add 失败"
+            likelihood: low
+            impact: high
+            mitigation: "同 task-4a"
+        tech_stack:
+          - "git worktree"
+          - "git rm"
+          - "sed / node JSON 编辑"
+        test_coverage: null
+
+  - id: "task-4c-worktree-demo3"
+    title: "创建 demo3 worktree 并清理非 demo3 代码"
+    description: |
+      创建 demo3 的 worktree，保留 shared/ + demo3-autochess/，删除 demo1/demo2 相关代码。
+
+      **步骤：**
+
+      1. 在主仓库根目录创建 worktree：
+         ```bash
+         cd "/Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos"
+         git worktree add .worktrees/demo3 feature/demo3-autochess
+         ```
+
+      2. 进入 worktree 并设置 git config：
+         ```bash
+         cd .worktrees/demo3
+         git config core.fileMode false
+         ```
+
+      3. 删除 demo1 源码和测试：
+         ```bash
+         git rm -r assets/scripts/game/demo1-idle/
+         git rm -r tests/game/demo1-idle/
+         ```
+
+      4. 删除 demo2 源码和测试：
+         ```bash
+         git rm -r assets/scripts/game/demo2-rpg/
+         git rm -r tests/game/demo2-rpg/
+         ```
+
+      5. 删除 E2E 测试（属于 demo2）：
+         ```bash
+         git rm -r tests/e2e/
+         ```
+
+      6. 删除 demo1/demo2 的 dist 产物：
+         ```bash
+         git rm -r dist/demo1/
+         git rm -r dist/demo2/
+         ```
+
+      7. 删除 playwright.config.ts（E2E 属于 demo2）：
+         ```bash
+         git rm playwright.config.ts
+         ```
+
+      8. 编辑 package.json，移除 demo1/demo2 相关 scripts：
+         需要移除的 scripts key：
+         - `demo1:build`
+         - `demo1:serve`
+         - `demo2:build`
+         - `demo2:serve`
+         - `demo2:dev`
+         - `test:e2e`
+
+         保留的 scripts：
+         - `lint`, `lint:fix`, `format`, `test`, `test:watch`, `test:coverage`, `prepare`
+         - `demo3:build`, `demo3:serve`, `demo3:dev`
+
+      9. 提交：
+         ```bash
+         git add -A
+         git commit -m "refactor(demo3): 清理非 demo3 代码，保留 shared + demo3-autochess
+
+         从 feature/demo3-autochess 分支移除：
+         - demo1-idle 源码和测试
+         - demo2-rpg 源码和测试
+         - E2E 测试和 playwright.config.ts
+         - demo1/demo2 的 dist 产物和 npm scripts"
+         ```
+
+      10. 回到主仓库：
+          ```bash
+          cd "/Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos"
+          ```
+    wave: 4
+    agent: gem-implementer
+    prototype: false
+    priority: high
+    status: pending
+    dependencies:
+      - "task-3-cleanup-main"
+    conflicts_with:
+      - "task-4a-worktree-demo1"
+      - "task-4b-worktree-demo2"
+    context_files:
+      - path: "assets/scripts/game/demo3-autochess/"
+        description: "demo3 源码（保留）"
+      - path: "assets/scripts/game/shared/"
+        description: "共享基础设施（保留）"
+      - path: "tests/game/demo3-autochess/"
+        description: "demo3 测试（保留）"
+      - path: "tests/game/shared/"
+        description: "shared 测试（保留）"
+      - path: "package.json"
+        description: "需要移除 demo1/2 的 scripts"
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: medium
+        estimated_files: 2
+        estimated_lines: 25
+        focus_area: "demo3 worktree 创建与清理"
+        verification:
+          - "ls .worktrees/demo3/assets/scripts/game/ 仅包含 shared/ demo3-autochess/ data/ procedures/ ui/"
+          - "ls .worktrees/demo3/tests/game/ 仅包含 shared/ demo3-autochess/ 和根目录 Mock 测试"
+          - "ls .worktrees/demo3/tests/e2e/ 报错（不存在）"
+          - "ls .worktrees/demo3/playwright.config.ts 报错（不存在）"
+          - "grep demo1 .worktrees/demo3/package.json 无匹配"
+          - "grep demo2 .worktrees/demo3/package.json 无匹配"
+        acceptance_criteria:
+          - "worktree .worktrees/demo3 已创建在 feature/demo3-autochess 分支"
+          - "demo1-idle 和 demo2-rpg 源码和测试已删除"
+          - "E2E 测试和 playwright.config.ts 已删除"
+          - "package.json 仅保留 demo3 相关 scripts"
+          - "commit 已创建并包含描述性信息"
+        failure_modes:
+          - scenario: "git worktree add 失败"
+            likelihood: low
+            impact: high
+            mitigation: "同 task-4a"
+        tech_stack:
+          - "git worktree"
+          - "git rm"
+          - "sed / node JSON 编辑"
+        test_coverage: null
+
+  # ============== Wave 5: 验证 ==============
+  - id: "task-5a-verify-main"
+    title: "验证 main 分支框架测试全部通过"
+    description: |
+      在 main 分支上运行全部测试，确认框架无回归。
+
+      **步骤：**
+
+      1. 切换到主仓库：
+         ```bash
+         cd "/Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos"
+         git checkout main
+         ```
+
+      2. 运行测试：
+         ```bash
+         npm test
+         ```
+
+      3. 确认无 game/ 相关文件残留：
+         ```bash
+         test ! -d assets/scripts/game && echo "OK: game/ 不存在" || echo "FAIL: game/ 仍存在"
+         test ! -d tests/game && echo "OK: tests/game/ 不存在" || echo "FAIL: tests/game/ 仍存在"
+         test ! -d tests/e2e && echo "OK: tests/e2e/ 不存在" || echo "FAIL: tests/e2e/ 仍存在"
+         test ! -d dist && echo "OK: dist/ 不存在" || echo "FAIL: dist/ 仍存在"
+         test ! -f playwright.config.ts && echo "OK: playwright.config.ts 不存在" || echo "FAIL: playwright.config.ts 仍存在"
+         ```
+
+      4. 验证 package.json 无 demo scripts：
+         ```bash
+         node -e "const p = require('./package.json'); const keys = Object.keys(p.scripts); const demoKeys = keys.filter(k => k.includes('demo') || k === 'test:e2e'); if (demoKeys.length > 0) { console.log('FAIL: 残留 scripts:', demoKeys); process.exit(1); } else { console.log('OK: 无 demo scripts'); }"
+         ```
+
+      5. 验证 worktree 状态：
+         ```bash
+         git worktree list
+         # 应显示 4 条记录：main + demo1 + demo2 + demo3
+         ```
+    wave: 5
+    agent: gem-implementer
+    prototype: false
+    priority: high
+    status: pending
+    dependencies:
+      - "task-4a-worktree-demo1"
+      - "task-4b-worktree-demo2"
+      - "task-4c-worktree-demo3"
+    conflicts_with: []
+    context_files:
+      - path: "package.json"
+        description: "验证无 demo scripts"
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: small
+        estimated_files: 0
+        estimated_lines: 0
+        focus_area: "main 分支验证"
+        verification:
+          - "npm test 退出码为 0"
+          - "所有 game/ 相关目录不存在"
+          - "package.json 无 demo scripts"
+          - "git worktree list 显示 4 条记录"
+        acceptance_criteria:
+          - "npm test 全部通过，无失败用例"
+          - "main 分支不包含任何 demo 相关文件或配置"
+          - "git worktree list 正确显示 main + 3 个 demo worktree"
+        failure_modes:
+          - scenario: "框架测试因 jest.config.js testMatch 仍包含 game/ 路径而报错"
+            likelihood: low
+            impact: medium
+            mitigation: "检查 jest.config.js 的 testMatch/testPathIgnorePatterns 配置，按需调整"
+        tech_stack:
+          - "jest"
+          - "node"
+          - "git"
+        test_coverage: "npm test 覆盖全部框架测试"
+
+  - id: "task-5b-verify-worktrees"
+    title: "验证各 worktree 内容和 demo 测试"
+    description: |
+      逐个验证 3 个 worktree 的内容正确性和测试通过。
+
+      **步骤：**
+
+      1. 验证 demo1 worktree：
+         ```bash
+         cd "/Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos/.worktrees/demo1"
+         echo "=== demo1 分支验证 ==="
+         git branch --show-current
+         # 应为 feature/demo1-idle
+
+         echo "--- game 目录内容 ---"
+         ls assets/scripts/game/
+         # 应包含 shared/ demo1-idle/（以及 data/ procedures/ ui/ 的 .gitkeep）
+
+         echo "--- 无 demo2/demo3 ---"
+         test ! -d assets/scripts/game/demo2-rpg && echo "OK" || echo "FAIL: demo2 存在"
+         test ! -d assets/scripts/game/demo3-autochess && echo "OK" || echo "FAIL: demo3 存在"
+
+         echo "--- 测试 ---"
+         npx jest --testPathPattern='tests/game' --no-coverage --forceExit 2>&1 | tail -20
+         ```
+
+      2. 验证 demo2 worktree：
+         ```bash
+         cd "/Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos/.worktrees/demo2"
+         echo "=== demo2 分支验证 ==="
+         git branch --show-current
+         # 应为 feature/demo2-rpg
+
+         echo "--- game 目录内容 ---"
+         ls assets/scripts/game/
+         # 应包含 shared/ demo2-rpg/
+
+         echo "--- 无 demo1/demo3 ---"
+         test ! -d assets/scripts/game/demo1-idle && echo "OK" || echo "FAIL: demo1 存在"
+         test ! -d assets/scripts/game/demo3-autochess && echo "OK" || echo "FAIL: demo3 存在"
+
+         echo "--- playwright.config.ts 存在 ---"
+         test -f playwright.config.ts && echo "OK" || echo "FAIL: 不存在"
+
+         echo "--- 测试 ---"
+         npx jest --testPathPattern='tests/game' --no-coverage --forceExit 2>&1 | tail -20
+         ```
+
+      3. 验证 demo3 worktree：
+         ```bash
+         cd "/Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos/.worktrees/demo3"
+         echo "=== demo3 分支验证 ==="
+         git branch --show-current
+         # 应为 feature/demo3-autochess
+
+         echo "--- game 目录内容 ---"
+         ls assets/scripts/game/
+         # 应包含 shared/ demo3-autochess/
+
+         echo "--- 无 demo1/demo2 ---"
+         test ! -d assets/scripts/game/demo1-idle && echo "OK" || echo "FAIL: demo1 存在"
+         test ! -d assets/scripts/game/demo2-rpg && echo "OK" || echo "FAIL: demo2 存在"
+
+         echo "--- 测试 ---"
+         npx jest --testPathPattern='tests/game' --no-coverage --forceExit 2>&1 | tail -20
+         ```
+
+      4. 回到主仓库：
+         ```bash
+         cd "/Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos"
+         ```
+    wave: 5
+    agent: gem-implementer
+    prototype: false
+    priority: high
+    status: pending
+    dependencies:
+      - "task-4a-worktree-demo1"
+      - "task-4b-worktree-demo2"
+      - "task-4c-worktree-demo3"
+    conflicts_with: []
+    context_files: []
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: medium
+        estimated_files: 0
+        estimated_lines: 0
+        focus_area: "worktree 内容和测试验证"
+        verification:
+          - "demo1 worktree: 仅含 shared/ + demo1-idle/，测试通过"
+          - "demo2 worktree: 仅含 shared/ + demo2-rpg/ + e2e/，测试通过"
+          - "demo3 worktree: 仅含 shared/ + demo3-autochess/，测试通过"
+        acceptance_criteria:
+          - "每个 worktree 在正确的分支上"
+          - "每个 worktree 仅包含 shared/ + 对应 demo 的代码"
+          - "每个 worktree 不包含其他 demo 的代码"
+          - "demo2 worktree 保留 playwright.config.ts 和 e2e 测试"
+          - "demo1/demo3 worktree 不包含 playwright.config.ts 和 e2e 测试"
+          - "各 worktree 的 game 测试通过"
+        failure_modes:
+          - scenario: "worktree 中 npm test 因缺少 node_modules 而失败"
+            likelihood: medium
+            impact: low
+            mitigation: "worktree 共享主仓库的 node_modules（因为是同一目录树）；若不共享则需 npm install"
+        tech_stack:
+          - "jest"
+          - "git"
+        test_coverage: "各 worktree 的 game 测试"

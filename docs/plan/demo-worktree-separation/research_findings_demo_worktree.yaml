@@ -1,0 +1,471 @@
+plan_id: demo-worktree-separation
+objective: "将 demo 代码从 main 分离到独立 worktree，main 仅保留框架层代码"
+focus_area: git-worktree-demo-isolation
+created_at: "2026-04-24T16:30:00+08:00"
+created_by: gem-researcher
+status: completed
+
+tldr: |
+  - main 分支包含全部 3 个 demo（demo1-idle, demo2-rpg, demo3-autochess）的源码、测试、E2E、构建脚本
+  - 已有 2 个 worktree（demo0 基础设施、demo1 idle-clicker），但分支均落后 main 33-45 个提交，且无领先 main 的提交
+  - Demo 间无交叉依赖，均单向依赖 shared/ 基础设施（DemoBase, HtmlRenderer, 12 个 Mock 策略）和 framework/
+  - Framework 层无任何对 game/ 层的反向依赖，分离是安全的
+  - 关键决策：shared/ 放 main 还是仅放 worktree、dist/HTML 跟踪策略、E2E 归属
+
+research_metadata:
+  methodology: "hybrid retrieval: git worktree list + git branch -a + git diff --name-only + find + grep + read_file"
+  scope: "完整覆盖：git 状态、文件分布、import 依赖、构建脚本、测试分布、E2E 配置、dist 跟踪"
+  confidence: high
+  coverage: 98
+  decision_blockers: 3
+  research_blockers: 0
+
+# ============================================================
+# 1. GIT 状态
+# ============================================================
+git_state:
+  current_branch: main
+  worktrees:
+    - path: "/Volumes/Extreme SSD/WorkSpace/GameFramework-Cocos"
+      branch: main
+      commit: 744c1b0
+
+    - path: ".worktrees/demo0"
+      branch: feature/demo0-infrastructure
+      commit: beb38ff
+      behind_main: 45
+      ahead_of_main: 0
+      has_demo_scripts: false  # package.json 无 demo 构建脚本
+      has_dist: false
+      has_e2e: false
+      game_files: "shared/ 基础设施 + gitkeep 占位"
+      test_files: "shared/ 测试 + 3 个根级 Mock 测试"
+
+    - path: ".worktrees/demo1"
+      branch: feature/demo1-idle-clicker
+      commit: 4f8c932
+      behind_main: 33
+      ahead_of_main: 0
+      has_demo_scripts: true  # demo1:build, demo1:serve
+      has_dist: true  # dist/demo1/
+      has_e2e: false
+      game_files: "shared/ + demo1-idle/ 完整源码"
+      test_files: "shared/ 测试 + demo1-idle/ 单元/集成测试"
+
+  remote_branches:
+    - origin/main
+    - origin/feature/demo0-infrastructure
+    - origin/feature/demo1-idle-clicker
+    - origin/copilot/create-project-config-files
+    - origin/copilot/find-tools-for-asset-organizing
+
+  uncommitted_files:
+    - "docs/plan/demo-worktree-separation/ (untracked)"
+    - "docs/plan/demo4-tactics/ (untracked)"
+
+# ============================================================
+# 2. DEMO 文件清单（main 分支）
+# ============================================================
+demo_files:
+  demo1_idle:
+    entry: assets/scripts/game/demo1-idle/index.ts
+    esbuild_entry: assets/scripts/game/demo1-idle/index.ts
+    source_files:
+      - assets/scripts/game/demo1-idle/IdleClickerDemo.ts
+      - assets/scripts/game/demo1-idle/data/AchievementConfigRow.ts
+      - assets/scripts/game/demo1-idle/data/BuildingConfigRow.ts
+      - assets/scripts/game/demo1-idle/data/IdleGameData.ts
+      - assets/scripts/game/demo1-idle/data/UpgradeCurveRow.ts
+      - assets/scripts/game/demo1-idle/events/IdleEvents.ts
+      - assets/scripts/game/demo1-idle/fsm/BuildingFsmDefs.ts
+      - assets/scripts/game/demo1-idle/fsm/BuildingFsmStates.ts
+      - assets/scripts/game/demo1-idle/index.ts
+      - assets/scripts/game/demo1-idle/procedures/LaunchProcedure.ts
+      - assets/scripts/game/demo1-idle/procedures/MainProcedure.ts
+      - assets/scripts/game/demo1-idle/procedures/OfflineSettleProcedure.ts
+      - assets/scripts/game/demo1-idle/procedures/PreloadProcedure.ts
+      - assets/scripts/game/demo1-idle/procedures/ProcedureContext.ts
+      - assets/scripts/game/demo1-idle/procedures/SettingsProcedure.ts
+      - assets/scripts/game/demo1-idle/systems/AchievementSystem.ts
+      - assets/scripts/game/demo1-idle/systems/BuildingSystem.ts
+      - assets/scripts/game/demo1-idle/systems/OfflineRewardSystem.ts
+      - assets/scripts/game/demo1-idle/systems/SaveSystem.ts
+      - assets/scripts/game/demo1-idle/ui/IdleMainPanel.ts
+      - assets/scripts/game/demo1-idle/ui/IdleSettingsPanel.ts
+    test_files:
+      - tests/game/demo1-idle/AchievementSystem.test.ts
+      - tests/game/demo1-idle/BuildingFsm.test.ts
+      - tests/game/demo1-idle/BuildingSystem.test.ts
+      - tests/game/demo1-idle/GameData.test.ts
+      - tests/game/demo1-idle/IdleProcedures.test.ts
+      - tests/game/demo1-idle/OfflineRewardSystem.test.ts
+      - tests/game/demo1-idle/SaveSystem.test.ts
+      - tests/game/demo1-idle/integration/idle-clicker.integration.test.ts
+    file_count: 21 source + 8 test
+    npm_scripts:
+      demo1_build: "esbuild assets/scripts/game/demo1-idle/index.ts --bundle --outfile=dist/demo1/demo1.js --platform=browser --format=iife --tsconfig=tsconfig.json --alias:@framework=./assets/scripts/framework --alias:@game=./assets/scripts/game --alias:@utils=./assets/scripts/utils --alias:@runtime=./assets/scripts/runtime"
+      demo1_serve: "npm run demo1:build && npx serve dist/demo1 -p 3001"
+    dist_html: dist/demo1/index.html  # git tracked via .gitignore exception
+    port: 3001
+
+  demo2_rpg:
+    entry: assets/scripts/game/demo2-rpg/main.ts
+    esbuild_entry: assets/scripts/game/demo2-rpg/main.ts
+    source_files:
+      - assets/scripts/game/demo2-rpg/TurnBasedRpgDemo.ts
+      - assets/scripts/game/demo2-rpg/data/CharacterConfigRow.ts
+      - assets/scripts/game/demo2-rpg/data/MonsterConfigRow.ts
+      - assets/scripts/game/demo2-rpg/data/RpgGameData.ts
+      - assets/scripts/game/demo2-rpg/data/SkillConfigRow.ts
+      - assets/scripts/game/demo2-rpg/data/StageConfigRow.ts
+      - assets/scripts/game/demo2-rpg/events/RpgEvents.ts
+      - assets/scripts/game/demo2-rpg/fsm/BattleFsmDefs.ts
+      - assets/scripts/game/demo2-rpg/fsm/CharacterFsmDefs.ts
+      - assets/scripts/game/demo2-rpg/fsm/battle/DefeatState.ts
+      - assets/scripts/game/demo2-rpg/fsm/battle/ExecuteActionState.ts
+      - assets/scripts/game/demo2-rpg/fsm/battle/RoundEndState.ts
+      - assets/scripts/game/demo2-rpg/fsm/battle/RoundStartState.ts
+      - assets/scripts/game/demo2-rpg/fsm/battle/SelectActionState.ts
+      - assets/scripts/game/demo2-rpg/fsm/battle/VictoryState.ts
+      - assets/scripts/game/demo2-rpg/fsm/character/CharActingState.ts
+      - assets/scripts/game/demo2-rpg/fsm/character/CharDeadState.ts
+      - assets/scripts/game/demo2-rpg/fsm/character/CharIdleState.ts
+      - assets/scripts/game/demo2-rpg/fsm/character/CharStunnedState.ts
+      - assets/scripts/game/demo2-rpg/index.ts
+      - assets/scripts/game/demo2-rpg/main.ts
+      - assets/scripts/game/demo2-rpg/procedures/BattlePrepProcedure.ts
+      - assets/scripts/game/demo2-rpg/procedures/BattleProcedure.ts
+      - assets/scripts/game/demo2-rpg/procedures/LaunchProcedure.ts
+      - assets/scripts/game/demo2-rpg/procedures/LobbyProcedure.ts
+      - assets/scripts/game/demo2-rpg/procedures/PreloadProcedure.ts
+      - assets/scripts/game/demo2-rpg/procedures/RpgProcedureContext.ts
+      - assets/scripts/game/demo2-rpg/procedures/SettleProcedure.ts
+      - assets/scripts/game/demo2-rpg/systems/BattleSystem.ts
+      - assets/scripts/game/demo2-rpg/systems/BuffSystem.ts
+      - assets/scripts/game/demo2-rpg/systems/DamageCalculator.ts
+      - assets/scripts/game/demo2-rpg/systems/EnemyAI.ts
+      - assets/scripts/game/demo2-rpg/ui/BattlePanel.ts
+      - assets/scripts/game/demo2-rpg/ui/LobbyPanel.ts
+      - assets/scripts/game/demo2-rpg/ui/SettlePanel.ts
+    test_files:
+      - tests/game/demo2-rpg/TurnBasedRpgDemo.test.ts
+      - tests/game/demo2-rpg/data/DataTableRows.test.ts
+      - tests/game/demo2-rpg/data/RpgGameData.test.ts
+      - tests/game/demo2-rpg/events/RpgEvents.test.ts
+      - tests/game/demo2-rpg/fsm/BattleFsm.test.ts
+      - tests/game/demo2-rpg/fsm/CharacterFsm.test.ts
+      - tests/game/demo2-rpg/fsm/FsmDefs.test.ts
+      - tests/game/demo2-rpg/procedures/BattlePrepProcedure.test.ts
+      - tests/game/demo2-rpg/procedures/BattleSettle.test.ts
+      - tests/game/demo2-rpg/procedures/LaunchPreload.test.ts
+      - tests/game/demo2-rpg/procedures/LobbyProcedure.test.ts
+      - tests/game/demo2-rpg/procedures/RpgProcedureContext.test.ts
+      - tests/game/demo2-rpg/procedures/SettleToLobbyReentry.test.ts
+      - tests/game/demo2-rpg/systems/BattleSystem.test.ts
+      - tests/game/demo2-rpg/systems/BuffSystem.test.ts
+      - tests/game/demo2-rpg/systems/DamageCalculator.test.ts
+      - tests/game/demo2-rpg/systems/EnemyAI.test.ts
+      - tests/game/demo2-rpg/ui/BattleSettlePanel.test.ts
+      - tests/game/demo2-rpg/ui/LobbyPanel.test.ts
+    e2e_files:
+      - tests/e2e/demo2-rpg.e2e.test.ts
+    file_count: 35 source + 19 test + 1 e2e
+    npm_scripts:
+      demo2_build: "esbuild assets/scripts/game/demo2-rpg/main.ts --bundle --outfile=dist/demo2/demo2.js --platform=browser --format=iife --tsconfig=tsconfig.json --alias:@framework=./assets/scripts/framework --alias:@game=./assets/scripts/game --alias:@utils=./assets/scripts/utils --alias:@runtime=./assets/scripts/runtime"
+      demo2_serve: "npx serve dist/demo2 -p 3002"
+      demo2_dev: "npm run demo2:build && npm run demo2:serve"
+    dist_html: dist/demo2/index.html  # git tracked via .gitignore exception
+    port: 3002
+
+  demo3_autochess:
+    entry: assets/scripts/game/demo3-autochess/main.ts
+    esbuild_entry: assets/scripts/game/demo3-autochess/main.ts
+    source_files:
+      - assets/scripts/game/demo3-autochess/AutoChessDefs.ts
+      - assets/scripts/game/demo3-autochess/AutoChessDemo.ts
+      - assets/scripts/game/demo3-autochess/data/AutoChessGameData.ts
+      - assets/scripts/game/demo3-autochess/data/ChessPieceConfigRow.ts
+      - assets/scripts/game/demo3-autochess/data/SynergyConfigRow.ts
+      - assets/scripts/game/demo3-autochess/entities/ChessPieceEntity.ts
+      - assets/scripts/game/demo3-autochess/factory/AutoChessEntityFactory.ts
+      - assets/scripts/game/demo3-autochess/factory/EnemyGenerator.ts
+      - assets/scripts/game/demo3-autochess/fsm/ChessAiFsmDefs.ts
+      - assets/scripts/game/demo3-autochess/fsm/chess-ai/AttackState.ts
+      - assets/scripts/game/demo3-autochess/fsm/chess-ai/DeadState.ts
+      - assets/scripts/game/demo3-autochess/fsm/chess-ai/IdleState.ts
+      - assets/scripts/game/demo3-autochess/fsm/chess-ai/MoveToState.ts
+      - assets/scripts/game/demo3-autochess/index.ts
+      - assets/scripts/game/demo3-autochess/main.ts
+      - assets/scripts/game/demo3-autochess/procedures/AutoChessProcedureContext.ts
+      - assets/scripts/game/demo3-autochess/procedures/BattleProcedure.ts
+      - assets/scripts/game/demo3-autochess/procedures/GameOverProcedure.ts
+      - assets/scripts/game/demo3-autochess/procedures/LaunchProcedure.ts
+      - assets/scripts/game/demo3-autochess/procedures/PreloadProcedure.ts
+      - assets/scripts/game/demo3-autochess/procedures/PrepareProcedure.ts
+      - assets/scripts/game/demo3-autochess/procedures/SettleProcedure.ts
+      - assets/scripts/game/demo3-autochess/systems/BattleSystem.ts
+      - assets/scripts/game/demo3-autochess/systems/BoardSystem.ts
+      - assets/scripts/game/demo3-autochess/systems/MergeSystem.ts
+      - assets/scripts/game/demo3-autochess/systems/ShopSystem.ts
+      - assets/scripts/game/demo3-autochess/systems/SynergySystem.ts
+      - assets/scripts/game/demo3-autochess/ui/AutoChessRenderer.ts
+    test_files:
+      - tests/game/demo3-autochess/AutoChessDefs.test.ts
+      - tests/game/demo3-autochess/AutoChessDemo.test.ts
+      - tests/game/demo3-autochess/AutoChessRenderer.test.ts
+      - tests/game/demo3-autochess/BattleSystem.test.ts
+      - tests/game/demo3-autochess/BoardSystem.test.ts
+      - tests/game/demo3-autochess/ChessPieceEntity.test.ts
+      - tests/game/demo3-autochess/MergeSystem.test.ts
+      - tests/game/demo3-autochess/ShopSystem.test.ts
+      - tests/game/demo3-autochess/SynergySystem.test.ts
+      - tests/game/demo3-autochess/chess-ai-fsm.test.ts
+      - tests/game/demo3-autochess/data/AutoChessGameData.test.ts
+      - tests/game/demo3-autochess/data/ConfigRows.test.ts
+      - tests/game/demo3-autochess/procedures/BattleProcedure.test.ts
+      - tests/game/demo3-autochess/procedures/PrepareProcedure.test.ts
+      - tests/game/demo3-autochess/procedures/launch-preload.test.ts
+      - tests/game/demo3-autochess/procedures/settle-gameover.test.ts
+    file_count: 28 source + 16 test
+    npm_scripts:
+      demo3_build: "esbuild assets/scripts/game/demo3-autochess/main.ts --bundle --outfile=dist/demo3/demo3.js --platform=browser --format=iife --tsconfig=tsconfig.json --alias:@framework=./assets/scripts/framework --alias:@game=./assets/scripts/game --alias:@utils=./assets/scripts/utils --alias:@runtime=./assets/scripts/runtime"
+      demo3_serve: "npm run demo3:build && npx serve dist/demo3 -p 3003"
+      demo3_dev: "npm run demo3:build && npm run demo3:serve"
+    dist_html: dist/demo3/index.html  # NOT git tracked (no .gitignore exception)
+    port: 3003
+
+# ============================================================
+# 3. SHARED 基础设施文件
+# ============================================================
+shared_files:
+  source:
+    - path: assets/scripts/game/shared/DemoBase.ts
+      purpose: "Demo 抽象基类，bootstrap() 注册全部 15 个框架模块 + Mock 策略注入"
+      imports_from_framework: true  # 导入 16 个框架模块
+      imports_from_shared: true  # 导入 HtmlRenderer + 全部 Mock
+
+    - path: assets/scripts/game/shared/HtmlRenderer.ts
+      purpose: "纯 DOM 渲染器，log/updateLog/updateStatus/StatusPanel/LOG_COLORS"
+      imports_from_framework: false
+
+    - path: assets/scripts/game/shared/MockResourceLoader.ts
+      purpose: "模拟 IResourceLoader 策略实现"
+    - path: assets/scripts/game/shared/MockAudioPlayer.ts
+      purpose: "模拟 IAudioPlayer 策略实现"
+    - path: assets/scripts/game/shared/MockSceneLoader.ts
+      purpose: "模拟 ISceneLoader 策略实现"
+    - path: assets/scripts/game/shared/MockUIFormFactory.ts
+      purpose: "模拟 IUIFormFactory 策略实现"
+    - path: assets/scripts/game/shared/MockEntityFactory.ts
+      purpose: "模拟 IEntityFactory 策略实现"
+    - path: assets/scripts/game/shared/MockDataTableParser.ts
+      purpose: "模拟 IDataTableParser 策略实现"
+    - path: assets/scripts/game/shared/MockNetworkSocket.ts
+      purpose: "模拟 INetworkSocket 策略实现"
+    - path: assets/scripts/game/shared/MockHotUpdateAdapter.ts
+      purpose: "模拟 IHotUpdateAdapter 策略实现"
+    - path: assets/scripts/game/shared/MockVersionComparator.ts
+      purpose: "模拟 IVersionComparator 策略实现"
+    - path: assets/scripts/game/shared/MockLocalizationLoader.ts
+      purpose: "模拟 ILocalizationLoader 策略实现"
+  source_count: 12
+
+  tests:
+    - tests/game/shared/DemoBase.test.ts
+    - tests/game/shared/HtmlRenderer.test.ts
+    - tests/game/shared/MockAudioPlayer.test.ts
+    - tests/game/shared/MockDataTableParser.test.ts
+    - tests/game/shared/MockEntityFactory.test.ts
+    - tests/game/shared/MockHotUpdateAdapter.test.ts
+    - tests/game/shared/MockLocalizationLoader.test.ts
+    - tests/game/shared/MockNetworkSocket.test.ts
+    - tests/game/shared/MockSceneLoader.test.ts
+    - tests/game/shared/MockUIFormFactory.test.ts
+    - tests/game/shared/MockVersionComparator.test.ts
+  test_count: 11
+
+  root_level_duplicates:
+    description: "tests/game/ 根目录存在 4 个看起来与 shared/ 重复的测试文件"
+    files:
+      - tests/game/MockAudioPlayer.test.ts  # 与 tests/game/shared/MockAudioPlayer.test.ts 内容重复
+      - tests/game/MockNetworkSocket.test.ts  # 占位 test.todo
+      - tests/game/MockResourceLoader.test.ts
+      - tests/game/MockSceneLoader.test.ts
+
+  dependency_direction: "单向：demo1/demo2/demo3 → shared/ → framework/。无反向依赖，无跨 demo 依赖。"
+
+# ============================================================
+# 4. PACKAGE.JSON NPM SCRIPTS（demo 相关）
+# ============================================================
+package_json_scripts:
+  demo1_build: "esbuild assets/scripts/game/demo1-idle/index.ts --bundle --outfile=dist/demo1/demo1.js --platform=browser --format=iife --tsconfig=tsconfig.json --alias:@framework=./assets/scripts/framework --alias:@game=./assets/scripts/game --alias:@utils=./assets/scripts/utils --alias:@runtime=./assets/scripts/runtime"
+  demo1_serve: "npm run demo1:build && npx serve dist/demo1 -p 3001"
+  demo2_build: "esbuild assets/scripts/game/demo2-rpg/main.ts --bundle --outfile=dist/demo2/demo2.js --platform=browser --format=iife --tsconfig=tsconfig.json --alias:@framework=./assets/scripts/framework --alias:@game=./assets/scripts/game --alias:@utils=./assets/scripts/utils --alias:@runtime=./assets/scripts/runtime"
+  demo2_serve: "npx serve dist/demo2 -p 3002"
+  demo2_dev: "npm run demo2:build && npm run demo2:serve"
+  demo3_build: "esbuild assets/scripts/game/demo3-autochess/main.ts --bundle --outfile=dist/demo3/demo3.js --platform=browser --format=iife --tsconfig=tsconfig.json --alias:@framework=./assets/scripts/framework --alias:@game=./assets/scripts/game --alias:@utils=./assets/scripts/utils --alias:@runtime=./assets/scripts/runtime"
+  demo3_serve: "npm run demo3:build && npx serve dist/demo3 -p 3003"
+  demo3_dev: "npm run demo3:build && npm run demo3:serve"
+  test_e2e: "npx playwright test"
+  non_demo_scripts:
+    - lint
+    - lint:fix
+    - format
+    - test
+    - test:watch
+    - test:coverage
+    - prepare
+
+# ============================================================
+# 5. 构建配置
+# ============================================================
+build_config:
+  tool: esbuild
+  version: "^0.28.0"
+  platform: browser
+  format: iife
+  tsconfig: tsconfig.json
+  aliases:
+    "@framework": "./assets/scripts/framework"
+    "@game": "./assets/scripts/game"
+    "@utils": "./assets/scripts/utils"
+    "@runtime": "./assets/scripts/runtime"
+  no_separate_esbuild_config_file: true  # 全部内联在 package.json scripts 中
+  serve_tool: "npx serve"
+
+  dist_tracking:
+    tracked_html:
+      - dist/demo1/index.html
+      - dist/demo2/index.html
+    untracked:
+      - dist/demo3/index.html  # .gitignore 中无 !dist/demo3/index.html 例外
+
+  gitignore_rules: |
+    dist/
+    !dist/demo1/index.html
+    !dist/demo2/index.html
+
+# ============================================================
+# 6. E2E 测试配置
+# ============================================================
+e2e_config:
+  tool: "@playwright/test ^1.59.1"
+  config_file: playwright.config.ts
+  test_dir: "./tests/e2e"
+  timeout: 60000
+  workers: 1
+  base_url: "http://localhost:3002"
+  headless: true
+  web_server:
+    command: "npm run demo2:serve"
+    port: 3002
+    reuse_existing_server: true
+  test_files:
+    - tests/e2e/demo2-rpg.e2e.test.ts
+  notes: |
+    当前 E2E 仅覆盖 demo2-rpg。
+    Playwright 配置硬编码了 demo2 的端口和 webServer 命令。
+    demo1 和 demo3 无 E2E 测试。
+    worktree demo0/demo1 均无 playwright.config.ts。
+
+# ============================================================
+# 7. PLAN 文档目录
+# ============================================================
+plan_docs:
+  demo_related:
+    - demo-e2e
+    - demo-worktree-separation
+    - demo0-infrastructure
+    - demo1-idle-clicker
+    - demo2-rpg
+    - demo3-autochess
+    - demo4-tactics
+    - phase4-demo
+
+# ============================================================
+# 8. 已有 WORKTREE 状态分析
+# ============================================================
+existing_worktree_analysis:
+  demo0_infrastructure:
+    branch: feature/demo0-infrastructure
+    content: "shared/ 基础设施（DemoBase + HtmlRenderer + 12 个 Mock）+ shared 测试"
+    no_demo_specific_code: true
+    behind_main: 45
+    ahead_of_main: 0
+    package_json_note: "无 demo 构建脚本，无 esbuild 依赖"
+    assessment: "需要 rebase 到 main 最新提交以获得框架层更新"
+
+  demo1_idle_clicker:
+    branch: feature/demo1-idle-clicker
+    content: "shared/ + demo1-idle/ 完整源码和测试"
+    behind_main: 33
+    ahead_of_main: 0
+    package_json_note: "有 demo1:build/demo1:serve，有 esbuild 依赖"
+    missing_from_main: |
+      demo2-rpg 和 demo3-autochess 代码在 demo1 分支中不存在（分支在 main 添加这些之前 fork）
+    assessment: "需要 rebase 且可能需要在 rebase 后移除非 demo1 的 demo 文件"
+
+  missing_worktrees:
+    - "demo2-rpg: 无对应 worktree 和分支"
+    - "demo3-autochess: 无对应 worktree 和分支"
+
+# ============================================================
+# 9. 依赖关系图
+# ============================================================
+dependency_graph:
+  framework_to_game: "无（framework/ 不 import game/）"
+  game_to_framework: "所有 demo 通过 @framework/* 别名依赖框架层"
+  demo_to_shared: "所有 demo → DemoBase(extends) + HtmlRenderer(import) + LOG_COLORS"
+  cross_demo: "无（demo1↛demo2, demo2↛demo3, etc.）"
+  shared_to_framework: "DemoBase 导入 16 个框架模块 + Container + SERVICE_KEYS"
+  shared_import_style: "@game/shared/* 别名（demo3 AutoChessRenderer 例外：用相对路径 ../../shared/）"
+
+# ============================================================
+# 10. OPEN QUESTIONS（决策阻塞项）
+# ============================================================
+open_questions:
+  - question: "shared/ 基础设施保留在 main 还是仅存在于 worktree？"
+    context: "shared/ 被所有 demo 依赖。若留 main，worktree 可复用；若移除，每个 worktree 需各维护一份。"
+    type: decision_blocker
+    affects: [all_worktrees]
+    options:
+      - "A: shared/ 留 main — 各 worktree 通过 rebase/merge 获取"
+      - "B: shared/ 移到 demo0 专用分支 — 其他 demo 分支 merge demo0 获取"
+      - "C: shared/ 移除 main，各 worktree 独立维护 — 最大隔离但有维护成本"
+
+  - question: "分离策略：main 移除 demo 文件后，现有 worktree 如何同步？"
+    context: "demo0 和 demo1 分支已落后 main 45/33 个提交。需要先 rebase 到最新 main 再操作。"
+    type: decision_blocker
+    affects: [demo0, demo1, demo2, demo3]
+    options:
+      - "A: 先 rebase 已有 worktree 到 main → main 删除 demo 文件 → 新建 demo2/demo3 分支从删除前的 main 切出"
+      - "B: main 先删除 demo → 各 worktree 分支从删除前的 commit 切出 → cherry-pick 框架更新"
+
+  - question: "dist/demoN/index.html 跟踪策略？"
+    context: "demo1/demo2 HTML 被 .gitignore 例外跟踪。demo3 未被跟踪。分离后 main 应移除这些例外。"
+    type: decision_blocker
+    affects: [gitignore, dist]
+
+# ============================================================
+# 11. GAPS
+# ============================================================
+gaps:
+  - area: "tests/game/ 根目录 4 个重复 Mock 测试"
+    description: "MockAudioPlayer/MockNetworkSocket/MockResourceLoader/MockSceneLoader 在 tests/game/ 和 tests/game/shared/ 各有一份"
+    impact: nice_to_know
+    affects: [cleanup]
+
+  - area: "demo3 dist HTML 未 git track"
+    description: ".gitignore 只 exempt demo1/demo2 的 index.html，demo3 遗漏"
+    impact: nice_to_know
+    affects: [demo3]
+
+  - area: "jest.config.js 无 demo 分组"
+    description: "当前 testMatch 匹配所有 .test.ts，无法按 demo 独立运行测试"
+    impact: nice_to_know
+    affects: [testing]
+
+  - area: "Playwright 配置硬编码 demo2"
+    description: "playwright.config.ts 仅配置 demo2，分离后需随 demo2 分支迁移"
+    impact: nice_to_know
+    affects: [e2e, demo2]

@@ -1,0 +1,501 @@
+plan_id: demo4-tactics
+objective: 研究 Demo4 Tactics Grid 的设计规格、技术要求和实施复杂度
+focus_area: assets/scripts/game/demo4-tactics
+created_at: "2026-04-24"
+created_by: gem-researcher
+status: completed
+
+tldr: |
+  - Demo4 是 SRPG 战棋游戏，核心是 6×6 网格地图 + 地形系统 + 双层 FSM（TurnFsm 外层 + UnitActionFsm 内层）
+  - 在 Demo2 RPG 基础上大幅进阶：新增网格寻路（BFS 范围计算）、地形效果、朝向伤害、三组 Entity（player/enemy/npc）
+  - 深度使用 8 个模块（Event、ObjectPool、FSM、Procedure、Entity、DataTable + 轻度 UI/Audio/Timer），4 张 DataTable
+  - 预估 30~38 个源文件 + 15~20 个测试文件，复杂度为 complex（高于 Demo3 的 28 文件）
+  - 关键技术挑战：BFS 移动范围计算（含地形消耗）、双层 FSM 嵌套协调、朝向系统、战棋 AI 决策
+
+research_metadata:
+  methodology: "文档分析（demo-design.md Section 7）+ 现有 Demo 结构对比（demo1/2/3 文件统计）+ module-registry 依赖图 + training/progress 进度确认"
+  scope: "Demo4 完整设计规格 + 与 Demo1/2/3 差异分析 + 工作量评估"
+  confidence: high
+  coverage: 95
+  decision_blockers: 0
+  research_blockers: 0
+
+# ══════════════════════════════════════════════════════════════
+# 1. Demo4 完整设计规格
+# ══════════════════════════════════════════════════════════════
+
+design_spec:
+  name: "Tactics Grid"
+  type: "战棋（SRPG 风格）"
+  directory: "assets/scripts/game/demo4-tactics"
+  
+  core_gameplay: |
+    玩家手动控制每个单位在 6×6 网格地图上移动和攻击，类似 Fire Emblem / 梦幻模拟战。
+    核心循环：选关 → 部署单位 → 回合制战斗（移动+攻击） → 关卡结算
+  
+  key_distinction_from_autochess: |
+    战棋 = 玩家手动控制每个单位的移动和攻击位置（强调战术决策）
+    自走棋 = 玩家只管编队和布阵，战斗完全自动进行
+
+  gameplay_details:
+    grid_map:
+      size: "6×6 文字网格"
+      display: "ASCII 表格形式，含地形标记和单位标记"
+    
+    terrain_system:
+      - type: Plain
+        move_cost: 1
+        def_bonus: "0%"
+        special: "无"
+      - type: Mountain
+        move_cost: 2
+        def_bonus: "+20%"
+        special: "高防御"
+      - type: Water
+        move_cost: 3 (弓手) / 不可通过 (步兵)
+        def_bonus: "0%"
+        special: "职业限制通行"
+      - type: Forest
+        move_cost: 1.5
+        def_bonus: "+10%"
+        special: "远程攻击减伤"
+    
+    unit_types:
+      - class: Warrior
+        hp: 高
+        def: 高
+        move_range: 3
+        atk_range: 1
+        special: "近战肉盾"
+      - class: Archer
+        atk: 高
+        move_range: 4
+        atk_range: "2~3"
+        special: "远程输出"
+      - class: Knight
+        move_range: 5
+        atk_range: 1
+        special: "高机动，可穿越部分地形"
+      - class: Healer
+        move_range: 3
+        heal_range: 2
+        special: "治疗队友"
+    
+    turn_mechanism:
+      player_turn: "依次操作己方所有单位（移动→攻击/技能→待机）"
+      enemy_turn: "AI 依次操作所有敌方单位"
+    
+    facing_system:
+      back: "×1.5 伤害"
+      side: "×1.2 伤害"
+      front: "×1.0 伤害"
+    
+    stage_goals:
+      - "击败所有敌人"
+      - "保护 NPC"
+      - "指定回合内通关"
+    
+    stages:
+      - id: 1
+        name: "平原遭遇"
+      - id: 2
+        name: "山地伏击"
+      - id: 3
+        name: "河谷之战"
+
+  procedure_flow:
+    - LaunchProcedure: "初始化框架"
+    - PreloadProcedure: "加载单位表/地形表/技能表/地图表"
+    - StageSelectProcedure: "选择关卡，查看关卡目标"
+    - DeployProcedure: "在起始区域部署单位，查看地图地形"
+    - TacticsBattleProcedure: "战棋战斗主循环，双层 FSM 驱动"
+    - SettleProcedure: "关卡结算，评价/奖励"
+    flow_graph: "Launch → Preload → StageSelect → Deploy → Battle → Settle → StageSelect"
+
+  fsm_design:
+    outer_turn_fsm:
+      name: TurnFsm
+      states:
+        - TurnStartState: "判断当前是哪方回合，重置行动标记"
+        - PlayerTurnState: "玩家依次操作每个单位，嵌套 UnitActionFsm"
+        - EnemyTurnState: "AI 依次操作敌方单位，嵌套 UnitActionFsm"
+        - TurnEndState: "回合结算，地形 DOT/BUFF 结算"
+        - VictoryState: "达成关卡目标"
+        - DefeatState: "失败条件触发"
+    
+    inner_unit_action_fsm:
+      name: UnitActionFsm
+      states:
+        - SelectedState: "选中单位，高亮可移动范围"
+        - MovingState: "选择移动目标格，执行移动"
+        - ActionMenuState: "移动后菜单：攻击/技能/待机"
+        - AttackingState: "选择攻击目标，计算伤害（含朝向）"
+        - UsingSkillState: "选择技能目标，应用技能效果"
+        - WaitingState: "单位待机，本回合结束行动"
+    
+    nesting_pattern: |
+      外层 TurnFsm 控制回合大循环（玩家回合 ↔ 敌方回合）
+      内层 UnitActionFsm 控制单个单位的行动流程
+      玩家回合期间，每操作一个单位就创建/复用一个 UnitActionFsm
+      敌方回合期间，AI 通过 UnitActionFsm 执行自动决策
+
+  data_tables:
+    - name: tactics_unit_config
+      fields: [id, name, unitClass, hp, atk, def, moveRange, atkRange, skills, passable]
+      description: "单位属性配置"
+    - name: terrain_config
+      fields: [id, type, moveCost, defBonus, atkPenalty, passable, desc]
+      description: "地形效果配置"
+    - name: tactics_skill_config
+      fields: [id, name, type, range, power, cooldown, aoeRadius, desc]
+      description: "技能配置"
+    - name: tactics_map_config
+      fields: [id, name, width, height, terrain, playerSpawns, enemyUnits, winCondition, winParam, maxTurns]
+      description: "关卡地图配置（含地形矩阵、出生点、敌方单位配置）"
+
+  html_ui:
+    button_groups:
+      stage_select: ["关卡1: 平原遭遇", "关卡2: 山地伏击", "关卡3: 河谷之战"]
+      deploy: ["部署战士到(x,y)", "部署弓手到(x,y)", "查看地形", "开始战斗!"]
+      player_turn: ["选择: 战士/弓手/骑士/治疗师", "移动到(x,y)", "攻击", "技能1", "待机", "结束回合"]
+    map_display: "ASCII 表格形式，地形标记(P/M/W/F) + 单位标记(P:戦/E:弓) + 选中高亮(★)"
+    status_panel: "回合数、当前阶段、各单位HP、地形信息"
+
+  integration_test_points:
+    - "移动范围计算：验证不同地形消耗移动力后的可达范围"
+    - "地形效果：山地防御加成、水域不可通过、森林远程减伤"
+    - "朝向伤害：正面/侧面/背面不同的伤害倍率"
+    - "双层 FSM 嵌套：TurnFsm 正确驱动 UnitActionFsm，状态不错乱"
+    - "AI 决策：敌方 AI 正确寻路到最近目标、优先攻击低 HP 单位"
+    - "胜利/失败条件：全灭判定、NPC 保护判定、回合限制"
+    - "Entity 三组管理：player / enemy / npc 三个 EntityGroup 独立管理"
+    - "技能冷却：使用技能后冷却回合数正确倒计"
+
+# ══════════════════════════════════════════════════════════════
+# 2. 需要使用的框架模块清单
+# ══════════════════════════════════════════════════════════════
+
+module_usage:
+  deep_usage:
+    - module: EventManager
+      depth: "◉ 深度"
+      usage: "单位移动、攻击、受伤、死亡、回合切换、地形触发、关卡目标事件；是战棋事件流的核心枢纽"
+    - module: ObjectPool
+      depth: "◉ 深度"
+      usage: "伤害飘字池、移动路径标记池、攻击范围指示池"
+    - module: FSM
+      depth: "◉ 深度"
+      usage: "回合 FSM（TurnFsm）+ 单位行动 FSM（UnitActionFsm）双层嵌套，是 Demo4 的核心亮点"
+    - module: ProcedureManager
+      depth: "◉ 深度"
+      usage: "6 步流程链：Launch → Preload → StageSelect → Deploy → TacticsBattle → Settle"
+    - module: EntityManager
+      depth: "◉ 深度"
+      usage: "三组 Entity 管理：player 组 + enemy 组 + npc 组，每组独立生命周期"
+    - module: DataTableManager
+      depth: "◉ 深度"
+      usage: "4 张配置表：单位表、地形表、技能表、关卡地图表"
+
+  normal_usage:
+    - module: Core
+      depth: "○ 常规"
+      usage: "GameEntry 初始化，模块注册"
+    - module: DI/IoC
+      depth: "○ 常规"
+      usage: "Container 注入 Mock 策略"
+    - module: UIManager
+      depth: "○ 常规"
+      usage: "单位信息面板、地形信息面板、行动选择面板"
+    - module: AudioManager
+      depth: "○ 常规"
+      usage: "移动音效、攻击音效、技能音效、BGM"
+    - module: SceneManager
+      depth: "○ 常规"
+      usage: "场景管理"
+    - module: Logger
+      depth: "○ 常规"
+      usage: "标准日志"
+    - module: DebugManager
+      depth: "○ 常规"
+      usage: "实时展示地图状态、Entity 数量、FSM 状态"
+    - module: TimerManager
+      depth: "○ 常规"
+      usage: "AI 思考延迟（模拟 AI 决策时间），回合时间限制"
+    - module: ResourceManager
+      depth: "○ 常规"
+      usage: "加载地图表、单位表、技能表"
+
+  light_usage:
+    - module: LocalizationManager
+      depth: "· 轻度"
+      usage: "单位名称、地形描述、技能名称多语言"
+    - module: NetworkManager
+      depth: "· 轻度"
+      usage: "轻度使用"
+    - module: HotUpdateManager
+      depth: "· 轻度"
+      usage: "轻度使用"
+
+# ══════════════════════════════════════════════════════════════
+# 3. 与 Demo1/2/3 的差异点
+# ══════════════════════════════════════════════════════════════
+
+diff_from_previous_demos:
+  vs_demo1_idle:
+    summary: "完全不同的游戏类型，几乎无可复用逻辑"
+    differences:
+      - "Demo1 是自动化放置，Demo4 是手动战术回合制"
+      - "Demo4 需要网格地图系统（Demo1 无空间概念）"
+      - "Demo4 需要 Entity 三组管理（Demo1 无 Entity 使用）"
+      - "Demo4 需要双层 FSM（Demo1 仅单层建筑 FSM）"
+      - "Demo4 需要朝向系统和伤害计算（Demo1 无战斗）"
+
+  vs_demo2_rpg:
+    summary: "Demo4 是 Demo2 的战术进阶版本，共享回合制战斗基础概念但大幅扩展"
+    shared_patterns:
+      - "回合制战斗概念"
+      - "Entity 管理（player/enemy 组）"
+      - "伤害计算系统"
+      - "Procedure 流程驱动"
+      - "DataTable 配置驱动"
+    new_in_demo4:
+      - area: "网格地图系统"
+        description: "6×6 文字网格，含 BFS 移动范围计算（考虑地形消耗），Demo2 无空间概念"
+      - area: "地形系统"
+        description: "4 种地形（Plain/Mountain/Water/Forest），影响移动消耗、防御加成、通行限制"
+      - area: "双层 FSM 嵌套"
+        description: "外层 TurnFsm + 内层 UnitActionFsm，Demo2 仅单层 BattleFsm"
+      - area: "朝向系统"
+        description: "背面 ×1.5 / 侧面 ×1.2 伤害倍率，Demo2 无朝向概念"
+      - area: "Entity 三组"
+        description: "新增 npc 组（保护 NPC 关卡目标），Demo2 仅 player/enemy 两组"
+      - area: "部署阶段"
+        description: "玩家手动在起始区域部署单位位置，Demo2 无部署概念"
+      - area: "多胜利条件"
+        description: "全灭 / 保护 NPC / 限时通关，Demo2 仅全灭一种"
+      - area: "战棋 AI"
+        description: "基于网格寻路的 AI 决策（考虑地形、距离、目标优先级），比 Demo2 简单 AI 复杂"
+
+  vs_demo3_autochess:
+    summary: "同为网格战斗但操控模式完全不同"
+    shared_patterns:
+      - "网格/棋盘概念（但 Demo3 是 8×8 自走棋，Demo4 是 6×6 战棋）"
+      - "Entity 大量管理"
+      - "AI FSM 驱动单位行为"
+      - "DataTable 配置驱动"
+    new_in_demo4:
+      - area: "手动操控 vs 自动战斗"
+        description: "Demo4 玩家手动控制每个单位移动攻击，Demo3 完全自动"
+      - area: "双层 FSM"
+        description: "Demo4 是 TurnFsm + UnitActionFsm 嵌套，Demo3 仅单层 AI FSM"
+      - area: "地形系统"
+        description: "Demo4 有完整地形效果系统，Demo3 棋盘是均匀网格"
+      - area: "朝向系统"
+        description: "Demo4 有方向伤害加成，Demo3 无朝向"
+      - area: "BFS 移动范围"
+        description: "Demo4 需要 BFS 算法计算移动可达范围（含地形消耗），Demo3 移动是简单距离判定"
+      - area: "关卡设计"
+        description: "Demo4 有多关卡多胜利条件，Demo3 是无限波次生存"
+
+# ══════════════════════════════════════════════════════════════
+# 4. 预计任务量
+# ══════════════════════════════════════════════════════════════
+
+estimated_workload:
+  reference_demos:
+    demo1_idle:
+      source_files: 21
+      test_files: 8
+    demo2_rpg:
+      source_files: 35
+      test_files: 20
+    demo3_autochess:
+      source_files: 28
+      test_files: 16
+
+  demo4_file_estimate:
+    total_source_files: "32~38"
+    total_test_files: "16~22"
+    complexity: complex
+    
+    breakdown:
+      entry_files:
+        files: ["TacticsDefs.ts", "TacticsDemo.ts", "index.ts", "main.ts"]
+        count: 4
+        
+      data:
+        files: ["TacticsGameData.ts", "UnitConfigRow.ts", "TerrainConfigRow.ts", "SkillConfigRow.ts", "MapConfigRow.ts"]
+        count: 5
+        note: "4 张 DataTable 行类型 + 1 个 GameData 管理器"
+        
+      systems:
+        files: ["GridSystem.ts", "MovementSystem.ts", "CombatSystem.ts", "TerrainSystem.ts", "TacticsAI.ts", "DeploySystem.ts"]
+        count: 6
+        note: "核心系统：网格管理/移动范围/战斗计算/地形效果/AI 决策/部署管理"
+        
+      entities:
+        files: ["TacticsUnitEntity.ts"]
+        count: 1
+        note: "战棋单位 Entity（含朝向、职业、技能冷却等属性）"
+        
+      fsm_turn:
+        files: ["TurnFsmDefs.ts", "TurnStartState.ts", "PlayerTurnState.ts", "EnemyTurnState.ts", "TurnEndState.ts", "VictoryState.ts", "DefeatState.ts"]
+        count: 7
+        note: "外层回合 FSM（6 个状态 + 1 个定义文件）"
+        
+      fsm_unit_action:
+        files: ["UnitActionFsmDefs.ts", "SelectedState.ts", "MovingState.ts", "ActionMenuState.ts", "AttackingState.ts", "UsingSkillState.ts", "WaitingState.ts"]
+        count: 7
+        note: "内层单位行动 FSM（6 个状态 + 1 个定义文件）"
+        
+      procedures:
+        files: ["TacticsProcedureContext.ts", "LaunchProcedure.ts", "PreloadProcedure.ts", "StageSelectProcedure.ts", "DeployProcedure.ts", "TacticsBattleProcedure.ts", "SettleProcedure.ts"]
+        count: 7
+        note: "6 个 Procedure + 1 个 Context（比 Demo2 多 StageSelect 和 Deploy）"
+        
+      events:
+        files: ["TacticsEvents.ts"]
+        count: 1
+        note: "EventKey 定义集"
+        
+      ui:
+        files: ["TacticsRenderer.ts"]
+        count: 1
+        note: "HTML 渲染器（含 ASCII 地图绘制、状态面板、按钮组）"
+
+  comparison_notes: |
+    Demo4 的 FSM 部分是所有 Demo 中最多的（14 个 FSM 相关文件），
+    这是因为双层嵌套导致状态文件数量翻倍。
+    系统复杂度也高于 Demo3（新增网格寻路、地形效果、朝向计算）。
+    总体文件数接近 Demo2 RPG（35 文件），但每个文件的逻辑复杂度更高。
+
+# ══════════════════════════════════════════════════════════════
+# 5. 关键技术挑战
+# ══════════════════════════════════════════════════════════════
+
+technical_challenges:
+  - challenge: "BFS 移动范围计算（含地形消耗）"
+    difficulty: high
+    description: |
+      核心算法挑战。需要实现 BFS 从单位当前位置出发，
+      考虑每种地形的移动力消耗（非均匀 cost），
+      同时处理某些地形对特定职业不可通过的限制。
+      输出为可达格子集合 + 各格子的剩余移动力。
+    affects: ["GridSystem.ts", "MovementSystem.ts"]
+    interview_value: "经典算法面试题变体（带权 BFS / Dijkstra）"
+
+  - challenge: "双层 FSM 嵌套协调"
+    difficulty: high
+    description: |
+      外层 TurnFsm 在 PlayerTurnState/EnemyTurnState 中需要创建并驱动内层 UnitActionFsm。
+      关键问题：
+      1. 内层 FSM 何时创建/销毁？（每个单位行动时 or 预创建复用？）
+      2. 内层 FSM 完成后如何通知外层切换到下一个单位？
+      3. 外层如何追踪"所有单位已行动完毕"？
+      4. AI 回合如何通过同一 UnitActionFsm 自动执行？
+    affects: ["所有 FSM 文件", "PlayerTurnState.ts", "EnemyTurnState.ts"]
+    interview_value: "FSM 深度应用的绝佳案例"
+
+  - challenge: "朝向系统实现"
+    difficulty: medium
+    description: |
+      单位有朝向（上/下/左/右），攻击时根据攻击方向 vs 目标朝向计算伤害倍率。
+      需要：1. 单位移动后自动更新朝向 2. 攻击时判断方位关系 3. 待机时可手动调整朝向。
+    affects: ["CombatSystem.ts", "TacticsUnitEntity.ts"]
+
+  - challenge: "ASCII 地图渲染"
+    difficulty: medium
+    description: |
+      在 HtmlRenderer 中绘制 6×6 ASCII 网格地图，
+      需要同时显示：地形类型标记、玩家/敌方/NPC 单位、当前选中高亮、可移动范围标记。
+      地图需要随状态变化实时更新（不追加日志，原地更新）。
+    affects: ["TacticsRenderer.ts"]
+
+  - challenge: "战棋 AI 决策"
+    difficulty: medium
+    description: |
+      敌方 AI 通过 UnitActionFsm 自动决策：
+      1. 选择移动目标（寻路到最近/最弱的玩家单位附近）
+      2. 选择攻击目标（优先低 HP 单位）
+      3. 考虑地形优势（优先占据高防地形）
+      比 Demo3 的 AI 更复杂：需要考虑地形、朝向、多单位协调。
+    affects: ["TacticsAI.ts", "EnemyTurnState.ts"]
+
+  - challenge: "关卡地图配置解析"
+    difficulty: low
+    description: |
+      从 DataTable 的字符串格式（如 terrain 矩阵 "PPMPFF/PPWWPP/..."）
+      解析出二维地形数组、出生点坐标、敌方单位配置。
+      需要健壮的解析逻辑处理各种格式。
+    affects: ["TacticsGameData.ts", "MapConfigRow.ts"]
+
+  - challenge: "Entity 三组管理 + 生命周期"
+    difficulty: low
+    description: |
+      EntityManager 已支持 EntityGroup，但 Demo4 需要三组（player/enemy/npc）。
+      关键是 NPC 组的"被保护"逻辑：NPC 死亡触发失败条件。
+    affects: ["TacticsBattleProcedure.ts", "TacticsUnitEntity.ts"]
+
+# ══════════════════════════════════════════════════════════════
+# 6. 培训计划中的位置
+# ══════════════════════════════════════════════════════════════
+
+training_context:
+  current_progress: "Week 5 / 8, 总完成度 75%"
+  demo_development_status: "Demo0 ✅ | Demo1 ✅ | Demo2 ✅ | Demo3 ✅ | Demo4 ⬜ 待开发"
+  recommended_development_order: |
+    设计文档推荐顺序为 Demo0 → Demo1 → Demo2 → Demo4 → Demo3 → Demo5 → Demo6。
+    但实际已完成 Demo3（先于 Demo4），这不影响 Demo4 开发。
+    Demo4 的前置条件（双层 FSM、Entity 三组）已通过 Demo2/Demo3 验证。
+  phase: "Phase 4 — 综合 Demo 面试冲刺"
+
+# ══════════════════════════════════════════════════════════════
+# 7. 面试价值
+# ══════════════════════════════════════════════════════════════
+
+interview_highlights:
+  - topic: "FSM 多层嵌套"
+    value: "外层回合 FSM + 内层单位行动 FSM，是面试中 FSM 深度应用的绝佳案例"
+  - topic: "网格寻路与范围计算"
+    value: "BFS 计算可达范围（考虑地形消耗），经典算法面试题"
+  - topic: "地形系统"
+    value: "DataTable 驱动的地形效果，展示配置与代码分离"
+  - topic: "Entity 三组管理"
+    value: "player/enemy/npc，展示 EntityGroup 的实际业务价值"
+  - topic: "战术 AI"
+    value: "简单但完整的 AI 决策（寻路 + 目标选择 + 攻击），可深入讨论优化"
+
+  plugin_discovery:
+    - "fbi-grid-system：通用网格系统（A* 寻路、BFS 范围计算、六角网格支持）"
+    - "fbi-tactics-ai：战棋 AI 引擎（威胁评估、多目标优先级、阵型分析）"
+    - "fbi-turn-system：通用回合管理器（支持插入行动、延迟行动、行动取消）"
+
+# ══════════════════════════════════════════════════════════════
+# Open Questions & Gaps
+# ══════════════════════════════════════════════════════════════
+
+open_questions:
+  - question: "双层 FSM 内层完成后如何通知外层？"
+    context: "框架 FSM 模块没有内建'子 FSM 完成通知父 FSM'的机制，需要用 EventManager 或 blackboard flag 实现"
+    type: research
+    affects: ["fsm-design"]
+
+  - question: "网格移动范围计算用 BFS 还是 Dijkstra？"
+    context: "地形消耗不均匀（1/1.5/2/3），BFS 适合均匀 cost，Dijkstra 适合非均匀 cost。实际应使用 Dijkstra 或带权 BFS"
+    type: research
+    affects: ["grid-system"]
+
+  - question: "ASCII 地图原地更新的技术方案？"
+    context: "HtmlRenderer 已有 updateLog(key) 原地更新能力，但整张地图的格式化渲染需要一个专用方法"
+    type: nice_to_know
+    affects: ["renderer"]
+
+gaps:
+  - area: "Demo4 目录尚未创建"
+    description: "assets/scripts/game/demo4-tactics/ 目录不存在，需从零创建全部文件"
+    impact: research_blocker
+    affects: ["all-tasks"]
+  - area: "Demo4 测试目录尚未创建"
+    description: "tests/game/demo4-tactics/ 目录不存在"
+    impact: research_blocker
+    affects: ["all-tests"]
