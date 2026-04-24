@@ -21,22 +21,28 @@
 ## 构建与验证命令
 
 ```bash
-npm test                # Jest 单元/集成测试
+npm test                # Jest 单元/集成测试（框架层）
 npm run test:coverage   # 覆盖率报告
 npm run lint            # ESLint 检查
 npm run lint:fix        # ESLint 自动修复
 npm run format          # Prettier 格式化
 npx tsc --noEmit        # TypeScript 类型检查
-npm run test:e2e        # Playwright E2E 测试（需先 npx playwright install chromium）
-npm run demo1:serve     # Idle Clicker Demo（端口 3001）
-npm run demo2:serve     # Turn-based RPG Demo（端口 3002）
+```
+
+Demo 相关命令（在对应 worktree 分支中执行）：
+
+```bash
+cd .worktrees/demo1 && npm run demo1:serve   # Idle Clicker Demo（端口 3001）
+cd .worktrees/demo2 && npm run demo2:serve   # Turn-based RPG Demo（端口 3002）
+cd .worktrees/demo3 && npm run demo3:serve   # Auto Chess Demo（端口 3003）
+cd .worktrees/demo2 && npm run test:e2e      # Playwright E2E 测试
 ```
 
 路径别名（`tsconfig.json` + `jest.config.js` 同步配置）：
 
 - `@framework/*` → `assets/scripts/framework/*`
 - `@runtime/*` → `assets/scripts/runtime/*`
-- `@game/*` → `assets/scripts/game/*`
+- `@game/*` → `assets/scripts/game/*`（仅在 demo worktree 分支中可用）
 - `@utils/*` → `assets/scripts/utils/*`
 
 ## 目录结构与职责
@@ -64,10 +70,6 @@ assets/scripts/
 │   └── debug/          # Logger + DebugManager — 日志与调试
 ├── runtime/            # 引擎适配层（唯一允许依赖 cc 的层）
 │   └── i18n/           # LocalizedLabel, LocalizedSprite（cc 组件）
-├── game/               # Demo 业务层（依赖接口，不依赖实现）
-│   ├── shared/         # DemoBase, HtmlRenderer, 全部 Mock 策略实现
-│   ├── demo1-idle/     # Idle Clicker Demo
-│   └── demo2-rpg/      # Turn-based RPG Demo
 └── utils/              # 工具函数（待开发）
 
 packages/               # 独立插件包
@@ -77,11 +79,10 @@ packages/               # 独立插件包
 
 tests/                  # 测试目录（镜像 framework/ 结构）
 ├── __mocks__/cc.ts     # Cocos Creator cc 模块全局 Mock
-├── {module}/           # 各模块单元测试
-├── game/               # Demo 业务测试
-├── integration/        # 集成测试
-└── e2e/                # Playwright E2E 测试
+└── {module}/           # 各模块单元测试
 ```
+
+> **注意**：Demo 业务代码（Game 层）已分离到独立的 git worktree 分支中（详见下方「Demo Worktree 分离」节）。
 
 ## 三层架构
 
@@ -89,7 +90,7 @@ tests/                  # 测试目录（镜像 framework/ 结构）
 | --------- | --------------------------- | ------------ | ----------------------------- |
 | Framework | `assets/scripts/framework/` | 纯 TS 框架层 | **禁止** `import` cc 命名空间 |
 | Runtime   | `assets/scripts/runtime/`   | 桥接引擎 API | 唯一允许依赖 cc 的层          |
-| Game      | `assets/scripts/game/`      | Demo 业务层  | 依赖接口，不依赖实现          |
+| Game      | 各 demo worktree 分支          | Demo 业务层  | 依赖接口，不依赖实现          |
 
 ### 架构硬性规则
 
@@ -100,6 +101,18 @@ tests/                  # 测试目录（镜像 framework/ 结构）
 5. `GameModule.register()` 支持 `allowReplace`，第三方插件可替换默认实现
 6. 插件命名：`fbi-{plugin-name}`，peerDependency 指向 `@fbi/core`
 7. Priority 分配：0-99 基础设施 / 100-199 核心服务 / 200-299 业务模块 / 300-399 上层逻辑 / 400+ 调试工具
+
+### Demo Worktree 分离
+
+main 分支为纯框架仓库，Demo 业务代码已分离到独立的 git worktree 分支：
+
+| Demo | 分支 | Worktree 路径 |
+| --- | --- | --- |
+| Demo 1 — Idle Clicker | `feature/demo1-idle` | `.worktrees/demo1` |
+| Demo 2 — Turn-based RPG | `feature/demo2-rpg` | `.worktrees/demo2` |
+| Demo 3 — Auto Chess | `feature/demo3-autochess` | `.worktrees/demo3` |
+
+切换方式：`cd .worktrees/demo1`。每个 worktree 分支包含 `assets/scripts/game/`、`tests/game/`、Demo 相关构建命令。
 
 ### 模块生命周期
 
@@ -237,6 +250,8 @@ public setResourceLoader(loader: IResourceLoader): void {
 `UILayer` 枚举（Background=0, Normal=100, Fixed=200, Popup=300, Toast=400），每层维护独立栈，栈顶切换触发 `onCover/onReveal`。
 
 ### Demo 架构（DemoBase + HtmlRenderer）
+
+> Demo 代码位于各 worktree 分支的 `assets/scripts/game/` 目录中。
 
 - `DemoBase` 抽象基类：`bootstrap()` 注册 15 个模块 → 子类 `setupProcedures()` + `setupDataTables()`
 - `HtmlRenderer`：纯 DOM 渲染，`log()` 追加日志 / `updateLog(key)` 原地更新 / `updateStatus()` 状态面板
