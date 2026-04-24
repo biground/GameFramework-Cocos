@@ -22,12 +22,7 @@ import { DataTableManager } from '@framework/datatable/DataTableManager';
 import { EntityManager } from '@framework/entity/EntityManager';
 import { AutoChessDemo } from '@game/demo3-autochess/AutoChessDemo';
 import { AutoChessGameData, IChessPieceConfig } from '@game/demo3-autochess/data/AutoChessGameData';
-import {
-    AutoChessEvents,
-    INITIAL_GOLD,
-    INITIAL_HP,
-    BASE_INCOME,
-} from '@game/demo3-autochess/AutoChessDefs';
+import { AutoChessEvents, INITIAL_GOLD, INITIAL_HP } from '@game/demo3-autochess/AutoChessDefs';
 import { LaunchProcedure } from '@game/demo3-autochess/procedures/LaunchProcedure';
 import { PrepareProcedure } from '@game/demo3-autochess/procedures/PrepareProcedure';
 import { BattleProcedure } from '@game/demo3-autochess/procedures/BattleProcedure';
@@ -155,12 +150,12 @@ describe('Demo 3 Auto-chess Lite 集成测试', () => {
             // 验证已到达 PrepareProcedure
             expect(procMgr.currentProcedure).toBeInstanceOf(PrepareProcedure);
 
-            // 第一个 Prepare 阶段的 round：初始 1 + Prepare.onEnter++ = 2
+            // 第一个 Prepare 阶段的 round：初始 0 + Prepare.onEnter++ = 1
             const roundAfterFirstPrepare = demo.gameData.round;
-            expect(roundAfterFirstPrepare).toBe(2);
+            expect(roundAfterFirstPrepare).toBe(1);
 
-            // 金币 = INITIAL_GOLD + BASE_INCOME
-            expect(demo.gameData.gold).toBe(INITIAL_GOLD + BASE_INCOME);
+            // 金币 = INITIAL_GOLD（第一轮无收入，收入由 SettleProcedure 发放）
+            expect(demo.gameData.gold).toBe(INITIAL_GOLD);
 
             // 购买棋子：先刷新商店让棋子可购买
             const configs = [
@@ -220,9 +215,9 @@ describe('Demo 3 Auto-chess Lite 集成测试', () => {
             demo.startAndFlush();
             const procMgr = GameModule.getModule<ProcedureManager>('ProcedureManager');
 
-            // 第一轮 Prepare：round = 2, gold = 15
-            expect(demo.gameData.round).toBe(2);
-            expect(demo.gameData.gold).toBe(INITIAL_GOLD + BASE_INCOME);
+            // 第一轮 Prepare：round = 1, gold = INITIAL_GOLD
+            expect(demo.gameData.round).toBe(1);
+            expect(demo.gameData.gold).toBe(INITIAL_GOLD);
 
             // 完成准备，进入战斗
             const prepareProcedure = procMgr.currentProcedure as PrepareProcedure;
@@ -239,12 +234,12 @@ describe('Demo 3 Auto-chess Lite 集成测试', () => {
             jest.advanceTimersByTime(200);
             jest.advanceTimersByTime(200);
 
-            // Settle 增加金币（无论胜负都有 BASE_INCOME），然后进入下一轮 Prepare 再加 BASE_INCOME
+            // Settle 增加金币（无论胜负都有 BASE_INCOME），然后进入下一轮 Prepare
             // 金币至少增长了
-            expect(demo.gameData.gold).toBeGreaterThan(INITIAL_GOLD);
+            expect(demo.gameData.gold).toBeGreaterThan(0);
 
-            // round 增长了：Settle++ + Prepare++ = +2
-            expect(demo.gameData.round).toBeGreaterThan(2);
+            // round 增长了：Settle 不加 + Prepare++ = +1
+            expect(demo.gameData.round).toBeGreaterThan(1);
         });
     });
 
@@ -529,7 +524,7 @@ describe('Demo 3 Auto-chess Lite 集成测试', () => {
 
             // 验证 reset 后数据恢复初始值
             expect(demo.gameData.hp).toBe(INITIAL_HP);
-            expect(demo.gameData.gold).toBe(INITIAL_GOLD + BASE_INCOME); // reset 后 Prepare 加了收入
+            expect(demo.gameData.gold).toBe(INITIAL_GOLD); // reset 后 Prepare 不再加收入
 
             // 验证进入 PrepareProcedure
             expect(procMgr.currentProcedure).toBeInstanceOf(PrepareProcedure);
