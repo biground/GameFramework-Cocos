@@ -50,11 +50,7 @@ export class BattleProcedure extends ProcedureBase {
      * 2. 注册 BATTLE_VICTORY / BATTLE_DEFEAT 事件监听
      */
     onEnter(fsm: IFsm<unknown>): void {
-        const ctx = fsm.getData<IRpgProcedureContext>(RPG_PROCEDURE_CONTEXT_KEY);
-        if (!ctx) {
-            Logger.error(TAG, 'Procedure 上下文缺失');
-            throw new Error(`[${TAG}] Procedure 上下文缺失`);
-        }
+        const ctx = this.getContext<IRpgProcedureContext>(fsm, RPG_PROCEDURE_CONTEXT_KEY);
 
         this._ctx = ctx;
 
@@ -85,7 +81,7 @@ export class BattleProcedure extends ProcedureBase {
 
         // 启动 BattleFsm，从 RoundStartState 开始战斗循环
         const battleFsm = ctx.fsmManager.getFsm('battle_fsm') as
-            | IFsm<IBattleBlackboard>
+            | IFsm<IBattleBlackboard, IBattleBlackboard>
             | undefined;
         if (battleFsm) {
             battleFsm.start(RoundStartState);

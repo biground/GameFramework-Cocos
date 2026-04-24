@@ -26,6 +26,7 @@ function createMockFsm(data: Map<string, unknown>): IFsm<unknown> {
         owner: {},
         currentState: null,
         isDestroyed: false,
+        blackboard: {} as Record<string, unknown>,
         changeState: jest.fn(),
         getData: <V>(key: string) => data.get(key) as V | undefined,
         setData: <V>(key: string, value: V) => {
@@ -33,6 +34,7 @@ function createMockFsm(data: Map<string, unknown>): IFsm<unknown> {
         },
         removeData: (key: string) => data.delete(key),
         hasState: () => false,
+        setBlackboard: jest.fn(),
         start: jest.fn(),
     };
 }

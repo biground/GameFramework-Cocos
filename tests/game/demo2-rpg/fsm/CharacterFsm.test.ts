@@ -6,7 +6,7 @@
 import { Fsm } from '@framework/fsm/Fsm';
 import { EventManager } from '@framework/event/EventManager';
 import { CharacterState } from '@game/demo2-rpg/data/RpgGameData';
-import { ICharacterBlackboard, CharacterFsmDataKeys } from '@game/demo2-rpg/fsm/CharacterFsmDefs';
+import { ICharacterBlackboard } from '@game/demo2-rpg/fsm/CharacterFsmDefs';
 import { CharIdleState } from '@game/demo2-rpg/fsm/character/CharIdleState';
 import { CharActingState } from '@game/demo2-rpg/fsm/character/CharActingState';
 import { CharStunnedState } from '@game/demo2-rpg/fsm/character/CharStunnedState';
@@ -51,14 +51,13 @@ function createCharacterFsm(charOverrides?: Partial<CharacterState>, stunRounds 
         stunRounds,
     };
 
-    const fsm = new Fsm<ICharacterBlackboard>(`char_fsm_${characterState.id}`, blackboard, [
-        new CharIdleState(),
-        new CharActingState(),
-        new CharStunnedState(),
-        new CharDeadState(),
-    ]);
+    const fsm = new Fsm<ICharacterBlackboard, ICharacterBlackboard>(
+        `char_fsm_${characterState.id}`,
+        blackboard,
+        [new CharIdleState(), new CharActingState(), new CharStunnedState(), new CharDeadState()],
+    );
 
-    fsm.setData(CharacterFsmDataKeys.BLACKBOARD, blackboard);
+    fsm.setBlackboard(blackboard);
 
     return { fsm, blackboard, eventManager, characterState };
 }

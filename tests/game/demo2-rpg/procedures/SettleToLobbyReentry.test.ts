@@ -103,6 +103,7 @@ function createMockFsm(data: Map<string, unknown>): {
         owner: {},
         currentState: null,
         isDestroyed: false,
+        blackboard: {} as Record<string, unknown>,
         changeState<TState extends IFsmState<unknown>>(stateType: Constructor<TState>): void {
             tracker.value = stateType as Constructor<IFsmState<unknown>>;
         },
@@ -117,6 +118,9 @@ function createMockFsm(data: Map<string, unknown>): {
         },
         hasState(): boolean {
             return true;
+        },
+        setBlackboard(): void {
+            // mock
         },
         start(): void {
             /* mock */

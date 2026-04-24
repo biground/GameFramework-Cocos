@@ -11,30 +11,21 @@
 import { FsmState } from '../../../../framework/fsm/FsmState';
 import { IFsm } from '../../../../framework/fsm/FsmDefs';
 import { Logger } from '../../../../framework/debug/Logger';
-import { IChessAiBlackboard, ChessAiDataKeys } from '../ChessAiFsmDefs';
+import { IChessAiBlackboard } from '../ChessAiFsmDefs';
 import { AttackState } from './AttackState';
 import { MoveToState } from './MoveToState';
 
 const TAG = 'ChessAiFSM';
-
-/** 从 FSM 共享数据中获取黑板 */
-function getBlackboard(fsm: IFsm<string>): IChessAiBlackboard {
-    const bb = fsm.getData<IChessAiBlackboard>(ChessAiDataKeys.BLACKBOARD);
-    if (!bb) {
-        throw new Error(`[${TAG}] 黑板数据缺失，FSM="${fsm.name}"`);
-    }
-    return bb;
-}
 
 /**
  * 空闲状态
  *
  * 进入后自动寻找最近敌人并决策下一步行为。
  */
-export class IdleState extends FsmState<string> {
+export class IdleState extends FsmState<string, IChessAiBlackboard> {
     /** 进入空闲状态，寻找最近敌人 */
-    onEnter(fsm: IFsm<string>): void {
-        const bb = getBlackboard(fsm);
+    onEnter(fsm: IFsm<string, IChessAiBlackboard>): void {
+        const bb = fsm.blackboard;
         const piece = bb.pieceState;
         const enemies = bb.allEnemies().filter((e) => e.isAlive);
 

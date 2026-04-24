@@ -28,11 +28,7 @@ export class PreloadProcedure extends ProcedureBase {
     onEnter(fsm: IFsm<unknown>): void {
         Logger.info(TAG, '进入预加载流程，加载配置表...');
 
-        const ctx = fsm.getData<IProcedureContext>(PROCEDURE_CONTEXT_KEY);
-        if (!ctx) {
-            Logger.error(TAG, 'Procedure 上下文缺失');
-            throw new Error(`[${TAG}] Procedure 上下文缺失`);
-        }
+        const ctx = this.getContext<IProcedureContext>(fsm, PROCEDURE_CONTEXT_KEY);
 
         const dtMgr = ctx.dataTableManager;
 

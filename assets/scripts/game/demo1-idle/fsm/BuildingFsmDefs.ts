@@ -41,8 +41,6 @@ export interface IBuildingBlackboard {
 
 /** FSM 共享数据键 */
 export const BuildingFsmDataKeys = {
-    /** 黑板数据 */
-    BLACKBOARD: 'blackboard',
     /** 升级开始时间（毫秒戳） */
     UPGRADE_START_TIME: 'upgradeStartTime',
     /** 升级所需时间（秒） */

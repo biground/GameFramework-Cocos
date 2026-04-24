@@ -36,11 +36,7 @@ export class SettleProcedure extends ProcedureBase {
      * 6. 展示结算界面与返回大厅按钮
      */
     onEnter(fsm: IFsm<unknown>): void {
-        const ctx = fsm.getData<IRpgProcedureContext>(RPG_PROCEDURE_CONTEXT_KEY);
-        if (!ctx) {
-            Logger.error(TAG, 'Procedure 上下文缺失');
-            throw new Error(`[${TAG}] Procedure 上下文缺失`);
-        }
+        const ctx = this.getContext<IRpgProcedureContext>(fsm, RPG_PROCEDURE_CONTEXT_KEY);
 
         const result = fsm.getData<BattleResultData>(BATTLE_RESULT_KEY);
         const gameData = ctx.gameData as RpgGameData;

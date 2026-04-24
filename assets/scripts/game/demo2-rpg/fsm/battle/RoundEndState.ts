@@ -8,7 +8,7 @@
 import { FsmState } from '@framework/fsm/FsmState';
 import { IFsm } from '@framework/fsm/FsmDefs';
 import { Logger } from '@framework/debug/Logger';
-import { IBattleBlackboard, BattleFsmDataKeys } from '../BattleFsmDefs';
+import { IBattleBlackboard } from '../BattleFsmDefs';
 import { RpgEvents } from '../../events/RpgEvents';
 import { RoundStartState } from './RoundStartState';
 import { DefeatState } from './DefeatState';
@@ -16,26 +16,15 @@ import { DefeatState } from './DefeatState';
 const TAG = 'BattleFSM';
 
 /**
- * 从 FSM 共享数据中获取黑板
- */
-function getBlackboard(fsm: IFsm<IBattleBlackboard>): IBattleBlackboard {
-    const bb = fsm.getData<IBattleBlackboard>(BattleFsmDataKeys.BLACKBOARD);
-    if (!bb) {
-        throw new Error(`[${TAG}] 黑板数据缺失，FSM="${fsm.name}"`);
-    }
-    return bb;
-}
-
-/**
  * 回合结束状态
  *
  * 进入时对所有存活角色执行 BUFF 回合递减，发射过期事件，
  * 检查是否超过最大回合限制，然后切换回 RoundStartState。
  */
-export class RoundEndState extends FsmState<IBattleBlackboard> {
+export class RoundEndState extends FsmState<IBattleBlackboard, IBattleBlackboard> {
     /** 进入回合结束状态 */
-    onEnter(fsm: IFsm<IBattleBlackboard>): void {
-        const bb = getBlackboard(fsm);
+    onEnter(fsm: IFsm<IBattleBlackboard, IBattleBlackboard>): void {
+        const bb = fsm.blackboard;
         const round = bb.gameData.currentRound;
 
         // 对所有存活角色进行 BUFF 递减

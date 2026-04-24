@@ -128,6 +128,7 @@ function createMockProcedureFsm(ctx: IRpgProcedureContext): {
         owner: {},
         currentState: null,
         isDestroyed: false,
+        blackboard: {} as Record<string, unknown>,
         changeState<TState extends IFsmState<unknown>>(stateType: Constructor<TState>): void {
             tracker.value = stateType as Constructor<IFsmState<unknown>>;
         },
@@ -142,6 +143,9 @@ function createMockProcedureFsm(ctx: IRpgProcedureContext): {
         },
         hasState(): boolean {
             return true;
+        },
+        setBlackboard(): void {
+            // mock
         },
         start(): void {
             // mock
@@ -268,11 +272,13 @@ describe('BattleProcedure — 战斗流程', () => {
             owner: {},
             currentState: null,
             isDestroyed: false,
+            blackboard: {} as Record<string, unknown>,
             changeState: jest.fn(),
             getData: jest.fn().mockReturnValue(undefined),
             setData: jest.fn(),
             removeData: jest.fn(),
             hasState: jest.fn(),
+            setBlackboard: jest.fn(),
             start: jest.fn(),
         };
 
@@ -455,11 +461,13 @@ describe('SettleProcedure — 结算流程', () => {
             owner: {},
             currentState: null,
             isDestroyed: false,
+            blackboard: {} as Record<string, unknown>,
             changeState: jest.fn(),
             getData: jest.fn().mockReturnValue(undefined),
             setData: jest.fn(),
             removeData: jest.fn(),
             hasState: jest.fn(),
+            setBlackboard: jest.fn(),
             start: jest.fn(),
         };
 

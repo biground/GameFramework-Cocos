@@ -5,7 +5,7 @@
  */
 
 import { IFsm, Constructor, IFsmState } from '@framework/fsm/FsmDefs';
-import { IBattleBlackboard, BattleFsmDataKeys } from '@game/demo2-rpg/fsm/BattleFsmDefs';
+import { IBattleBlackboard } from '@game/demo2-rpg/fsm/BattleFsmDefs';
 import { RoundStartState } from '@game/demo2-rpg/fsm/battle/RoundStartState';
 import { SelectActionState } from '@game/demo2-rpg/fsm/battle/SelectActionState';
 import { ExecuteActionState } from '@game/demo2-rpg/fsm/battle/ExecuteActionState';
@@ -86,23 +86,29 @@ function makeEnemy(overrides: Partial<CharacterState> = {}): CharacterState {
 
 /** 记录 changeState 调用的 mock FSM */
 function createMockFsm(bb: IBattleBlackboard): {
-    fsm: IFsm<IBattleBlackboard>;
-    lastChangedState: Constructor<IFsmState<IBattleBlackboard>> | null;
+    fsm: IFsm<IBattleBlackboard, IBattleBlackboard>;
+    lastChangedState: Constructor<IFsmState<IBattleBlackboard, IBattleBlackboard>> | null;
 } {
     const data = new Map<string, unknown>();
-    data.set(BattleFsmDataKeys.BLACKBOARD, bb);
 
-    const tracker = { lastChangedState: null as Constructor<IFsmState<IBattleBlackboard>> | null };
+    const tracker = {
+        lastChangedState: null as Constructor<
+            IFsmState<IBattleBlackboard, IBattleBlackboard>
+        > | null,
+    };
 
-    const fsm: IFsm<IBattleBlackboard> = {
+    const fsm: IFsm<IBattleBlackboard, IBattleBlackboard> = {
         name: 'battle_fsm_test',
         owner: bb,
         currentState: null,
         isDestroyed: false,
-        changeState<TState extends IFsmState<IBattleBlackboard>>(
+        blackboard: bb,
+        changeState<TState extends IFsmState<IBattleBlackboard, IBattleBlackboard>>(
             stateType: Constructor<TState>,
         ): void {
-            tracker.lastChangedState = stateType as Constructor<IFsmState<IBattleBlackboard>>;
+            tracker.lastChangedState = stateType as Constructor<
+                IFsmState<IBattleBlackboard, IBattleBlackboard>
+            >;
         },
         getData<V>(key: string): V | undefined {
             return data.get(key) as V | undefined;
@@ -115,6 +121,9 @@ function createMockFsm(bb: IBattleBlackboard): {
         },
         hasState(): boolean {
             return true;
+        },
+        setBlackboard(): void {
+            // mock: 不实际设置
         },
         start(): void {
             // mock: 不实际启动

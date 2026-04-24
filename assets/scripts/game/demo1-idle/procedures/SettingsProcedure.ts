@@ -26,11 +26,7 @@ export class SettingsProcedure extends ProcedureBase {
     onEnter(fsm: IFsm<unknown>): void {
         Logger.info(TAG, '进入设置流程');
 
-        const ctx = fsm.getData<IProcedureContext>(PROCEDURE_CONTEXT_KEY);
-        if (!ctx) {
-            Logger.error(TAG, 'Procedure 上下文缺失');
-            throw new Error(`[${TAG}] Procedure 上下文缺失`);
-        }
+        const ctx = this.getContext<IProcedureContext>(fsm, PROCEDURE_CONTEXT_KEY);
 
         this._backRequested = false;
 
@@ -67,10 +63,7 @@ export class SettingsProcedure extends ProcedureBase {
      * @param fsm 所属状态机
      */
     deleteSave(fsm: IFsm<unknown>): void {
-        const ctx = fsm.getData<IProcedureContext>(PROCEDURE_CONTEXT_KEY);
-        if (!ctx) {
-            return;
-        }
+        const ctx = this.getContext<IProcedureContext>(fsm, PROCEDURE_CONTEXT_KEY);
         ctx.saveSystem.clearSave();
         ctx.gameData.reset();
         Logger.info(TAG, '存档已删除，游戏数据已重置');

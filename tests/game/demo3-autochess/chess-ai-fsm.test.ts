@@ -8,7 +8,7 @@
 import { IFsm } from '@framework/fsm/FsmDefs';
 import { BoardSystem } from '@game/demo3-autochess/systems/BoardSystem';
 import { ChessPieceRuntimeState } from '@game/demo3-autochess/data/AutoChessGameData';
-import { IChessAiBlackboard, ChessAiDataKeys } from '@game/demo3-autochess/fsm/ChessAiFsmDefs';
+import { IChessAiBlackboard } from '@game/demo3-autochess/fsm/ChessAiFsmDefs';
 import { IdleState } from '@game/demo3-autochess/fsm/chess-ai/IdleState';
 import { MoveToState } from '@game/demo3-autochess/fsm/chess-ai/MoveToState';
 import { AttackState } from '@game/demo3-autochess/fsm/chess-ai/AttackState';
@@ -50,16 +50,16 @@ function createPieceState(overrides: Partial<ChessPieceRuntimeState> = {}): Ches
     };
 }
 
-/** 创建 mock IFsm<string>，注入黑板数据 */
-function createMockFsm(blackboard: IChessAiBlackboard): IFsm<string> {
+/** 创建 mock IFsm<string, IChessAiBlackboard>，注入黑板数据 */
+function createMockFsm(blackboard: IChessAiBlackboard): IFsm<string, IChessAiBlackboard> {
     const dataMap = new Map<string, unknown>();
-    dataMap.set(ChessAiDataKeys.BLACKBOARD, blackboard);
 
     const mockFsm = {
         name: 'test_chess_ai',
         owner: 'test',
         currentState: null,
         isDestroyed: false,
+        blackboard,
         changeState: jest.fn(),
         getData: jest.fn((key: string) => dataMap.get(key)),
         setData: jest.fn((key: string, value: unknown) => {
@@ -68,7 +68,8 @@ function createMockFsm(blackboard: IChessAiBlackboard): IFsm<string> {
         removeData: jest.fn((key: string) => dataMap.delete(key)),
         hasState: jest.fn(() => true),
         start: jest.fn(),
-    } as unknown as IFsm<string>;
+        setBlackboard: jest.fn(),
+    } as unknown as IFsm<string, IChessAiBlackboard>;
     return mockFsm;
 }
 

@@ -104,7 +104,7 @@ describe('LaunchProcedure', () => {
         const fsm = createMockFsm(); // 无上下文
         const proc = new LaunchProcedure();
 
-        expect(() => proc.onEnter(fsm)).toThrow('上下文缺失');
+        expect(() => proc.onEnter(fsm)).toThrow('不存在');
     });
 });
 
@@ -148,7 +148,7 @@ describe('PreloadProcedure', () => {
         const fsm = createMockFsm(); // 无上下文
         const proc = new PreloadProcedure();
 
-        expect(() => proc.onEnter(fsm)).toThrow('上下文缺失');
+        expect(() => proc.onEnter(fsm)).toThrow('不存在');
     });
 
     it('每张配置表应传入表名和原始数据数组', () => {

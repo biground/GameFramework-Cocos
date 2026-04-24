@@ -13,7 +13,7 @@ import { Logger } from '../../../framework/debug/Logger';
 import { CHESS_AI_FSM_PREFIX } from '../AutoChessDefs';
 import { ChessPieceRuntimeState, ChessPieceSide } from '../data/AutoChessGameData';
 import { BoardSystem } from './BoardSystem';
-import { IChessAiBlackboard, ChessAiDataKeys } from '../fsm/ChessAiFsmDefs';
+import { IChessAiBlackboard } from '../fsm/ChessAiFsmDefs';
 import { IdleState } from '../fsm/chess-ai/IdleState';
 import { MoveToState } from '../fsm/chess-ai/MoveToState';
 import { AttackState } from '../fsm/chess-ai/AttackState';
@@ -30,7 +30,7 @@ export class BattleSystem {
     private _eventManager: IEventManager | null = null;
 
     /** 棋子 ID → AI FSM 映射 */
-    private _chessFsms: Map<number, IFsm<string>> = new Map();
+    private _chessFsms: Map<number, IFsm<string, IChessAiBlackboard>> = new Map();
 
     /** 玩家方棋子列表 */
     private _playerPieces: ChessPieceRuntimeState[] = [];
@@ -188,8 +188,8 @@ export class BattleSystem {
         const fsmName = CHESS_AI_FSM_PREFIX + piece.id;
         const isPlayerSide = piece.side === 'player';
 
-        // 创建 FSM
-        const fsm = this._fsmManager.createFsm<string>(
+        // 创建 FSM（双泛型：T=string, TBlackboard=IChessAiBlackboard）
+        const fsm = this._fsmManager.createFsm<string, IChessAiBlackboard>(
             fsmName,
             fsmName,
             new IdleState(),
@@ -211,7 +211,7 @@ export class BattleSystem {
         };
 
         // 写入黑板
-        fsm.setData(ChessAiDataKeys.BLACKBOARD, blackboard);
+        fsm.setBlackboard(blackboard);
 
         // 启动 FSM，初始状态 Idle
         fsm.start(IdleState);

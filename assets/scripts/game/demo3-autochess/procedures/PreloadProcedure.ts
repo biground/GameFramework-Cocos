@@ -128,11 +128,7 @@ export class PreloadProcedure extends ProcedureBase {
     onEnter(fsm: IFsm<unknown>): void {
         Logger.info(TAG, '进入预加载流程，注册配置表与实体分组...');
 
-        const ctx = fsm.getData<IAutoChessProcedureContext>(AUTO_CHESS_CONTEXT_KEY);
-        if (!ctx) {
-            Logger.error(TAG, 'Auto-chess Procedure 上下文缺失');
-            throw new Error(`[${TAG}] Auto-chess Procedure 上下文缺失`);
-        }
+        const ctx = this.getContext<IAutoChessProcedureContext>(fsm, AUTO_CHESS_CONTEXT_KEY);
 
         const dtMgr = ctx.dataTableManager;
 

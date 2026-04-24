@@ -11,7 +11,7 @@
 import { FsmState } from '../../../../framework/fsm/FsmState';
 import { IFsm } from '../../../../framework/fsm/FsmDefs';
 import { Logger } from '../../../../framework/debug/Logger';
-import { IChessAiBlackboard, ChessAiDataKeys } from '../ChessAiFsmDefs';
+import { IChessAiBlackboard } from '../ChessAiFsmDefs';
 import { AutoChessEvents } from '../../AutoChessDefs';
 import { IdleState } from './IdleState';
 import { MoveToState } from './MoveToState';
@@ -19,32 +19,23 @@ import { DeadState } from './DeadState';
 
 const TAG = 'ChessAiFSM';
 
-/** 从 FSM 共享数据中获取黑板 */
-function getBlackboard(fsm: IFsm<string>): IChessAiBlackboard {
-    const bb = fsm.getData<IChessAiBlackboard>(ChessAiDataKeys.BLACKBOARD);
-    if (!bb) {
-        throw new Error(`[${TAG}] 黑板数据缺失，FSM="${fsm.name}"`);
-    }
-    return bb;
-}
-
 /**
  * 攻击状态
  *
  * 管理攻击冷却和伤害逻辑。
  */
-export class AttackState extends FsmState<string> {
+export class AttackState extends FsmState<string, IChessAiBlackboard> {
     /** 攻击冷却计时器 */
     private _cooldown: number = 0;
 
     /** 进入攻击状态，重置冷却 */
-    onEnter(_fsm: IFsm<string>): void {
+    onEnter(_fsm: IFsm<string, IChessAiBlackboard>): void {
         this._cooldown = 0;
     }
 
     /** 每帧检查冷却，执行攻击 */
-    onUpdate(fsm: IFsm<string>, deltaTime: number): void {
-        const bb = getBlackboard(fsm);
+    onUpdate(fsm: IFsm<string, IChessAiBlackboard>, deltaTime: number): void {
+        const bb = fsm.blackboard;
         const piece = bb.pieceState;
 
         // 自身已死亡 → Dead
@@ -103,7 +94,7 @@ export class AttackState extends FsmState<string> {
     }
 
     /** 离开攻击状态时清理冷却 */
-    onLeave(_fsm: IFsm<string>): void {
+    onLeave(_fsm: IFsm<string, IChessAiBlackboard>): void {
         this._cooldown = 0;
     }
 }

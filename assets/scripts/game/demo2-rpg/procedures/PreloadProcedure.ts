@@ -61,11 +61,7 @@ export class PreloadProcedure extends ProcedureBase {
     onEnter(fsm: IFsm<unknown>): void {
         Logger.info(TAG, '进入预加载流程，注册配置表...');
 
-        const ctx = fsm.getData<IRpgProcedureContext>(RPG_PROCEDURE_CONTEXT_KEY);
-        if (!ctx) {
-            Logger.error(TAG, 'RPG Procedure 上下文缺失');
-            throw new Error(`[${TAG}] RPG Procedure 上下文缺失`);
-        }
+        const ctx = this.getContext<IRpgProcedureContext>(fsm, RPG_PROCEDURE_CONTEXT_KEY);
 
         const dtMgr = ctx.dataTableManager;
 

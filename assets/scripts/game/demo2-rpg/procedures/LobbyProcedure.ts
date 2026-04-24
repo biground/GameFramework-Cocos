@@ -33,11 +33,7 @@ export class LobbyProcedure extends ProcedureBase {
 
     /** 进入大厅流程 */
     onEnter(fsm: IFsm<unknown>): void {
-        const ctx = fsm.getData<IRpgProcedureContext>(RPG_PROCEDURE_CONTEXT_KEY);
-        if (!ctx) {
-            Logger.error(TAG, 'Procedure 上下文缺失');
-            throw new Error(`[${TAG}] Procedure 上下文缺失`);
-        }
+        const ctx = this.getContext<IRpgProcedureContext>(fsm, RPG_PROCEDURE_CONTEXT_KEY);
 
         const gameData = ctx.gameData as RpgGameData;
         const { renderer, dataTableManager, eventManager } = ctx;

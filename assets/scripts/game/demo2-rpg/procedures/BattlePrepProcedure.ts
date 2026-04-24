@@ -14,7 +14,7 @@ import { RpgGameData, CharacterState } from '../data/RpgGameData';
 import { StageConfigRow } from '../data/StageConfigRow';
 import { MonsterConfigRow } from '../data/MonsterConfigRow';
 import { SkillConfigRow } from '../data/SkillConfigRow';
-import { IBattleBlackboard, BattleFsmDataKeys } from '../fsm/BattleFsmDefs';
+import { IBattleBlackboard } from '../fsm/BattleFsmDefs';
 import { RoundStartState } from '../fsm/battle/RoundStartState';
 import { SelectActionState } from '../fsm/battle/SelectActionState';
 import { ExecuteActionState } from '../fsm/battle/ExecuteActionState';
@@ -46,10 +46,7 @@ export class BattlePrepProcedure extends ProcedureBase {
      */
     onEnter(fsm: IFsm<unknown>): void {
         // 1. 获取上下文
-        const ctx = fsm.getData<IRpgProcedureContext>(RPG_PROCEDURE_CONTEXT_KEY);
-        if (!ctx) {
-            throw new Error(`[${TAG}] 无法获取 RPG Procedure 上下文`);
-        }
+        const ctx = this.getContext<IRpgProcedureContext>(fsm, RPG_PROCEDURE_CONTEXT_KEY);
 
         const gameData = ctx.gameData as RpgGameData;
         const { dataTableManager, fsmManager, audioManager } = ctx;
@@ -107,7 +104,7 @@ export class BattlePrepProcedure extends ProcedureBase {
         ) as MonsterConfigRow[];
 
         // 6. 创建 BattleFsm（owner 占位，实际数据通过黑板共享）
-        const battleFsm = fsmManager.createFsm<IBattleBlackboard>(
+        const battleFsm = fsmManager.createFsm<IBattleBlackboard, IBattleBlackboard>(
             'battle_fsm',
             {} as IBattleBlackboard,
             new RoundStartState(),
@@ -134,7 +131,7 @@ export class BattlePrepProcedure extends ProcedureBase {
             monsterTable: monsterTable,
             maxRound: stageRow.maxRound,
         };
-        battleFsm.setData(BattleFsmDataKeys.BLACKBOARD, blackboard);
+        battleFsm.setBlackboard(blackboard);
 
         // 8. 播放战斗 BGM
         audioManager.playMusic(stageRow.bgm);

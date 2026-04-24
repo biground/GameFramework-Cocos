@@ -36,11 +36,7 @@ export class MainProcedure extends ProcedureBase {
     onEnter(fsm: IFsm<unknown>): void {
         Logger.info(TAG, '进入主游戏流程');
 
-        const ctx = fsm.getData<IProcedureContext>(PROCEDURE_CONTEXT_KEY);
-        if (!ctx) {
-            Logger.error(TAG, 'Procedure 上下文缺失');
-            throw new Error(`[${TAG}] Procedure 上下文缺失`);
-        }
+        const ctx = this.getContext<IProcedureContext>(fsm, PROCEDURE_CONTEXT_KEY);
 
         // 启动所有已拥有建筑的生产 Timer
         ctx.buildingSystem.startAllProduction();

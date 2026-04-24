@@ -24,11 +24,7 @@ const TAG = 'LaunchProcedure';
 export class LaunchProcedure extends ProcedureBase {
     /** 进入启动流程 */
     onEnter(fsm: IFsm<unknown>): void {
-        const ctx = fsm.getData<IRpgProcedureContext>(RPG_PROCEDURE_CONTEXT_KEY);
-        if (!ctx) {
-            Logger.error(TAG, 'RPG Procedure 上下文缺失');
-            throw new Error(`[${TAG}] RPG Procedure 上下文缺失`);
-        }
+        const ctx = this.getContext<IRpgProcedureContext>(fsm, RPG_PROCEDURE_CONTEXT_KEY);
 
         Logger.info(TAG, 'RPG 框架初始化完成，进入启动流程');
 

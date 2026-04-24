@@ -12,24 +12,9 @@
 import { FsmState } from '@framework/fsm/FsmState';
 import { IFsm } from '@framework/fsm/FsmDefs';
 import { Logger } from '@framework/debug/Logger';
-import {
-    IBuildingBlackboard,
-    BuildingFsmDataKeys,
-    BuildingFsmStateNames,
-} from './BuildingFsmDefs';
+import { IBuildingBlackboard, BuildingFsmDataKeys, BuildingFsmStateNames } from './BuildingFsmDefs';
 
 const TAG = 'BuildingFSM';
-
-/**
- * 从 FSM 共享数据中获取黑板
- */
-function getBlackboard(fsm: IFsm<IBuildingBlackboard>): IBuildingBlackboard {
-    const bb = fsm.getData<IBuildingBlackboard>(BuildingFsmDataKeys.BLACKBOARD);
-    if (!bb) {
-        throw new Error(`[${TAG}] 黑板数据缺失，FSM="${fsm.name}"`);
-    }
-    return bb;
-}
 
 // ─── IdleBuildingState ─────────────────────────────────
 
@@ -39,19 +24,22 @@ function getBlackboard(fsm: IFsm<IBuildingBlackboard>): IBuildingBlackboard {
  * 建筑尚未被玩家购买，不产出、不可升级。
  * 当建筑被购买后切换到 ProducingState。
  */
-export class IdleBuildingState extends FsmState<IBuildingBlackboard> {
+export class IdleBuildingState extends FsmState<IBuildingBlackboard, IBuildingBlackboard> {
     /** 进入等待购买状态 */
-    onEnter(fsm: IFsm<IBuildingBlackboard>): void {
-        const bb = getBlackboard(fsm);
-        Logger.info(TAG, `[${fsm.name}] 建筑 #${bb.buildingId} 进入 ${BuildingFsmStateNames.IDLE} 状态`);
+    onEnter(fsm: IFsm<IBuildingBlackboard, IBuildingBlackboard>): void {
+        const bb = fsm.blackboard;
+        Logger.info(
+            TAG,
+            `[${fsm.name}] 建筑 #${bb.buildingId} 进入 ${BuildingFsmStateNames.IDLE} 状态`,
+        );
     }
 
     /**
      * 每帧检测建筑是否已被购买
      * 购买后切换到 ProducingState
      */
-    onUpdate(fsm: IFsm<IBuildingBlackboard>, _dt: number): void {
-        const bb = getBlackboard(fsm);
+    onUpdate(fsm: IFsm<IBuildingBlackboard, IBuildingBlackboard>, _dt: number): void {
+        const bb = fsm.blackboard;
         const buildingState = bb.gameData.buildings.find((b) => b.id === bb.buildingId);
         if (buildingState && buildingState.owned) {
             this.changeState(fsm, ProducingState);
@@ -67,11 +55,14 @@ export class IdleBuildingState extends FsmState<IBuildingBlackboard> {
  * 建筑已购买并正在产出金币（Timer 由 BuildingSystem 管理）。
  * 可响应升级请求切换到 UpgradingState，或检测到满级切换到 MaxLevelState。
  */
-export class ProducingState extends FsmState<IBuildingBlackboard> {
+export class ProducingState extends FsmState<IBuildingBlackboard, IBuildingBlackboard> {
     /** 进入产出状态 */
-    onEnter(fsm: IFsm<IBuildingBlackboard>): void {
-        const bb = getBlackboard(fsm);
-        Logger.info(TAG, `[${fsm.name}] 建筑 #${bb.buildingId} 进入 ${BuildingFsmStateNames.PRODUCING} 状态`);
+    onEnter(fsm: IFsm<IBuildingBlackboard, IBuildingBlackboard>): void {
+        const bb = fsm.blackboard;
+        Logger.info(
+            TAG,
+            `[${fsm.name}] 建筑 #${bb.buildingId} 进入 ${BuildingFsmStateNames.PRODUCING} 状态`,
+        );
 
         // 确保生产 Timer 运行（BuildingSystem 在 purchaseBuilding / upgradeBuilding 中已自动管理）
     }
@@ -81,8 +72,8 @@ export class ProducingState extends FsmState<IBuildingBlackboard> {
      * - 正在升级 → 切换到 UpgradingState
      * - 已达满级 → 切换到 MaxLevelState
      */
-    onUpdate(fsm: IFsm<IBuildingBlackboard>, _dt: number): void {
-        const bb = getBlackboard(fsm);
+    onUpdate(fsm: IFsm<IBuildingBlackboard, IBuildingBlackboard>, _dt: number): void {
+        const bb = fsm.blackboard;
         const buildingState = bb.gameData.buildings.find((b) => b.id === bb.buildingId);
         if (!buildingState) {
             return;
@@ -102,9 +93,12 @@ export class ProducingState extends FsmState<IBuildingBlackboard> {
     }
 
     /** 离开产出状态 */
-    onLeave(fsm: IFsm<IBuildingBlackboard>): void {
-        const bb = getBlackboard(fsm);
-        Logger.debug(TAG, `[${fsm.name}] 建筑 #${bb.buildingId} 离开 ${BuildingFsmStateNames.PRODUCING} 状态`);
+    onLeave(fsm: IFsm<IBuildingBlackboard, IBuildingBlackboard>): void {
+        const bb = fsm.blackboard;
+        Logger.debug(
+            TAG,
+            `[${fsm.name}] 建筑 #${bb.buildingId} 离开 ${BuildingFsmStateNames.PRODUCING} 状态`,
+        );
     }
 }
 
@@ -116,11 +110,14 @@ export class ProducingState extends FsmState<IBuildingBlackboard> {
  * 建筑正在升级，等待升级计时器完成。
  * 升级完成后切换回 ProducingState。
  */
-export class UpgradingState extends FsmState<IBuildingBlackboard> {
+export class UpgradingState extends FsmState<IBuildingBlackboard, IBuildingBlackboard> {
     /** 进入升级状态，记录升级开始时间 */
-    onEnter(fsm: IFsm<IBuildingBlackboard>): void {
-        const bb = getBlackboard(fsm);
-        Logger.info(TAG, `[${fsm.name}] 建筑 #${bb.buildingId} 进入 ${BuildingFsmStateNames.UPGRADING} 状态`);
+    onEnter(fsm: IFsm<IBuildingBlackboard, IBuildingBlackboard>): void {
+        const bb = fsm.blackboard;
+        Logger.info(
+            TAG,
+            `[${fsm.name}] 建筑 #${bb.buildingId} 进入 ${BuildingFsmStateNames.UPGRADING} 状态`,
+        );
 
         const buildingState = bb.gameData.buildings.find((b) => b.id === bb.buildingId);
         if (buildingState) {
@@ -132,8 +129,8 @@ export class UpgradingState extends FsmState<IBuildingBlackboard> {
      * 每帧检测升级是否完成
      * 升级完成（isUpgrading 变为 false）后切换回 ProducingState
      */
-    onUpdate(fsm: IFsm<IBuildingBlackboard>, _dt: number): void {
-        const bb = getBlackboard(fsm);
+    onUpdate(fsm: IFsm<IBuildingBlackboard, IBuildingBlackboard>, _dt: number): void {
+        const bb = fsm.blackboard;
         const buildingState = bb.gameData.buildings.find((b) => b.id === bb.buildingId);
         if (!buildingState) {
             return;
@@ -141,17 +138,23 @@ export class UpgradingState extends FsmState<IBuildingBlackboard> {
 
         // 升级完成
         if (!buildingState.isUpgrading) {
-            Logger.info(TAG, `[${fsm.name}] 建筑 #${bb.buildingId} 升级完成, lv${buildingState.level}`);
+            Logger.info(
+                TAG,
+                `[${fsm.name}] 建筑 #${bb.buildingId} 升级完成, lv${buildingState.level}`,
+            );
             this.changeState(fsm, ProducingState);
         }
     }
 
     /** 离开升级状态，清理升级临时数据 */
-    onLeave(fsm: IFsm<IBuildingBlackboard>): void {
-        const bb = getBlackboard(fsm);
+    onLeave(fsm: IFsm<IBuildingBlackboard, IBuildingBlackboard>): void {
+        const bb = fsm.blackboard;
         fsm.removeData(BuildingFsmDataKeys.UPGRADE_START_TIME);
         fsm.removeData(BuildingFsmDataKeys.UPGRADE_DURATION);
-        Logger.debug(TAG, `[${fsm.name}] 建筑 #${bb.buildingId} 离开 ${BuildingFsmStateNames.UPGRADING} 状态`);
+        Logger.debug(
+            TAG,
+            `[${fsm.name}] 建筑 #${bb.buildingId} 离开 ${BuildingFsmStateNames.UPGRADING} 状态`,
+        );
     }
 }
 
@@ -162,10 +165,10 @@ export class UpgradingState extends FsmState<IBuildingBlackboard> {
  *
  * 建筑已达最大等级，持续产出但无法再升级。
  */
-export class MaxLevelState extends FsmState<IBuildingBlackboard> {
+export class MaxLevelState extends FsmState<IBuildingBlackboard, IBuildingBlackboard> {
     /** 进入满级状态 */
-    onEnter(fsm: IFsm<IBuildingBlackboard>): void {
-        const bb = getBlackboard(fsm);
+    onEnter(fsm: IFsm<IBuildingBlackboard, IBuildingBlackboard>): void {
+        const bb = fsm.blackboard;
         const buildingState = bb.gameData.buildings.find((b) => b.id === bb.buildingId);
         const level = buildingState ? buildingState.level : 0;
         Logger.info(TAG, `[${fsm.name}] 建筑 #${bb.buildingId} 达到满级 lv${level}, 持续产出中`);

@@ -1,0 +1,287 @@
+plan_id: demo3-autochess
+objective: 分析 Demo3 Auto-chess Lite 实际代码，识别框架真实不足
+focus_area: framework-gaps-from-demo3
+created_at: "2026-04-24"
+created_by: gem-researcher
+status: completed
+
+tldr: |
+  - Demo3 代码整体质量好，17 个框架模块协作顺畅，架构分层清晰
+  - 真实缺口 2 个：FSM 黑板访问样板代码泛滥（16+ 文件重复）、Procedure 上下文获取样板（每个 Procedure 重复 getData+null check+解构）
+  - 可补强 3 个：EntityManager 与业务数据断层（实体创建了但未实际参与战斗逻辑）、renderer 类型 unknown 导致 duck-type 检查、ObjectPool 在 Demo3 未实际发挥复用价值
+  - 工作良好：EventManager 幻影类型、FSM 驱动 AI、Procedure 流程链、DataTableManager 配置表、TimerManager、DemoBase 共享基础设施
+
+research_metadata:
+  methodology: "逐文件阅读 Demo3 全部 22 个源文件 + 对比 Demo1/Demo2 同模式文件 + grep 搜索重复代码 + 阅读框架接口定义"
+  scope: "Demo3 全量代码 + shared/ 基础设施 + framework/interfaces/ + demo-design.md 未来 Demo 设计"
+  confidence: high
+  coverage: 100  # Demo3 全部源文件已读
+  decision_blockers: 0
+  research_blockers: 0
+
+# ═══════════════════════════════════════════════════════════════
+# 真实缺口（有代码证据的痛点）
+# ═══════════════════════════════════════════════════════════════
+
+true_gaps:
+
+  - id: GAP-1
+    title: "FSM 黑板访问样板代码泛滥"
+    severity: medium
+    description: |
+      每个 FSM 状态文件都要复制粘贴一个 getBlackboard() 辅助函数。
+      Demo3 的 4 个 AI 状态文件（IdleState/MoveToState/AttackState/DeadState）每个都有
+      完全相同的 8 行 getBlackboard 函数。Demo2 有 8 个状态文件同样重复。Demo1 也有。
+      总计跨 3 个 Demo 有 16+ 处完全相同的样板代码。
+    evidence:
+      - file: assets/scripts/game/demo3-autochess/fsm/chess-ai/IdleState.ts
+        line: 21-28
+        snippet: |
+          function getBlackboard(fsm: IFsm<string>): IChessAiBlackboard {
+              const bb = fsm.getData<IChessAiBlackboard>(ChessAiDataKeys.BLACKBOARD);
+              if (!bb) { throw new Error(`[${TAG}] 黑板数据缺失，FSM="${fsm.name}"`); }
+              return bb;
+          }
+      - file: assets/scripts/game/demo3-autochess/fsm/chess-ai/MoveToState.ts
+        line: 23-28
+        snippet: "(完全相同的函数)"
+      - file: assets/scripts/game/demo3-autochess/fsm/chess-ai/AttackState.ts
+        line: 23-28
+        snippet: "(完全相同的函数)"
+      - file: assets/scripts/game/demo3-autochess/fsm/chess-ai/DeadState.ts
+        line: 18-23
+        snippet: "(完全相同的函数)"
+      - file: assets/scripts/game/demo2-rpg/fsm/battle/VictoryState.ts
+        line: 19
+        snippet: "function getBlackboard(fsm: IFsm<IBattleBlackboard>): IBattleBlackboard {"
+      - file: assets/scripts/game/demo2-rpg/fsm/battle/SelectActionState.ts
+        line: 23
+        snippet: "(同样的模式)"
+      - file: assets/scripts/game/demo2-rpg/fsm/character/CharIdleState.ts
+        line: 19
+        snippet: "(同样的模式)"
+    root_cause: |
+      FsmState 基类没有提供类型安全的黑板访问机制。
+      getData<T>(key) 返回 T | undefined，每个状态都需要手动取值+null检查+类型断言。
+    impact: |
+      - 维护成本：改黑板 key 名需要改 16+ 处
+      - DRY 违反：明显的 copy-paste 代码
+      - Demo4/5/6 会继续恶化（战棋双层 FSM、多人对战角色 FSM 更多状态）
+    potential_fix: |
+      方案 A：FsmState 基类增加泛型 blackboard 参数 FsmState<TOwner, TBlackboard>，
+              onEnter/onUpdate 签名带 blackboard 参数
+      方案 B：提供工具函数 createBlackboardAccessor<T>(key) 返回类型安全的 getter
+
+  - id: GAP-2
+    title: "Procedure 上下文获取样板代码重复"
+    severity: low-medium
+    description: |
+      每个 Procedure 的 onEnter 都要执行 fsm.getData<Context>(KEY) + null check + throw。
+      Demo3 的 6 个 Procedure 每个都有完全相同的 4 行上下文获取代码。
+      Demo2 也有相同模式。
+    evidence:
+      - file: assets/scripts/game/demo3-autochess/procedures/LaunchProcedure.ts
+        line: 27-31
+        snippet: |
+          const ctx = fsm.getData<IAutoChessProcedureContext>(AUTO_CHESS_CONTEXT_KEY);
+          if (!ctx) {
+              Logger.error(TAG, 'Auto-chess Procedure 上下文缺失');
+              throw new Error(`[${TAG}] Auto-chess Procedure 上下文缺失`);
+          }
+      - file: assets/scripts/game/demo3-autochess/procedures/PreloadProcedure.ts
+        line: 131-135
+        snippet: "(完全相同的 4 行)"
+      - file: assets/scripts/game/demo3-autochess/procedures/PrepareProcedure.ts
+        line: 91-96
+        snippet: "(完全相同的 4 行)"
+      - file: assets/scripts/game/demo3-autochess/procedures/BattleProcedure.ts
+        line: 41-46
+        snippet: "(完全相同的 4 行)"
+      - file: assets/scripts/game/demo3-autochess/procedures/SettleProcedure.ts
+        line: 43-48
+        snippet: "(完全相同的 4 行)"
+      - file: assets/scripts/game/demo3-autochess/procedures/GameOverProcedure.ts
+        line: 32-37
+        snippet: "(完全相同的 4 行)"
+    root_cause: |
+      ProcedureBase 没有提供类型安全的上下文访问机制。
+      所有 Procedure 共享同一个 FSM，但 getData 是无类型保证的字符串键。
+    impact: |
+      - 6 处完全相同的 null check + throw 样板
+      - Demo4/5/6 将各新增 5-7 个 Procedure，继续累积
+    potential_fix: |
+      ProcedureBase 增加泛型 ProcedureBase<TContext>，
+      提供 protected getContext(fsm): TContext 方法封装 getData + null check
+
+# ═══════════════════════════════════════════════════════════════
+# 可补强（不是缺口但补了会更好）
+# ═══════════════════════════════════════════════════════════════
+
+enhancements:
+
+  - id: ENH-1
+    title: "EntityManager 与业务逻辑数据断层"
+    priority: medium
+    description: |
+      BattleProcedure 调用 entityManager.showEntity() 创建了实体，但战斗系统（BattleSystem）
+      完全不使用这些 Entity 实例。战斗逻辑直接操作 ChessPieceRuntimeState 对象，
+      EntityManager 沦为「创建了就扔掉」的装饰品。
+    evidence:
+      - file: assets/scripts/game/demo3-autochess/procedures/BattleProcedure.ts
+        line: 104-131
+        detail: |
+          连续调用 entityManager.showEntity('enemy_chess', {...}) 和
+          entityManager.showEntity('player_chess', {...})，但返回值完全未使用。
+          BattleSystem.startBattle() 接收的是 ChessPieceRuntimeState[] 而非 EntityBase[]。
+      - file: assets/scripts/game/demo3-autochess/systems/BattleSystem.ts
+        line: 84-100
+        detail: |
+          startBattle 签名接收 playerPieces/enemyPieces: ChessPieceRuntimeState[]，
+          完全不涉及 EntityBase 或 EntityManager。
+    why_valuable: |
+      当前 Entity 系统的 onShow(data?: unknown) 接口太弱：
+      1. 传入的 data 是 unknown，无法从 Entity 反查回业务数据
+      2. EntityManager 无法通过业务 ID 查找 Entity（只有 entityId）
+      3. 导致 Demo 开发者绕过 EntityManager，直接管理纯数据对象
+      补强后 Demo4/5 的实体管理会更自然，特别是战棋的 3 组实体 + 多人对战的实体。
+
+  - id: ENH-2
+    title: "ProcedureContext.renderer 类型为 unknown 导致 duck-type 检查"
+    priority: low
+    description: |
+      IAutoChessProcedureContext 中 renderer 字段类型为 unknown，
+      导致多个 Procedure 需要做 `typeof (renderer as Record<string, unknown>)['log'] === 'function'`
+      这样的运行时 duck-type 检查。
+    evidence:
+      - file: assets/scripts/game/demo3-autochess/procedures/AutoChessProcedureContext.ts
+        line: 33
+        detail: "renderer: unknown;"
+      - file: assets/scripts/game/demo3-autochess/procedures/BattleProcedure.ts
+        line: 152
+        detail: "if (renderer && typeof (renderer as Record<string, unknown>)['log'] === 'function')"
+      - file: assets/scripts/game/demo3-autochess/procedures/SettleProcedure.ts
+        line: 102
+        detail: "(同样的 duck-type 检查)"
+      - file: assets/scripts/game/demo3-autochess/procedures/GameOverProcedure.ts
+        line: 52
+        detail: "(同样的 duck-type 检查)"
+    why_valuable: |
+      定义一个 IDemoRenderer 接口（log/updateLog/updateStatus），
+      ProcedureContext 使用该接口类型，消除所有 duck-type 检查。
+      这是 Game 层自己可以解决的问题，不需要框架改动。
+
+  - id: ENH-3
+    title: "ObjectPool 在 Demo3 未实际发挥价值"
+    priority: low
+    description: |
+      design doc 声称 Demo3 深度使用 ObjectPool，但实际代码中：
+      - 棋子的运行时状态（ChessPieceRuntimeState）是通过 Map/Array 管理的纯数据对象
+      - EntityManager 内部有等待池，但上面分析了 Entity 未实际参与战斗
+      - 没有任何地方直接使用 ObjectPool.acquire/release
+    evidence:
+      - file: assets/scripts/game/demo3-autochess/data/AutoChessGameData.ts
+        line: 161-184
+        detail: "createPieceState() 用 new 创建纯对象并注册到 Map，无池化"
+      - file: assets/scripts/game/demo3-autochess/factory/EnemyGenerator.ts
+        line: 83-117
+        detail: "generate() 用字面量对象创建敌方棋子，无池化"
+    why_valuable: |
+      如果 Entity 能真正参与战斗逻辑，EntityGroup 的内部池化就能发挥作用。
+      或者为 ChessPieceRuntimeState 这类频繁创建销毁的数据对象提供轻量池。
+      但当前不是阻塞问题——对象数量级（4-16 个棋子/回合）不构成 GC 压力。
+
+# ═══════════════════════════════════════════════════════════════
+# 工作良好的部分
+# ═══════════════════════════════════════════════════════════════
+
+works_well:
+
+  - module: EventManager
+    assessment: |
+      AutoChessEvents 定义了 14 个事件键，全部使用幻影类型 EventKey<T>，
+      事件 emit/on 调用处编译期类型安全。事件贯穿 Procedure/System/Renderer 三层，
+      解耦效果良好。
+    evidence:
+      - "AutoChessDefs.ts 14 个 EventKey 定义清晰，payload 类型精确"
+      - "AutoChessDemo._registerEventListeners() 事件监听编译期类型检查通过"
+
+  - module: FSM（棋子 AI 状态机）
+    assessment: |
+      4 个 AI 状态（Idle/MoveTo/Attack/Dead）职责分明，状态转换逻辑正确。
+      每个棋子独立 FSM 实例，BattleSystem 统一创建/销毁，生命周期管理清晰。
+      FsmManager.createFsm/destroyFsm API 用起来直观。
+    evidence:
+      - "BattleSystem._createChessFsm() 创建流程简洁"
+      - "BattleSystem.endBattle() 批量销毁 FSM 无泄漏"
+
+  - module: ProcedureManager
+    assessment: |
+      6 个 Procedure（Launch→Preload→Prepare→Battle→Settle→GameOver）流程链清晰，
+      Prepare↔Battle↔Settle 循环正确，GameOver 支持 restart 回到 Prepare。
+      changeProcedure() API 简洁。
+    evidence:
+      - "完整的流程链在测试和 E2E 中验证通过"
+      - "PrepareProcedure.onPrepareComplete() 的倒计时→切换流程正确"
+
+  - module: DataTableManager
+    assessment: |
+      chess_piece_config（6 行）和 synergy_config（4 行）注册和查询正常。
+      createTableFromRawData() + getAllRows<T>() 泛型查询用起来方便。
+      ChessPieceConfigRow/SynergyConfigRow 的 parseRow 实现规范。
+    evidence:
+      - "PreloadProcedure 注册 2 张表正确"
+      - "PrepareProcedure._recalculateSynergies() 查询羁绊配置无问题"
+
+  - module: TimerManager
+    assessment: |
+      准备阶段 30s 倒计时（addTimer + removeTimer）工作正确，
+      onLeave 清理 Timer 无泄漏。
+    evidence:
+      - "PrepareProcedure._timerId 在 onLeave 中正确清理"
+
+  - module: DemoBase + HtmlRenderer 共享基础设施
+    assessment: |
+      AutoChessDemo 继承 DemoBase 只需实现 setupProcedures + setupDataTables，
+      bootstrap 注册 17 个模块 + Mock 策略注入全自动。
+      AutoChessRenderer 封装 HtmlRenderer 提供棋盘/商店/状态面板渲染，
+      使用 updateLog 原地更新避免日志爆炸。
+    evidence:
+      - "AutoChessDemo.start() 仅 15 行完成启动"
+      - "AutoChessRenderer 使用 createStatusPanel + updateLog 渲染"
+
+  - module: FsmManager + EntityManager 协作
+    assessment: |
+      BattleSystem 创建 AI FSM 时引用 EntityManager 创建的实体分组，
+      EntityManager.registerGroup() + showEntity() API 正常工作。
+      EntityFactory 策略注入模式正确（AutoChessEntityFactory implements IEntityFactory）。
+
+# ═══════════════════════════════════════════════════════════════
+# Demo4-6 前瞻预判
+# ═══════════════════════════════════════════════════════════════
+
+future_impact:
+
+  - demo: Demo4-Tactics
+    assessment: |
+      GAP-1（FSM 样板）将严重恶化：战棋有双层 FSM（TurnFsm + UnitActionFsm），
+      每层各 5-6 个状态，每个状态都需要 getBlackboard，预计 10+ 处重复。
+      ENH-1（Entity 断层）也会更明显：战棋需要 3 组 Entity（player/enemy/npc），
+      如果 Entity 不能参与逻辑，会更加 decorative。
+    recommendation: "建议在 Demo4 开发前解决 GAP-1"
+
+  - demo: Demo5-Arena
+    assessment: |
+      GAP-1 继续出现：角色战斗 FSM 有 7 个状态 + 网络状态 FSM 有 4 个状态。
+      GAP-2 继续出现：7 个 Procedure。
+      NetworkManager 的 Mock 已有 MockNetworkSocket，应该够用。
+    recommendation: "GAP-1 + GAP-2 如果在 Demo4 前修复，Demo5 自动受益"
+
+  - demo: Demo6-Launcher
+    assessment: |
+      主要考验 HotUpdateManager、SceneManager、LocalizationManager、DebugManager。
+      这些模块在 Demo3 中都只是轻度使用，无法从 Demo3 预判问题。
+      Procedure 数量较多（6 个），GAP-2 会继续出现。
+
+open_questions: []
+
+gaps: []

@@ -76,11 +76,13 @@ function createMockFsmManager(): FsmManager {
                 owner: _owner,
                 currentState: null,
                 isDestroyed: false,
+                blackboard: {} as Record<string, unknown>,
                 changeState: jest.fn(),
                 getData: jest.fn(),
                 setData: jest.fn(),
                 removeData: jest.fn(),
                 hasState: jest.fn(() => true),
+                setBlackboard: jest.fn(),
                 start: jest.fn(),
             };
             fsmMap.set(name, mockFsm);
@@ -220,10 +222,7 @@ describe('BattleSystem', () => {
                     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                     eventManager: expect.any(Object),
                 });
-                expect(result.value.setData).toHaveBeenCalledWith(
-                    'chess_ai_blackboard',
-                    expectedBlackboard,
-                );
+                expect(result.value.setBlackboard).toHaveBeenCalledWith(expectedBlackboard);
             }
         });
     });

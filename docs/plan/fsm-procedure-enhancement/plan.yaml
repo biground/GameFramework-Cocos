@@ -1,0 +1,951 @@
+plan_id: fsm-procedure-enhancement
+objective: |
+  补强 FSM 和 Procedure 两个框架模块：
+  1. FSM 黑板泛型：为 IFsm/Fsm/IFsmState/FsmState 添加第二个泛型参数 TBlackboard，
+     提供 `get blackboard()` 类型安全访问器，消除 Demo 中 16+ 处 getBlackboard() 样板
+  2. Procedure 上下文便捷方法：为 ProcedureBase 添加 `getContext<T>(fsm, key)` 方法，
+     封装 getData + null 检查 + Logger.error + throw，消除 18+ 处 4 行样板
+created_at: "2026-04-24"
+created_by: gem-planner
+status: pending_approval
+research_confidence: high
+
+plan_metrics:
+  wave_1_task_count: 3
+  total_dependencies: 10
+  risk_score: medium
+
+tldr: |
+  Wave 1（框架层）：修改 FSM 泛型签名 + 添加 blackboard 属性 + ProcedureBase.getContext()，配套测试
+  Wave 2（Demo 重构）：三个 Demo 并行移除 getBlackboard() 样板 + Procedure 上下文样板，更新 Demo 测试
+  Wave 3（验证与文档）：集成测试验证 + 模块文档更新
+
+  关键风险：泛型签名变更需确保 TBlackboard 默认值 `Record<string, unknown>` 保证向后兼容，
+  现有不传第二个类型参数的代码必须零改动编译通过。
+
+open_questions: []
+
+pre_mortem:
+  overall_risk_level: medium
+  critical_failure_modes:
+    - scenario: "TBlackboard 默认类型导致现有 FsmState<T> 子类编译失败"
+      likelihood: medium
+      impact: critical
+      mitigation: |
+        Wave 1 task 1 完成后立即运行 `npx tsc --noEmit` 全量类型检查，
+        确保所有现有代码在不传第二个类型参数时零编译错误。
+        默认值使用 `Record<string, unknown>` 而非 `{}`，避免 `{}` 的隐式兼容问题。
+    - scenario: "ProcedureManager 内部 as unknown as 强转链路因泛型变更断裂"
+      likelihood: medium
+      impact: high
+      mitigation: |
+        ProcedureBase 保持 `extends FsmState<unknown>`，不引入 TBlackboard 泛型。
+        ProcedureManager 内部的强转逻辑不变。getContext() 仅是一个便捷 wrapper，
+        不改变 Procedure FSM 的类型签名。
+    - scenario: "blackboard getter 返回 TBlackboard 但实际 _dataMap 仍是 Map<string, unknown>，运行时类型不安全"
+      likelihood: low
+      impact: medium
+      mitigation: |
+        blackboard getter 内部通过代理或直接返回 _dataMap 的类型断言。
+        文档明确说明 blackboard 是编译期类型约束，运行时仍依赖 getData/setData。
+        或者 blackboard 直接作为一个独立的 typed 属性存储，与 _dataMap 分离。
+  assumptions:
+    - "现有 Demo 中 FsmState<T> 的 T 参数与黑板接口的对应关系已在研究报告中完全列出"
+    - "所有 getBlackboard() 辅助函数的模式完全一致（getData + null check + throw）"
+    - "ProcedureBase 不需要泛型化，仅需添加 getContext 便捷方法"
+    - "Demo 中的建筑 FSM owner 类型是 IBuildingBlackboard（owner 即黑板），其他 Demo 的 owner 与黑板分离"
+
+implementation_specification:
+  code_structure: |
+    框架层改动集中在 3 个核心文件（FsmDefs.ts, Fsm.ts, FsmState.ts）+ 1 个文件（ProcedureBase.ts）。
+    通过添加带默认值的泛型参数实现向后兼容。
+    blackboard 属性在 Fsm 类中作为独立的 typed 存储引入，与 _dataMap 共存。
+    Procedure 的 getContext 是纯 wrapper 方法，不改变类继承关系。
+  affected_areas:
+    - assets/scripts/framework/fsm/ — 核心泛型签名变更
+    - assets/scripts/framework/procedure/ProcedureBase.ts — 添加 getContext 方法
+    - assets/scripts/framework/interfaces/IFsmManager.ts — createFsm 签名微调
+    - assets/scripts/game/demo1-idle/fsm/ — 移除 getBlackboard 样板
+    - assets/scripts/game/demo2-rpg/fsm/ — 移除 getBlackboard 样板（battle + character）
+    - assets/scripts/game/demo3-autochess/fsm/ — 移除 getBlackboard 样板
+    - assets/scripts/game/demo1-idle/procedures/ — getContext 替代样板
+    - assets/scripts/game/demo2-rpg/procedures/ — getContext 替代样板
+    - assets/scripts/game/demo3-autochess/procedures/ — getContext 替代样板
+    - tests/fsm/ — 框架层测试更新
+    - tests/procedure/ — 框架层测试更新
+    - tests/game/ — Demo 测试更新
+  component_details:
+    - component: "IFsm<T, TBlackboard>"
+      responsibility: "状态机公共契约，新增 blackboard 只读属性和 setBlackboard 方法"
+      interfaces:
+        - "readonly blackboard: TBlackboard — 类型安全的黑板访问器"
+        - "setBlackboard(data: TBlackboard): void — 设置完整黑板对象"
+    - component: "Fsm<T, TBlackboard>"
+      responsibility: "状态机实现类，新增 _blackboard 私有字段和对应的 getter/setter"
+      interfaces:
+        - "get blackboard(): TBlackboard"
+        - "setBlackboard(data: TBlackboard): void"
+    - component: "IFsmState<T, TBlackboard>"
+      responsibility: "状态接口，生命周期方法的 fsm 参数类型随泛型同步变化"
+      interfaces:
+        - "onInit/onEnter/onUpdate/onLeave/onDestroy(fsm: IFsm<T, TBlackboard>): void"
+    - component: "FsmState<T, TBlackboard>"
+      responsibility: "状态基类，同步 IFsmState 的泛型变更"
+      interfaces:
+        - "changeState<TState>(fsm: IFsm<T, TBlackboard>, stateType: Constructor<TState>): void"
+    - component: "ProcedureBase.getContext<T>"
+      responsibility: "封装 Procedure 上下文获取的 4 行样板为 1 行调用"
+      interfaces:
+        - "protected getContext<T>(fsm: IFsm<unknown>, key: string): T"
+  dependencies:
+    - component: "Fsm"
+      relationship: "implements IFsm<T, TBlackboard>"
+    - component: "FsmState"
+      relationship: "implements IFsmState<T, TBlackboard>"
+    - component: "ProcedureBase"
+      relationship: "extends FsmState<unknown>（不变），新增 getContext 方法"
+    - component: "FsmManager"
+      relationship: "createFsm 签名同步添加 TBlackboard 默认泛型"
+  integration_points:
+    - "Demo 主入口调用 fsm.setBlackboard(data) 替代 fsm.setData(KEY, data)"
+    - "FsmState 子类通过 fsm.blackboard.xxx 替代 getBlackboard(fsm).xxx"
+    - "Procedure 子类通过 this.getContext<ICtx>(fsm, KEY) 替代 4 行样板"
+
+contracts:
+  - from_task: "task-1"
+    to_task: "task-2"
+    interface: "FsmDefs.ts 中的 IFsm<T, TBlackboard>、IFsmState<T, TBlackboard> 签名和新增方法"
+    format: "TypeScript 接口定义，TBlackboard 默认值为 Record<string, unknown>"
+  - from_task: "task-1"
+    to_task: "task-3"
+    interface: "Fsm 类的 blackboard getter/setBlackboard 实现"
+    format: "Fsm.ts 中的公共方法"
+  - from_task: "task-2"
+    to_task: "task-4"
+    interface: "ProcedureBase.getContext<T> 方法可用"
+    format: "protected getContext<T>(fsm: IFsm<unknown>, key: string): T"
+  - from_task: "task-3"
+    to_task: "task-5"
+    interface: "FSM 黑板泛型 API 稳定，向后兼容已验证"
+    format: "tsc --noEmit 通过 + fsm.test.ts 绿灯"
+  - from_task: "task-3"
+    to_task: "task-6"
+    interface: "同 task-5"
+    format: "tsc --noEmit 通过 + fsm.test.ts 绿灯"
+  - from_task: "task-3"
+    to_task: "task-7"
+    interface: "同 task-5"
+    format: "tsc --noEmit 通过 + fsm.test.ts 绿灯"
+  - from_task: "task-4"
+    to_task: "task-8"
+    interface: "ProcedureBase.getContext 方法可用"
+    format: "procedure-manager.test.ts 绿灯"
+  - from_task: "task-4"
+    to_task: "task-9"
+    interface: "同 task-8"
+    format: "procedure-manager.test.ts 绿灯"
+  - from_task: "task-4"
+    to_task: "task-10"
+    interface: "同 task-8"
+    format: "procedure-manager.test.ts 绿灯"
+
+tasks:
+  # ═══════════════════════════════════════════════════════
+  # Wave 1：框架层改动 + 框架层测试
+  # ═══════════════════════════════════════════════════════
+
+  - id: "task-1"
+    title: "FSM 泛型签名添加 TBlackboard 参数 + blackboard API"
+    description: |
+      修改 FsmDefs.ts 中的核心接口签名，添加第二个泛型参数 `TBlackboard = Record<string, unknown>`：
+
+      **IFsmState<T, TBlackboard = Record<string, unknown>>**：
+      - 所有生命周期方法的 fsm 参数类型改为 `IFsm<T, TBlackboard>`
+
+      **IFsm<T, TBlackboard = Record<string, unknown>>**：
+      - 新增 `readonly blackboard: TBlackboard` 属性
+      - 新增 `setBlackboard(data: TBlackboard): void` 方法
+      - 现有 getData/setData/removeData 保留不变（向后兼容）
+      - changeState 签名中 TState 约束改为 `extends IFsmState<T, TBlackboard>`
+      - hasState/start 签名同理
+
+      **IFsmManager**：
+      - `createFsm<T, TBlackboard = Record<string, unknown>>(name, owner, ...states)` 签名微调
+
+      **TDD 流程**：
+      - Red：在 fsm.test.ts 中添加测试用例：创建 `Fsm<MockOwner, IMockBlackboard>` 并验证 `fsm.blackboard` 返回类型安全对象
+      - Red：测试 setBlackboard + blackboard getter 的 round-trip
+      - Red：测试不传 TBlackboard 时默认行为（向后兼容）
+      - Green：修改 FsmDefs.ts 中的接口定义
+      - Refactor：确保现有测试仍然通过（无需修改现有测试代码）
+
+      **向后兼容验证**：`npx tsc --noEmit` 全量检查，确保所有现有的 `FsmState<T>` / `IFsm<T>` 用法零改动编译通过。
+    wave: 1
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - "fsm-blackboard-generic-signature"
+      - "backward-compatibility"
+    priority: high
+    status: pending
+    dependencies: []
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/framework/fsm/FsmDefs.ts
+        description: "核心接口定义文件，IFsm<T> + IFsmState<T> + Constructor<T>"
+      - path: assets/scripts/framework/interfaces/IFsmManager.ts
+        description: "FsmManager 接口，createFsm 签名需同步"
+      - path: docs/plan/fsm-procedure-research/research_findings_fsm_procedure.yaml
+        description: "研究报告，包含完整的类型签名和影响范围"
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: medium
+        estimated_files: 2
+        estimated_lines: 80
+        focus_area: "FsmDefs.ts + IFsmManager.ts"
+        verification:
+          - "npx tsc --noEmit — 零编译错误"
+          - "npx jest --testPathPattern=fsm --no-coverage — 现有测试全绿"
+        acceptance_criteria:
+          - "IFsm<T> 不传第二个参数时等价于 IFsm<T, Record<string, unknown>>"
+          - "IFsm<T, IMockBlackboard> 的 blackboard 属性返回 IMockBlackboard 类型"
+          - "setBlackboard(data) 设置后 blackboard getter 返回同一对象"
+          - "所有现有 FsmState<T> 子类（20 个）零改动编译通过"
+        failure_modes:
+          - scenario: "默认泛型 Record<string, unknown> 与现有 FsmState<T> 的约束冲突"
+            likelihood: low
+            impact: critical
+            mitigation: "使用 = Record<string, unknown> 作为默认值，这是最宽松的映射类型"
+        tech_stack:
+          - "TypeScript 5.4+ 泛型默认参数"
+        test_coverage: "tests/fsm/fsm.test.ts"
+
+  - id: "task-2"
+    title: "Fsm 类实现 blackboard 存储 + FsmState/FsmManager 同步"
+    description: |
+      修改 Fsm.ts、FsmState.ts、FsmManager.ts 实现层：
+
+      **Fsm<T, TBlackboard = Record<string, unknown>>**：
+      - 新增 `private _blackboard: TBlackboard` 私有字段（初始值为 `{} as TBlackboard`）
+      - 新增 `get blackboard(): TBlackboard` 公共属性
+      - 新增 `setBlackboard(data: TBlackboard): void` 方法
+      - 现有 _dataMap / getData / setData / removeData 保留不变
+      - constructor 签名：`constructor(name: string, owner: T, states: IFsmState<T, TBlackboard>[])`
+
+      **FsmState<T, TBlackboard = Record<string, unknown>>**：
+      - `implements IFsmState<T, TBlackboard>`
+      - 所有方法签名中 fsm 参数类型改为 `IFsm<T, TBlackboard>`
+      - changeState 约束改为 `TState extends IFsmState<T, TBlackboard>`
+
+      **FsmManager**：
+      - `createFsm<T, TBlackboard = Record<string, unknown>>(...)` 签名同步
+      - 内部存储仍为 `Map<string, Fsm<unknown>>`，不变
+
+      **TDD 流程**：
+      - Red：task-1 添加的测试此时应该编译失败（接口已定义但实现未添加）
+      - Green：实现 Fsm 的 _blackboard 字段和 getter/setter
+      - Green：FsmState 和 FsmManager 签名同步
+      - Refactor：运行全量 tsc + 全量 jest 验证
+
+    wave: 1
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - "fsm-blackboard-implementation"
+    priority: high
+    status: pending
+    dependencies:
+      - "task-1"
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/framework/fsm/Fsm.ts
+        description: "Fsm 实现类，需添加 _blackboard 字段和 getter/setter"
+      - path: assets/scripts/framework/fsm/FsmState.ts
+        description: "FsmState 基类，需同步 TBlackboard 泛型"
+      - path: assets/scripts/framework/fsm/FsmManager.ts
+        description: "FsmManager 模块，createFsm 签名同步"
+      - path: tests/fsm/fsm.test.ts
+        description: "现有 FSM 测试，必须全部通过"
+      - path: tests/fsm/fsm-manager.test.ts
+        description: "现有 FsmManager 测试，必须全部通过"
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: medium
+        estimated_files: 3
+        estimated_lines: 120
+        focus_area: "Fsm.ts + FsmState.ts + FsmManager.ts"
+        verification:
+          - "npx tsc --noEmit — 零编译错误"
+          - "npx jest --testPathPattern=fsm --no-coverage — 全部绿灯（含 task-1 新增的用例）"
+          - "npx jest --no-coverage --forceExit — 全量测试无回归"
+        acceptance_criteria:
+          - "Fsm 类有 _blackboard 私有字段，初始值为 {} as TBlackboard"
+          - "fsm.setBlackboard(data) 后 fsm.blackboard === data"
+          - "FsmState<T> 用法（不传 TBlackboard）零改动编译通过"
+          - "FsmManager.createFsm<T>() 不传 TBlackboard 零改动编译通过"
+          - "全量 jest 测试无回归"
+        failure_modes:
+          - scenario: "FsmManager 内部 Map<string, Fsm<unknown>> 与 Fsm<T, TBlackboard> 泛型不兼容"
+            likelihood: medium
+            impact: high
+            mitigation: "Map 存储保持 Fsm<unknown>，createFsm 返回 IFsm<T, TBlackboard> 后内部 as unknown 存入"
+        tech_stack:
+          - "TypeScript 泛型"
+        test_coverage: "tests/fsm/fsm.test.ts + tests/fsm/fsm-manager.test.ts"
+
+  - id: "task-3"
+    title: "FSM 黑板泛型测试补全"
+    description: |
+      为 FSM 黑板泛型补全测试覆盖：
+
+      **tests/fsm/fsm.test.ts 新增用例**：
+      1. 「blackboard 基本功能」：创建带 TBlackboard 的 FSM，setBlackboard 后 getter 返回正确对象
+      2. 「blackboard 与 dataMap 独立」：setBlackboard 不影响 getData，反之亦然
+      3. 「blackboard 默认值」：不调用 setBlackboard 时 blackboard 返回空对象
+      4. 「状态中访问 blackboard」：在 FsmState.onEnter 中通过 fsm.blackboard 访问类型安全字段
+      5. 「向后兼容」：现有的 FsmState<MockOwner> 用法不变，所有老测试通过
+
+      **TDD 流程**：
+      - Red：先写全部新测试，标注 expect 的期望值
+      - Green：确认 task-2 实现后全部通过（此任务主要是验证和补全）
+      - Refactor：整理测试分组
+    wave: 1
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - "fsm-blackboard-test-coverage"
+    priority: high
+    status: pending
+    dependencies:
+      - "task-2"
+    conflicts_with: []
+    context_files:
+      - path: tests/fsm/fsm.test.ts
+        description: "现有 FSM 测试，需添加 blackboard 测试分组"
+      - path: assets/scripts/framework/fsm/FsmDefs.ts
+        description: "接口定义，确认 API 形状"
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: small
+        estimated_files: 1
+        estimated_lines: 100
+        focus_area: "tests/fsm/fsm.test.ts"
+        verification:
+          - "npx jest --testPathPattern=fsm --no-coverage — 全绿"
+        acceptance_criteria:
+          - "新增 5+ 个 blackboard 相关测试用例"
+          - "全部绿灯"
+          - "现有测试无回归"
+        failure_modes:
+          - scenario: "blackboard 默认值测试与实现不一致"
+            likelihood: low
+            impact: low
+            mitigation: "检查 Fsm constructor 中 _blackboard 的初始化方式"
+        tech_stack:
+          - "Jest + TypeScript"
+        test_coverage: "tests/fsm/fsm.test.ts"
+
+  - id: "task-4"
+    title: "ProcedureBase 添加 getContext<T>() 便捷方法 + 测试"
+    description: |
+      修改 ProcedureBase.ts，添加 `getContext` 便捷方法：
+
+      ```typescript
+      protected getContext<T>(fsm: IFsm<unknown>, key: string): T {
+          const ctx = fsm.getData<T>(key);
+          if (ctx == null) {
+              Logger.error('ProcedureBase', `流程上下文缺失，key="${key}"，FSM="${fsm.name}"`);
+              throw new Error(`[ProcedureBase] 流程上下文缺失，key="${key}"，FSM="${fsm.name}"`);
+          }
+          return ctx;
+      }
+      ```
+
+      **不改变 ProcedureBase 的继承关系**：仍然 `extends FsmState<unknown>`。
+      **不改变 ProcedureManager 的任何代码**。
+
+      **TDD 流程**：
+      - Red：在 tests/procedure/procedure-manager.test.ts 中添加测试：
+        1. getContext 正常返回：setData + getContext 能拿到值
+        2. getContext 缺失抛异常：不 setData 时 getContext 抛出包含 key 名的 Error
+      - Green：在 ProcedureBase 中实现 getContext
+      - Refactor：确保现有 Procedure 测试全绿
+    wave: 1
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - "procedure-getcontext-method"
+    priority: high
+    status: pending
+    dependencies: []
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/framework/procedure/ProcedureBase.ts
+        description: "ProcedureBase 基类，需添加 getContext 方法"
+      - path: assets/scripts/framework/procedure/ProcedureManager.ts
+        description: "ProcedureManager 实现，确认不需要修改"
+      - path: tests/procedure/procedure-manager.test.ts
+        description: "现有 Procedure 测试，需扩展"
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: small
+        estimated_files: 2
+        estimated_lines: 50
+        focus_area: "ProcedureBase.ts + procedure-manager.test.ts"
+        verification:
+          - "npx jest --testPathPattern=procedure --no-coverage — 全绿"
+          - "npx tsc --noEmit — 零编译错误"
+        acceptance_criteria:
+          - "getContext<T>(fsm, key) 返回类型 T 的值"
+          - "key 不存在时抛出 Error 且 Logger.error 输出包含 key 和 fsm.name"
+          - "现有 Procedure 测试无回归"
+        failure_modes:
+          - scenario: "getContext 是 protected 方法，测试中无法直接调用"
+            likelihood: medium
+            impact: low
+            mitigation: "创建测试子类 TestProcedure extends ProcedureBase，暴露 getContext 为 public 方法用于测试"
+        tech_stack:
+          - "TypeScript"
+        test_coverage: "tests/procedure/procedure-manager.test.ts"
+
+  # ═══════════════════════════════════════════════════════
+  # Wave 2：Demo 重构（三个 Demo 可并行）
+  # ═══════════════════════════════════════════════════════
+
+  - id: "task-5"
+    title: "Demo1 Idle — FSM 黑板重构 + getBlackboard 移除"
+    description: |
+      重构 Demo1 的建筑 FSM，利用新的 blackboard 泛型消除样板：
+
+      **BuildingFsmStates.ts（4 个状态）**：
+      - `extends FsmState<IBuildingBlackboard>` 改为 `extends FsmState<IBuildingBlackboard, IBuildingBlackboard>`
+        （注意 Demo1 的 owner 类型就是 IBuildingBlackboard）
+      - 所有 `getBlackboard(fsm)` 调用改为 `fsm.blackboard`
+      - 删除文件顶部的 `getBlackboard()` 辅助函数
+      - 删除 `BuildingFsmDataKeys.BLACKBOARD` 常量及其使用
+
+      **BuildingFsmDefs.ts**：
+      - 移除 `BuildingFsmDataKeys.BLACKBOARD`（保留 UPGRADE_START_TIME / UPGRADE_DURATION）
+
+      **BuildingSystem.ts 或主入口**（创建 FSM 的地方）：
+      - `fsmManager.createFsm<IBuildingBlackboard>(...)` 改为 `createFsm<IBuildingBlackboard, IBuildingBlackboard>(...)`
+      - 在 FSM 创建后调用 `fsm.setBlackboard(bb)` 替代 `fsm.setData(KEY, bb)`
+
+      **TDD 流程**：
+      - Red：修改测试 expect getBlackboard 函数不存在（或标注新 API 使用方式）
+      - Green：重构源码
+      - Refactor：运行 Demo1 相关测试全绿
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - "demo1-fsm-blackboard-refactor"
+    priority: medium
+    status: pending
+    dependencies:
+      - "task-3"
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/game/demo1-idle/fsm/BuildingFsmStates.ts
+        description: "4 个建筑 FSM 状态，都有 getBlackboard 样板"
+      - path: assets/scripts/game/demo1-idle/fsm/BuildingFsmDefs.ts
+        description: "黑板接口 + DataKeys 常量"
+      - path: assets/scripts/game/demo1-idle/systems/BuildingSystem.ts
+        description: "创建建筑 FSM 的地方"
+      - path: tests/game/demo1-idle/
+        description: "Demo1 测试目录"
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: medium
+        estimated_files: 3
+        estimated_lines: 80
+        focus_area: "BuildingFsmStates.ts + BuildingFsmDefs.ts + BuildingSystem.ts"
+        verification:
+          - "npx jest --testPathPattern='demo1-idle' --no-coverage --forceExit — 全绿"
+          - "npx tsc --noEmit — 零编译错误"
+        acceptance_criteria:
+          - "BuildingFsmStates.ts 中不再有 getBlackboard 函数"
+          - "所有状态通过 fsm.blackboard 访问黑板字段"
+          - "Demo1 全部测试通过"
+        failure_modes:
+          - scenario: "BuildingSystem 中 FSM 创建方式与新 API 不兼容"
+            likelihood: low
+            impact: medium
+            mitigation: "检查 BuildingSystem 中 createFsm 的调用方式，确保 setBlackboard 在 start 之前调用"
+        tech_stack:
+          - "TypeScript"
+        test_coverage: "tests/game/demo1-idle/"
+
+  - id: "task-6"
+    title: "Demo2 RPG — FSM 黑板重构（battle + character）"
+    description: |
+      重构 Demo2 的两套 FSM：
+
+      **战斗 FSM（6 个状态）**：
+      - `RoundStartState/SelectActionState/ExecuteActionState/RoundEndState/VictoryState/DefeatState`
+      - 每个文件：`extends FsmState<IBattleBlackboard>` → `extends FsmState<IBattleBlackboard, IBattleBlackboard>`
+      - 删除每个文件中的 `getBlackboard()` 辅助函数
+      - `getBlackboard(fsm)` → `fsm.blackboard`
+      - BattleFsmDefs.ts 中移除 `BattleFsmDataKeys.BLACKBOARD`
+
+      **角色 FSM（4 个状态）**：
+      - `CharIdleState/CharActingState/CharStunnedState/CharDeadState`
+      - 每个文件：`extends FsmState<ICharacterBlackboard>` → `extends FsmState<ICharacterBlackboard, ICharacterBlackboard>`
+      - 删除 `getBlackboard()`
+      - CharacterFsmDefs.ts 中移除对应 DataKey
+
+      **创建 FSM 的地方**：
+      - BattleSystem 或相关入口：`createFsm<IBattleBlackboard, IBattleBlackboard>(...)` + `setBlackboard()`
+      - 角色 FSM 入口类似处理
+
+      **TDD 流程**：
+      - Red：调整测试中 mock FSM 的 getData 断言为 blackboard 访问
+      - Green：重构源码
+      - Refactor：运行 Demo2 相关测试全绿
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - "demo2-fsm-blackboard-refactor"
+    priority: medium
+    status: pending
+    dependencies:
+      - "task-3"
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/game/demo2-rpg/fsm/BattleFsmDefs.ts
+        description: "战斗 FSM 定义和黑板接口"
+      - path: assets/scripts/game/demo2-rpg/fsm/battle/
+        description: "6 个战斗状态文件"
+      - path: assets/scripts/game/demo2-rpg/fsm/CharacterFsmDefs.ts
+        description: "角色 FSM 定义和黑板接口"
+      - path: assets/scripts/game/demo2-rpg/fsm/character/
+        description: "4 个角色状态文件"
+      - path: tests/game/demo2-rpg/
+        description: "Demo2 测试目录"
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: large
+        estimated_files: 12
+        estimated_lines: 200
+        focus_area: "demo2-rpg/fsm/ 下的 12 个文件"
+        verification:
+          - "npx jest --testPathPattern='demo2-rpg' --no-coverage --forceExit — 全绿"
+          - "npx tsc --noEmit — 零编译错误"
+        acceptance_criteria:
+          - "10 个状态文件中不再有 getBlackboard 函数"
+          - "所有状态通过 fsm.blackboard 访问黑板"
+          - "Demo2 全部测试通过"
+        failure_modes:
+          - scenario: "战斗/角色 FSM 的 mock 在测试中依赖 getData(BLACKBOARD_KEY)，需同步改 mock"
+            likelihood: high
+            impact: medium
+            mitigation: "grep 测试文件中所有 BLACKBOARD 引用，同步更新 mock 的 blackboard 属性"
+        tech_stack:
+          - "TypeScript"
+        test_coverage: "tests/game/demo2-rpg/"
+
+  - id: "task-7"
+    title: "Demo3 AutoChess — FSM 黑板重构（chess-ai）"
+    description: |
+      重构 Demo3 的棋子 AI FSM：
+
+      **4 个 AI 状态**：
+      - `IdleState/AttackState/MoveToState/DeadState`
+      - 每个文件：`extends FsmState<string>` → `extends FsmState<string, IChessAiBlackboard>`
+      - 删除每个文件中的 `getBlackboard()` 辅助函数
+      - `getBlackboard(fsm)` → `fsm.blackboard`
+
+      **ChessAiFsmDefs.ts**：
+      - 移除 `ChessAiDataKeys.BLACKBOARD`
+
+      **创建 FSM 的地方**（ChessPieceEntity 或 BattleSystem）：
+      - `createFsm<string, IChessAiBlackboard>(...)` + `fsm.setBlackboard(bb)`
+
+      **特殊注意**：Demo3 的 owner 类型是 string（棋子名称），与黑板接口分离，这正是 TBlackboard 的设计意义所在。
+
+      **TDD 流程**：
+      - Red：更新 chess-ai-fsm.test.ts 中的 mock，改用 blackboard 属性
+      - Green：重构 4 个状态文件
+      - Refactor：运行 Demo3 相关测试全绿
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - "demo3-fsm-blackboard-refactor"
+    priority: medium
+    status: pending
+    dependencies:
+      - "task-3"
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/game/demo3-autochess/fsm/ChessAiFsmDefs.ts
+        description: "棋子 AI FSM 定义和黑板接口"
+      - path: assets/scripts/game/demo3-autochess/fsm/chess-ai/
+        description: "4 个 AI 状态文件"
+      - path: tests/game/demo3-autochess/chess-ai-fsm.test.ts
+        description: "棋子 AI FSM 测试"
+      - path: tests/game/demo3-autochess/ChessPieceEntity.test.ts
+        description: "ChessPieceEntity 测试（可能涉及 FSM 创建）"
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: medium
+        estimated_files: 5
+        estimated_lines: 100
+        focus_area: "demo3-autochess/fsm/ 下的 5 个文件"
+        verification:
+          - "npx jest --testPathPattern='demo3-autochess' --no-coverage --forceExit — 全绿"
+          - "npx tsc --noEmit — 零编译错误"
+        acceptance_criteria:
+          - "4 个 AI 状态文件中不再有 getBlackboard 函数"
+          - "所有状态通过 fsm.blackboard 访问黑板"
+          - "Demo3 全部测试通过"
+        failure_modes:
+          - scenario: "ChessPieceEntity 中 FSM 创建逻辑复杂，setBlackboard 时机不对"
+            likelihood: medium
+            impact: medium
+            mitigation: "检查 ChessPieceEntity 的 FSM 创建流程，确保 setBlackboard 在 fsm.start 之前调用"
+        tech_stack:
+          - "TypeScript"
+        test_coverage: "tests/game/demo3-autochess/"
+
+  - id: "task-8"
+    title: "Demo1 Idle — Procedure 上下文重构（getContext 替代样板）"
+    description: |
+      重构 Demo1 的 Procedure 上下文获取方式：
+
+      **5 个 Procedure 文件**（LaunchProcedure 除外，它不取 context）：
+      - PreloadProcedure / OfflineSettleProcedure / MainProcedure / SettingsProcedure
+      - 将 4 行样板：
+        ```
+        const ctx = fsm.getData<IProcedureContext>(PROCEDURE_CONTEXT_KEY);
+        if (!ctx) { Logger.error(TAG, '...'); throw new Error('...'); }
+        ```
+      - 替换为 1 行：
+        ```
+        const ctx = this.getContext<IProcedureContext>(fsm, PROCEDURE_CONTEXT_KEY);
+        ```
+      - 保留 PROCEDURE_CONTEXT_KEY 常量和 IProcedureContext 接口（不变）
+      - 保留 Demo 主入口中 `procMgr.setData(KEY, ctx)` 的调用方式（不变）
+
+      **TDD 流程**：
+      - Red：更新测试中的 mock，确认 getContext 抛异常的场景仍有覆盖
+      - Green：重构 Procedure 文件
+      - Refactor：运行 Demo1 Procedure 测试全绿
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - "demo1-procedure-getcontext-refactor"
+    priority: medium
+    status: pending
+    dependencies:
+      - "task-4"
+    conflicts_with:
+      - "task-5"
+    context_files:
+      - path: assets/scripts/game/demo1-idle/procedures/ProcedureContext.ts
+        description: "IProcedureContext 接口和 PROCEDURE_CONTEXT_KEY"
+      - path: assets/scripts/game/demo1-idle/procedures/PreloadProcedure.ts
+        description: "Procedure 实现"
+      - path: assets/scripts/game/demo1-idle/procedures/MainProcedure.ts
+        description: "Procedure 实现"
+      - path: assets/scripts/game/demo1-idle/procedures/OfflineSettleProcedure.ts
+        description: "Procedure 实现"
+      - path: assets/scripts/game/demo1-idle/procedures/SettingsProcedure.ts
+        description: "Procedure 实现"
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: small
+        estimated_files: 4
+        estimated_lines: 40
+        focus_area: "demo1-idle/procedures/"
+        verification:
+          - "npx jest --testPathPattern='demo1-idle' --no-coverage --forceExit — 全绿"
+          - "npx tsc --noEmit — 零编译错误"
+        acceptance_criteria:
+          - "4 个 Procedure 文件中不再有手动 null 检查样板"
+          - "全部使用 this.getContext<IProcedureContext>(fsm, KEY)"
+          - "Demo1 Procedure 测试全绿"
+        failure_modes:
+          - scenario: "某些 Procedure 的 context 获取有额外逻辑（如 LaunchProcedure 不取 context）"
+            likelihood: low
+            impact: low
+            mitigation: "LaunchProcedure 不取 context 就不改，仅改有样板的 Procedure"
+        tech_stack:
+          - "TypeScript"
+        test_coverage: "tests/game/demo1-idle/"
+
+  - id: "task-9"
+    title: "Demo2 RPG — Procedure 上下文重构（getContext 替代样板）"
+    description: |
+      重构 Demo2 的 Procedure 上下文获取方式：
+
+      **6 个 Procedure 文件**：
+      - LaunchProcedure / PreloadProcedure / LobbyProcedure / BattlePrepProcedure / BattleProcedure / SettleProcedure
+      - 将 4 行 `fsm.getData + null check + throw` 样板替换为 `this.getContext<IRpgProcedureContext>(fsm, RPG_PROCEDURE_CONTEXT_KEY)`
+      - 保留 RPG_PROCEDURE_CONTEXT_KEY 和 IRpgProcedureContext 不变
+
+      **TDD 流程**：
+      - Red：确认测试中 mock FSM 的 getData 逻辑不受影响（getContext 内部调 getData）
+      - Green：重构 6 个 Procedure 文件
+      - Refactor：运行 Demo2 Procedure 测试全绿
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - "demo2-procedure-getcontext-refactor"
+    priority: medium
+    status: pending
+    dependencies:
+      - "task-4"
+    conflicts_with:
+      - "task-6"
+    context_files:
+      - path: assets/scripts/game/demo2-rpg/procedures/RpgProcedureContext.ts
+        description: "IRpgProcedureContext 接口和 RPG_PROCEDURE_CONTEXT_KEY"
+      - path: assets/scripts/game/demo2-rpg/procedures/
+        description: "6 个 Procedure 文件"
+      - path: tests/game/demo2-rpg/
+        description: "Demo2 测试目录"
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: medium
+        estimated_files: 6
+        estimated_lines: 60
+        focus_area: "demo2-rpg/procedures/"
+        verification:
+          - "npx jest --testPathPattern='demo2-rpg' --no-coverage --forceExit — 全绿"
+          - "npx tsc --noEmit — 零编译错误"
+        acceptance_criteria:
+          - "6 个 Procedure 文件中不再有手动 null 检查样板"
+          - "全部使用 this.getContext<IRpgProcedureContext>(fsm, KEY)"
+          - "Demo2 全部测试通过"
+        failure_modes:
+          - scenario: "某些 Procedure 有额外的 context 后处理逻辑（如解构赋值多个字段）"
+            likelihood: low
+            impact: low
+            mitigation: "getContext 返回完整 context 对象，后续解构不受影响"
+        tech_stack:
+          - "TypeScript"
+        test_coverage: "tests/game/demo2-rpg/"
+
+  - id: "task-10"
+    title: "Demo3 AutoChess — Procedure 上下文重构（getContext 替代样板）"
+    description: |
+      重构 Demo3 的 Procedure 上下文获取方式：
+
+      **6 个 Procedure 文件**：
+      - LaunchProcedure / PreloadProcedure / PrepareProcedure / BattleProcedure / SettleProcedure / GameOverProcedure
+      - 将样板替换为 `this.getContext<IAutoChessProcedureContext>(fsm, AUTO_CHESS_CONTEXT_KEY)`
+      - 保留 AUTO_CHESS_CONTEXT_KEY 和 IAutoChessProcedureContext 不变
+      - **特殊处理**：GameOverProcedure.ts 中有 `this._ctx ?? targetFsm?.getData<>(KEY)` 的缓存模式，需保留
+
+      **TDD 流程**：
+      - Red：确认测试中 createMockFsm 的 getData mock 不受影响
+      - Green：重构 6 个 Procedure 文件
+      - Refactor：运行 Demo3 Procedure 测试全绿
+    wave: 2
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - "demo3-procedure-getcontext-refactor"
+    priority: medium
+    status: pending
+    dependencies:
+      - "task-4"
+    conflicts_with:
+      - "task-7"
+    context_files:
+      - path: assets/scripts/game/demo3-autochess/procedures/AutoChessProcedureContext.ts
+        description: "IAutoChessProcedureContext 接口和 AUTO_CHESS_CONTEXT_KEY"
+      - path: assets/scripts/game/demo3-autochess/procedures/
+        description: "6 个 Procedure 文件"
+      - path: assets/scripts/game/demo3-autochess/procedures/GameOverProcedure.ts
+        description: "有特殊的 ctx 缓存模式"
+      - path: tests/game/demo3-autochess/procedures/
+        description: "Demo3 Procedure 测试"
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: medium
+        estimated_files: 6
+        estimated_lines: 60
+        focus_area: "demo3-autochess/procedures/"
+        verification:
+          - "npx jest --testPathPattern='demo3-autochess' --no-coverage --forceExit — 全绿"
+          - "npx tsc --noEmit — 零编译错误"
+        acceptance_criteria:
+          - "5 个 Procedure 文件中不再有手动 null 检查样板"
+          - "GameOverProcedure 的 _ctx 缓存模式保留但 onEnter 中使用 getContext"
+          - "Demo3 全部测试通过"
+        failure_modes:
+          - scenario: "GameOverProcedure 的特殊缓存模式与 getContext 不兼容"
+            likelihood: medium
+            impact: low
+            mitigation: "GameOverProcedure.onEnter 用 getContext，_ctx 缓存的 fallback 保持原始 getData 调用"
+        tech_stack:
+          - "TypeScript"
+        test_coverage: "tests/game/demo3-autochess/procedures/"
+
+  # ═══════════════════════════════════════════════════════
+  # Wave 3：集成验证 + 文档
+  # ═══════════════════════════════════════════════════════
+
+  - id: "task-11"
+    title: "全量集成验证：tsc + jest + benchmark"
+    description: |
+      全量验证所有改动的正确性和无回归：
+
+      1. `npx tsc --noEmit` — 全量 TypeScript 类型检查，零错误
+      2. `npx jest --no-coverage --forceExit` — 全量单元/集成测试，零失败
+      3. `npx jest --testPathPattern='integration' --no-coverage --forceExit` — 集成测试单独确认
+      4. `npm run lint` — ESLint 检查（确保无新增 lint 问题）
+      5. 检查 benchmark 文件（tools/benchmark/run-benchmarks.ts）是否需要更新 FsmState 泛型
+
+      如有失败，定位问题并修复（此 task 兼作 fixup 缓冲）。
+    wave: 3
+    agent: gem-implementer
+    prototype: false
+    covers:
+      - "full-regression-verification"
+    priority: high
+    status: pending
+    dependencies:
+      - "task-5"
+      - "task-6"
+      - "task-7"
+      - "task-8"
+      - "task-9"
+      - "task-10"
+    conflicts_with: []
+    context_files:
+      - path: tools/benchmark/run-benchmarks.ts
+        description: "Benchmark 文件，可能使用 FsmState<object>，需检查"
+      - path: tests/integration/
+        description: "集成测试目录"
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: medium
+        estimated_files: 2
+        estimated_lines: 30
+        focus_area: "全局验证 + benchmark 修复"
+        verification:
+          - "npx tsc --noEmit — 零错误"
+          - "npx jest --no-coverage --forceExit — 零失败"
+          - "npm run lint — 零新增错误"
+        acceptance_criteria:
+          - "tsc 零编译错误"
+          - "jest 全量测试零失败"
+          - "lint 零新增错误"
+          - "benchmark 文件编译通过"
+        failure_modes:
+          - scenario: "某些边缘文件（如 .worktrees 中的副本）编译失败"
+            likelihood: low
+            impact: low
+            mitigation: ".worktrees 不在 tsconfig include 中，不影响。如有问题排除即可"
+        tech_stack:
+          - "TypeScript + Jest + ESLint"
+        test_coverage: null
+
+  - id: "task-12"
+    title: "文档更新：FSM README + Procedure README + module-registry"
+    description: |
+      更新相关模块文档：
+
+      **assets/scripts/framework/fsm/README.md**：
+      - 新增「黑板泛型」章节：说明 TBlackboard 的用法、默认值、与 getData/setData 的关系
+      - 添加使用示例：`Fsm<MyOwner, IMyBlackboard>` + `fsm.setBlackboard()` + `fsm.blackboard.xxx`
+      - 说明向后兼容性
+
+      **assets/scripts/framework/procedure/README.md**：
+      - 新增「getContext 便捷方法」章节
+      - 添加使用示例：`this.getContext<IMyContext>(fsm, KEY)`
+
+      **docs/module-registry.md**：
+      - FSM 模块 API 列表新增 blackboard / setBlackboard
+      - Procedure 模块 API 列表新增 getContext
+    wave: 3
+    agent: gem-documentation-writer
+    prototype: false
+    covers:
+      - "documentation-update"
+    priority: low
+    status: pending
+    dependencies:
+      - "task-11"
+    conflicts_with: []
+    context_files:
+      - path: assets/scripts/framework/fsm/README.md
+        description: "FSM 模块 README"
+      - path: assets/scripts/framework/procedure/README.md
+        description: "Procedure 模块 README（可能不存在，需创建）"
+      - path: docs/module-registry.md
+        description: "模块注册表文档"
+      - path: docs/module-readme-template.md
+        description: "README 模板"
+    planning_pass: 1
+    planning_history:
+      - pass: 1
+        reason: "初始计划"
+        timestamp: "2026-04-24"
+        estimated_effort: small
+        estimated_files: 3
+        estimated_lines: 120
+        focus_area: "文档更新"
+        verification:
+          - "README 中包含 blackboard 和 getContext 的使用示例"
+          - "module-registry.md 的 API 列表已更新"
+        acceptance_criteria:
+          - "FSM README 包含黑板泛型章节和示例代码"
+          - "Procedure README 包含 getContext 章节"
+          - "module-registry.md 的 FSM/Procedure API 已更新"
+        failure_modes:
+          - scenario: "Procedure README 不存在"
+            likelihood: medium
+            impact: low
+            mitigation: "不存在则根据 module-readme-template.md 创建"
+        task_type: update
+        audience: developers
+        coverage_matrix:
+          - "FSM blackboard 泛型 API 文档"
+          - "Procedure getContext API 文档"
+          - "module-registry API 更新"
+
+planning_pass: 1
+planning_history:
+  - pass: 1
+    reason: "初始计划创建"
+    timestamp: "2026-04-24"

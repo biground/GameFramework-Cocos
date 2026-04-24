@@ -8,21 +8,10 @@
 import { FsmState } from '@framework/fsm/FsmState';
 import { IFsm } from '@framework/fsm/FsmDefs';
 import { Logger } from '@framework/debug/Logger';
-import { IBattleBlackboard, BattleFsmDataKeys } from '../BattleFsmDefs';
+import { IBattleBlackboard } from '../BattleFsmDefs';
 import { RpgEvents } from '../../events/RpgEvents';
 
 const TAG = 'BattleFSM';
-
-/**
- * 从 FSM 共享数据中获取黑板
- */
-function getBlackboard(fsm: IFsm<IBattleBlackboard>): IBattleBlackboard {
-    const bb = fsm.getData<IBattleBlackboard>(BattleFsmDataKeys.BLACKBOARD);
-    if (!bb) {
-        throw new Error(`[${TAG}] 黑板数据缺失，FSM="${fsm.name}"`);
-    }
-    return bb;
-}
 
 /**
  * 胜利状态
@@ -30,10 +19,10 @@ function getBlackboard(fsm: IFsm<IBattleBlackboard>): IBattleBlackboard {
  * 进入时遍历所有击杀的敌方角色，累加经验和金币奖励，
  * 发射 BATTLE_VICTORY 事件，播放胜利音效。
  */
-export class VictoryState extends FsmState<IBattleBlackboard> {
+export class VictoryState extends FsmState<IBattleBlackboard, IBattleBlackboard> {
     /** 进入胜利状态 */
-    onEnter(fsm: IFsm<IBattleBlackboard>): void {
-        const bb = getBlackboard(fsm);
+    onEnter(fsm: IFsm<IBattleBlackboard, IBattleBlackboard>): void {
+        const bb = fsm.blackboard;
 
         // 计算奖励：遍历已死亡的敌方角色，查找怪物配置获取奖励
         let totalExp = 0;

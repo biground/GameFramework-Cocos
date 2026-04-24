@@ -13,12 +13,17 @@ export interface IFsmManager {
     /**
      * 创建有限状态机
      * @template T 状态机持有者类型
+     * @template TBlackboard 黑板数据类型，默认 Record<string, unknown>
      * @param name 状态机名称（同名状态机不可重复创建）
      * @param owner 状态机持有者
      * @param states 状态机包含的状态列表（至少一个）
      * @returns 创建的状态机实例
      */
-    createFsm<T>(name: string, owner: T, ...states: IFsmState<T>[]): IFsm<T>;
+    createFsm<T, TBlackboard = Record<string, unknown>>(
+        name: string,
+        owner: T,
+        ...states: IFsmState<T, TBlackboard>[]
+    ): IFsm<T, TBlackboard>;
 
     /**
      * 销毁有限状态机

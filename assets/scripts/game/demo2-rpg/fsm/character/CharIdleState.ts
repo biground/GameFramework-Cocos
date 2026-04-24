@@ -8,21 +8,10 @@
 import { FsmState } from '@framework/fsm/FsmState';
 import { IFsm } from '@framework/fsm/FsmDefs';
 import { Logger } from '@framework/debug/Logger';
-import { ICharacterBlackboard, CharacterFsmDataKeys } from '@game/demo2-rpg/fsm/CharacterFsmDefs';
+import { ICharacterBlackboard } from '@game/demo2-rpg/fsm/CharacterFsmDefs';
 import { CharDeadState } from './CharDeadState';
 
 const TAG = 'CharacterFSM';
-
-/**
- * 从 FSM 共享数据中获取黑板
- */
-function getBlackboard(fsm: IFsm<ICharacterBlackboard>): ICharacterBlackboard {
-    const bb = fsm.getData<ICharacterBlackboard>(CharacterFsmDataKeys.BLACKBOARD);
-    if (!bb) {
-        throw new Error(`[${TAG}] 黑板数据缺失，FSM="${fsm.name}"`);
-    }
-    return bb;
-}
 
 /**
  * 角色空闲状态
@@ -30,10 +19,10 @@ function getBlackboard(fsm: IFsm<ICharacterBlackboard>): ICharacterBlackboard {
  * 角色在战斗中等待行动。外部可通过 changeState 触发切换到 Acting。
  * 每帧检测 HP <= 0 自动切换到 Dead。
  */
-export class CharIdleState extends FsmState<ICharacterBlackboard> {
+export class CharIdleState extends FsmState<ICharacterBlackboard, ICharacterBlackboard> {
     /** 进入空闲状态 */
-    onEnter(fsm: IFsm<ICharacterBlackboard>): void {
-        const bb = getBlackboard(fsm);
+    onEnter(fsm: IFsm<ICharacterBlackboard, ICharacterBlackboard>): void {
+        const bb = fsm.blackboard;
         Logger.info(TAG, `[${fsm.name}] 角色 #${bb.characterId} 进入空闲状态`);
     }
 
@@ -41,8 +30,8 @@ export class CharIdleState extends FsmState<ICharacterBlackboard> {
      * 每帧检测角色是否死亡
      * HP <= 0 时切换到 Dead
      */
-    onUpdate(fsm: IFsm<ICharacterBlackboard>, _dt: number): void {
-        const bb = getBlackboard(fsm);
+    onUpdate(fsm: IFsm<ICharacterBlackboard, ICharacterBlackboard>, _dt: number): void {
+        const bb = fsm.blackboard;
         if (bb.characterState.hp <= 0) {
             this.changeState(fsm, CharDeadState);
         }

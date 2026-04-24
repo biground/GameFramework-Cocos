@@ -13,7 +13,6 @@ import { RpgGameData, CharacterState } from '@game/demo2-rpg/data/RpgGameData';
 import { MonsterConfigRow } from '@game/demo2-rpg/data/MonsterConfigRow';
 import { StageConfigRow } from '@game/demo2-rpg/data/StageConfigRow';
 import { SkillConfigRow } from '@game/demo2-rpg/data/SkillConfigRow';
-import { BattleFsmDataKeys } from '@game/demo2-rpg/fsm/BattleFsmDefs';
 import { IFsm, IFsmState, Constructor } from '@framework/fsm/FsmDefs';
 
 // ─── Mock 工具 ──────────────────────────────────────────
@@ -48,6 +47,7 @@ function createMockProcedureFsm(context: IRpgProcedureContext): IFsm<unknown> {
 /** 创建 mock 的 BattleFsm */
 function createMockBattleFsm(): IFsm<unknown> {
     const dataStore = new Map<string, unknown>();
+    let storedBlackboard: unknown = null;
     return {
         name: 'battle_fsm',
         owner: {},
@@ -60,6 +60,13 @@ function createMockBattleFsm(): IFsm<unknown> {
         }),
         removeData: jest.fn((): boolean => false),
         hasState: jest.fn((): boolean => true),
+        setBlackboard: jest.fn((data: unknown) => {
+            storedBlackboard = data;
+        }),
+        get blackboard() {
+            return storedBlackboard;
+        },
+        start: jest.fn(),
     } as unknown as IFsm<unknown>;
 }
 
@@ -217,16 +224,11 @@ describe('BattlePrepProcedure', () => {
 
             // 关卡 1 的怪物列表是 '1,1,2'，应创建 3 个敌人
             // 从黑板中验证
-            const setDataCalls = (mockBattleFsm.setData as jest.Mock).mock.calls as [
-                string,
-                unknown,
-            ][];
-            const blackboardCall = setDataCalls.find(
-                (call) => call[0] === BattleFsmDataKeys.BLACKBOARD,
-            );
-            expect(blackboardCall).toBeDefined();
-
-            const blackboard = blackboardCall![1] as { allCharacters: CharacterState[] };
+            expect(mockBattleFsm.setBlackboard).toHaveBeenCalledTimes(1);
+            const calls = (mockBattleFsm.setBlackboard as jest.Mock).mock.calls as Array<
+                [{ allCharacters: CharacterState[] }]
+            >;
+            const blackboard = calls[0][0];
             // 玩家 1 + 敌人 3 = 4 个角色
             const enemies = blackboard.allCharacters.filter(
                 (c: CharacterState) => c.group === 'enemy',
@@ -237,14 +239,10 @@ describe('BattlePrepProcedure', () => {
         it('敌人属性应与怪物配置表一致', () => {
             procedure.onEnter(fsm);
 
-            const setDataCalls = (mockBattleFsm.setData as jest.Mock).mock.calls as [
-                string,
-                unknown,
-            ][];
-            const blackboardCall = setDataCalls.find(
-                (call) => call[0] === BattleFsmDataKeys.BLACKBOARD,
-            );
-            const blackboard = blackboardCall![1] as { allCharacters: CharacterState[] };
+            const calls = (mockBattleFsm.setBlackboard as jest.Mock).mock.calls as Array<
+                [{ allCharacters: CharacterState[] }]
+            >;
+            const blackboard = calls[0][0];
             const enemies = blackboard.allCharacters.filter(
                 (c: CharacterState) => c.group === 'enemy',
             );
@@ -266,14 +264,10 @@ describe('BattlePrepProcedure', () => {
         it('敌人应标记为 enemy 阵营且存活', () => {
             procedure.onEnter(fsm);
 
-            const setDataCalls = (mockBattleFsm.setData as jest.Mock).mock.calls as [
-                string,
-                unknown,
-            ][];
-            const blackboardCall = setDataCalls.find(
-                (call) => call[0] === BattleFsmDataKeys.BLACKBOARD,
-            );
-            const blackboard = blackboardCall![1] as { allCharacters: CharacterState[] };
+            const calls = (mockBattleFsm.setBlackboard as jest.Mock).mock.calls as Array<
+                [{ allCharacters: CharacterState[] }]
+            >;
+            const blackboard = calls[0][0];
             const enemies = blackboard.allCharacters.filter(
                 (c: CharacterState) => c.group === 'enemy',
             );
@@ -308,8 +302,7 @@ describe('BattlePrepProcedure', () => {
         it('应正确设置 BattleFsm 黑板数据', () => {
             procedure.onEnter(fsm);
 
-            expect(mockBattleFsm.setData).toHaveBeenCalledWith(
-                BattleFsmDataKeys.BLACKBOARD,
+            expect(mockBattleFsm.setBlackboard).toHaveBeenCalledWith(
                 expect.objectContaining({
                     gameData: gameData,
                     maxRound: 10,

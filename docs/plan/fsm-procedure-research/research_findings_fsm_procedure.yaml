@@ -1,0 +1,542 @@
+plan_id: fsm-procedure-research
+objective: 研究 FSM 和 Procedure 模块的现有实现细节，为后续补强提供精确信息
+focus_area: framework/fsm + framework/procedure + game 层 FSM/Procedure 使用
+created_at: "2026-04-24"
+created_by: gem-researcher
+status: completed
+
+tldr: |
+  - FSM 泛型签名：Fsm<T> / IFsm<T> / FsmState<T> / IFsmState<T>，T 为 owner 类型
+  - 黑板 API：getData<V>(key: string): V | undefined / setData<V>(key: string, value: V): void / removeData(key: string): boolean — 纯 string key + unknown map
+  - ProcedureBase 硬编码 extends FsmState<unknown>，所有 Procedure 的 onEnter 参数是 IFsm<unknown>，只能 getData<T>(key) 取上下文
+  - 3 个 Demo 各自定义黑板接口 + 数据键常量 + getBlackboard() 辅助函数，模式高度一致但纯手写样板
+  - 破坏性变更影响：修改 Fsm<T> 泛型签名影响 18+ 个 FsmState 子类 + 18+ 个 ProcedureBase 子类 + 2 个测试文件 + 1 个 benchmark
+
+research_metadata:
+  methodology: "hybrid retrieval: read_file + grep_search + list_dir"
+  scope: "framework/fsm/, framework/procedure/, framework/interfaces/, game/demo1-idle/, game/demo2-rpg/, game/demo3-autochess/, tests/fsm/, tests/procedure/"
+  confidence: high
+  coverage: 95
+  decision_blockers: 0
+  research_blockers: 0
+
+# ═══════════════════════════════════════════════════════════
+# 1. FSM 类型签名全貌
+# ═══════════════════════════════════════════════════════════
+
+fsm_type_signatures:
+  Constructor:
+    file: assets/scripts/framework/fsm/FsmDefs.ts
+    line: 6
+    signature: "type Constructor<T> = new (...args: never[]) => T"
+
+  IFsmState:
+    file: assets/scripts/framework/fsm/FsmDefs.ts
+    lines: "14-48"
+    signature: "interface IFsmState<T>"
+    methods:
+      - "onInit(fsm: IFsm<T>): void"
+      - "onEnter(fsm: IFsm<T>): void"
+      - "onUpdate(fsm: IFsm<T>, deltaTime: number): void"
+      - "onLeave(fsm: IFsm<T>): void"
+      - "onDestroy(fsm: IFsm<T>): void"
+
+  IFsm:
+    file: assets/scripts/framework/fsm/FsmDefs.ts
+    lines: "54-110"
+    signature: "interface IFsm<T>"
+    properties:
+      - "readonly name: string"
+      - "readonly owner: T"
+      - "readonly currentState: IFsmState<T> | null"
+      - "readonly isDestroyed: boolean"
+    methods:
+      - "changeState<TState extends IFsmState<T>>(stateType: Constructor<TState>): void"
+      - "getData<V>(key: string): V | undefined"
+      - "setData<V>(key: string, value: V): void"
+      - "removeData(key: string): boolean"
+      - "hasState<TState extends IFsmState<T>>(stateType: Constructor<TState>): boolean"
+      - "start<TState extends IFsmState<T>>(stateType: Constructor<TState>): void"
+
+  Fsm_class:
+    file: assets/scripts/framework/fsm/Fsm.ts
+    lines: "1-217"
+    signature: "class Fsm<T> implements IFsm<T>"
+    private_fields:
+      - "_name: string"
+      - "_owner: T"
+      - "_states: Map<Constructor<IFsmState<T>>, IFsmState<T>>"
+      - "_currentState: IFsmState<T> | null"
+      - "_dataMap: Map<string, unknown>"
+      - "_isDestroyed: boolean"
+      - "_isTransitioning: boolean"
+      - "_pendingState: Constructor<IFsmState<T>> | null"
+    key_design:
+      - "反递归保护: _isTransitioning 标志 + _pendingState 延迟切换"
+      - "状态注册: Map<Constructor, Instance>，通过 constructor 做 key"
+      - "黑板: Map<string, unknown>，完全无类型约束"
+
+  FsmState_class:
+    file: assets/scripts/framework/fsm/FsmState.ts
+    lines: "1-52"
+    signature: "abstract class FsmState<T> implements IFsmState<T>"
+    methods:
+      - "onInit(_fsm: IFsm<T>): void {}"
+      - "onEnter(_fsm: IFsm<T>): void {}"
+      - "onUpdate(_fsm: IFsm<T>, _deltaTime: number): void {}"
+      - "onLeave(_fsm: IFsm<T>): void {}"
+      - "onDestroy(_fsm: IFsm<T>): void {}"
+      - "protected changeState<TState extends IFsmState<T>>(fsm: IFsm<T>, stateType: Constructor<TState>): void"
+
+  FsmManager_class:
+    file: assets/scripts/framework/fsm/FsmManager.ts
+    lines: "1-121"
+    signature: "class FsmManager extends ModuleBase implements IFsmManager"
+    priority: 110
+    key_methods:
+      - "createFsm<T>(name: string, owner: T, ...states: IFsmState<T>[]): IFsm<T>"
+      - "destroyFsm(name: string): boolean"
+      - "getFsm(name: string): IFsm<unknown> | undefined"
+      - "hasFsm(name: string): boolean"
+    internal_storage: "Map<string, Fsm<unknown>>"
+    note: "getFsm 返回 IFsm<unknown>，调用者需要自行 cast"
+
+# ═══════════════════════════════════════════════════════════
+# 2. 黑板 API 详情
+# ═══════════════════════════════════════════════════════════
+
+blackboard_api:
+  getData:
+    signature: "getData<V>(key: string): V | undefined"
+    implementation_file: assets/scripts/framework/fsm/Fsm.ts
+    implementation_line: 186
+    body: "return this._dataMap.get(key) as V | undefined"
+    note: "泛型 V 是调用者声明式断言，运行时无校验"
+
+  setData:
+    signature: "setData<V>(key: string, value: V): void"
+    implementation_file: assets/scripts/framework/fsm/Fsm.ts
+    implementation_line: 194
+    body: "this._dataMap.set(key, value)"
+
+  removeData:
+    signature: "removeData(key: string): boolean"
+    implementation_file: assets/scripts/framework/fsm/Fsm.ts
+    implementation_line: 202
+    body: "return this._dataMap.delete(key)"
+
+  storage:
+    type: "Map<string, unknown>"
+    declaration_line: 17
+    note: "纯 string key → unknown value，无类型映射、无 schema 校验"
+
+# ═══════════════════════════════════════════════════════════
+# 3. Procedure 类型签名
+# ═══════════════════════════════════════════════════════════
+
+procedure_type_signatures:
+  ProcedureBase:
+    file: assets/scripts/framework/procedure/ProcedureBase.ts
+    lines: "1-37"
+    signature: "abstract class ProcedureBase extends FsmState<unknown>"
+    key_point: "硬编码 T=unknown，所有 Procedure 的 FSM 参数是 IFsm<unknown>"
+    methods:
+      - "protected changeProcedure<T extends IFsmState<unknown>>(fsm: IFsm<unknown>, procedureType: Constructor<T>): void"
+    note: "changeProcedure 直接委托给 FsmState.changeState"
+
+  ProcedureManager:
+    file: assets/scripts/framework/procedure/ProcedureManager.ts
+    lines: "1-143"
+    signature: "class ProcedureManager extends ModuleBase implements IProcedureManager"
+    priority: 300
+    internal_fsm: "Fsm<ProcedureManager> — owner 是 ProcedureManager 自身"
+    key_methods:
+      - "initialize(...procedures: ProcedureBase[]): void"
+      - "setData<V>(key: string, value: V): void"
+      - "startProcedure<T extends ProcedureBase>(entryProcedure: Constructor<T>): void"
+      - "hasProcedure<T extends ProcedureBase>(procedureType: Constructor<T>): boolean"
+      - "get currentProcedure(): ProcedureBase | null"
+    note: |
+      initialize 内部: new Fsm<ProcedureManager>('__procedure__', this, procedures as unknown as IFsmState<ProcedureManager>[])
+      存在 as unknown as 强制类型转换，因为 ProcedureBase extends FsmState<unknown> 而 FSM 的 owner 是 ProcedureManager
+
+  IProcedureManager:
+    file: assets/scripts/framework/interfaces/IProcedureManager.ts
+    lines: "1-34"
+    signature: "interface IProcedureManager"
+    methods:
+      - "readonly currentProcedure: ProcedureBase | null"
+      - "startProcedure<T extends ProcedureBase>(entryProcedure: Constructor<T>): void"
+      - "hasProcedure<T extends ProcedureBase>(procedureType: Constructor<T>): boolean"
+    note: "接口不包含 initialize 和 setData，这两个只在实现类上"
+
+# ═══════════════════════════════════════════════════════════
+# 4. 三个 Demo 的 FSM 黑板样板
+# ═══════════════════════════════════════════════════════════
+
+demo_fsm_blackboard_patterns:
+  demo1_idle:
+    fsm_defs_file: assets/scripts/game/demo1-idle/fsm/BuildingFsmDefs.ts
+    state_file: assets/scripts/game/demo1-idle/fsm/BuildingFsmStates.ts
+    state_count: 4
+    states:
+      - "IdleBuildingState extends FsmState<IBuildingBlackboard>"
+      - "ProducingState extends FsmState<IBuildingBlackboard>"
+      - "UpgradingState extends FsmState<IBuildingBlackboard>"
+      - "MaxLevelState extends FsmState<IBuildingBlackboard>"
+    owner_type: IBuildingBlackboard
+    blackboard_interface: IBuildingBlackboard
+    blackboard_fields:
+      - "buildingId: number"
+      - "buildingSystem: BuildingSystem"
+      - "gameData: IdleGameData"
+    data_keys:
+      BLACKBOARD: "blackboard"
+      UPGRADE_START_TIME: "upgradeStartTime"
+      UPGRADE_DURATION: "upgradeDuration"
+    getBlackboard_pattern: |
+      function getBlackboard(fsm: IFsm<IBuildingBlackboard>): IBuildingBlackboard {
+          const bb = fsm.getData<IBuildingBlackboard>(BuildingFsmDataKeys.BLACKBOARD);
+          if (!bb) { throw new Error(`[${TAG}] 黑板数据缺失，FSM="${fsm.name}"`); }
+          return bb;
+      }
+    note: "owner 类型直接用 IBuildingBlackboard（非 string），所有 4 个状态在同一文件中"
+
+  demo2_rpg:
+    battle_fsm:
+      defs_file: assets/scripts/game/demo2-rpg/fsm/BattleFsmDefs.ts
+      state_dir: assets/scripts/game/demo2-rpg/fsm/battle/
+      state_count: 6
+      states:
+        - "RoundStartState extends FsmState<IBattleBlackboard>"
+        - "SelectActionState extends FsmState<IBattleBlackboard>"
+        - "ExecuteActionState extends FsmState<IBattleBlackboard>"
+        - "RoundEndState extends FsmState<IBattleBlackboard>"
+        - "VictoryState extends FsmState<IBattleBlackboard>"
+        - "DefeatState extends FsmState<IBattleBlackboard>"
+      owner_type: IBattleBlackboard
+      blackboard_interface: IBattleBlackboard
+      blackboard_fields:
+        - "battleSystem: BattleSystem"
+        - "buffSystem: BuffSystem"
+        - "gameData: RpgGameData"
+        - "turnOrder: CharacterState[]"
+        - "currentActorIndex: number"
+        - "actionDecision: ActionDecision | null"
+        - "renderer: HtmlRenderer"
+        - "eventManager: IEventManager"
+        - "audioManager: IAudioManager"
+        - "allCharacters: CharacterState[]"
+        - "skillTable: SkillConfigRow[]"
+        - "monsterTable: MonsterConfigRow[]"
+        - "maxRound: number"
+      data_keys:
+        BLACKBOARD: "battle_blackboard"
+      getBlackboard_pattern: |
+        function getBlackboard(fsm: IFsm<IBattleBlackboard>): IBattleBlackboard {
+            const bb = fsm.getData<IBattleBlackboard>(BattleFsmDataKeys.BLACKBOARD);
+            if (!bb) { throw new Error(`[${TAG}] 黑板数据缺失，FSM="${fsm.name}"`); }
+            return bb;
+        }
+
+    character_fsm:
+      defs_file: assets/scripts/game/demo2-rpg/fsm/CharacterFsmDefs.ts
+      state_dir: assets/scripts/game/demo2-rpg/fsm/character/
+      state_count: 4
+      states:
+        - "CharIdleState extends FsmState<ICharacterBlackboard>"
+        - "CharActingState extends FsmState<ICharacterBlackboard>"
+        - "CharStunnedState extends FsmState<ICharacterBlackboard>"
+        - "CharDeadState extends FsmState<ICharacterBlackboard>"
+      owner_type: ICharacterBlackboard
+      blackboard_interface: ICharacterBlackboard
+      blackboard_fields:
+        - "characterId: number"
+        - "characterState: CharacterState"
+        - "eventManager: EventManager"
+        - "stunRounds: number"
+      data_keys:
+        BLACKBOARD: "character_blackboard"
+
+  demo3_autochess:
+    defs_file: assets/scripts/game/demo3-autochess/fsm/ChessAiFsmDefs.ts
+    state_dir: assets/scripts/game/demo3-autochess/fsm/chess-ai/
+    state_count: 4
+    states:
+      - "IdleState extends FsmState<string>"
+      - "AttackState extends FsmState<string>"
+      - "MoveToState extends FsmState<string>"
+      - "DeadState extends FsmState<string>"
+    owner_type: string
+    blackboard_interface: IChessAiBlackboard
+    blackboard_fields:
+      - "pieceState: ChessPieceRuntimeState"
+      - "boardSystem: BoardSystem"
+      - "allEnemies: () => ChessPieceRuntimeState[]"
+      - "target: ChessPieceRuntimeState | null"
+      - "eventManager: IEventManager"
+    data_keys:
+      BLACKBOARD: "chess_ai_blackboard"
+    getBlackboard_pattern: |
+      function getBlackboard(fsm: IFsm<string>): IChessAiBlackboard {
+          const bb = fsm.getData<IChessAiBlackboard>(ChessAiDataKeys.BLACKBOARD);
+          if (!bb) { throw new Error(`[${TAG}] 黑板数据缺失，FSM="${fsm.name}"`); }
+          return bb;
+      }
+    note: "owner 类型是 string（棋子名称），黑板通过 getData 获取（与 owner 类型无关）"
+
+  cross_demo_observations:
+    - "三个 Demo 的 FsmState 泛型参数各不相同: IBuildingBlackboard / IBattleBlackboard / ICharacterBlackboard / string"
+    - "黑板数据始终通过 fsm.getData<Interface>(KEY) 获取，key 是 string 常量"
+    - "每个 FSM 场景都手写 getBlackboard() 辅助函数（3-5 行样板代码）"
+    - "黑板接口定义在 *FsmDefs.ts 中，与状态名常量共存"
+    - "owner 类型与黑板接口的关系不一致：demo1 owner=IBuildingBlackboard，demo3 owner=string"
+
+# ═══════════════════════════════════════════════════════════
+# 5. 三个 Demo 的 Procedure 上下文样板
+# ═══════════════════════════════════════════════════════════
+
+demo_procedure_context_patterns:
+  demo1_idle:
+    context_file: assets/scripts/game/demo1-idle/procedures/ProcedureContext.ts
+    interface_name: IProcedureContext
+    context_key: "__procedure_context__"
+    constant_name: PROCEDURE_CONTEXT_KEY
+    procedure_count: 6
+    procedures:
+      - "LaunchProcedure (procedures/LaunchProcedure.ts:20)"
+      - "PreloadProcedure (procedures/PreloadProcedure.ts:26)"
+      - "OfflineSettleProcedure (procedures/OfflineSettleProcedure.ts:24)"
+      - "MainProcedure (procedures/MainProcedure.ts:30)"
+      - "SettingsProcedure (procedures/SettingsProcedure.ts:22)"
+    access_pattern: |
+      // 在 onEnter 中:
+      onEnter(fsm: IFsm<unknown>): void {
+          // demo1 最简模式 — LaunchProcedure 甚至不取 context
+          this.changeProcedure(fsm, PreloadProcedure);
+      }
+      // 其他 Procedure 取上下文:
+      const ctx = fsm.getData<IProcedureContext>(PROCEDURE_CONTEXT_KEY);
+    context_fields:
+      - "gameData: IdleGameData"
+      - "buildingSystem: BuildingSystem"
+      - "achievementSystem: AchievementSystem"
+      - "offlineRewardSystem: OfflineRewardSystem"
+      - "saveSystem: SaveSystem"
+      - "eventManager: EventManager"
+      - "timerManager: TimerManager"
+      - "dataTableManager: DataTableManager"
+      - "fsmManager: FsmManager"
+
+  demo2_rpg:
+    context_file: assets/scripts/game/demo2-rpg/procedures/RpgProcedureContext.ts
+    interface_name: IRpgProcedureContext
+    context_key: "__rpg_procedure_context__"
+    constant_name: RPG_PROCEDURE_CONTEXT_KEY
+    procedure_count: 7
+    procedures:
+      - "LaunchProcedure (procedures/LaunchProcedure.ts:24)"
+      - "PreloadProcedure (procedures/PreloadProcedure.ts:59)"
+      - "LobbyProcedure (procedures/LobbyProcedure.ts:30)"
+      - "BattlePrepProcedure (procedures/BattlePrepProcedure.ts:42)"
+      - "BattleProcedure (procedures/BattleProcedure.ts:38)"
+      - "SettleProcedure (procedures/SettleProcedure.ts:27)"
+    access_pattern: |
+      onEnter(fsm: IFsm<unknown>): void {
+          const ctx = fsm.getData<IRpgProcedureContext>(RPG_PROCEDURE_CONTEXT_KEY);
+          if (!ctx) {
+              Logger.error(TAG, 'RPG Procedure 上下文缺失');
+              throw new Error(`[${TAG}] RPG Procedure 上下文缺失`);
+          }
+          // 使用 ctx...
+      }
+    context_fields:
+      - "gameData: unknown"
+      - "renderer: HtmlRenderer"
+      - "battleSystem: unknown"
+      - "buffSystem: unknown"
+      - "damageCalculator: unknown"
+      - "enemyAI: unknown"
+      - "eventManager: EventManager"
+      - "timerManager: TimerManager"
+      - "fsmManager: FsmManager"
+      - "entityManager: EntityManager"
+      - "audioManager: AudioManager"
+      - "uiManager: UIManager"
+      - "dataTableManager: DataTableManager"
+      - "referencePool: ReferencePool"
+
+  demo3_autochess:
+    context_file: assets/scripts/game/demo3-autochess/procedures/AutoChessProcedureContext.ts
+    interface_name: IAutoChessProcedureContext
+    context_key: "__auto_chess_context__"
+    constant_name: AUTO_CHESS_CONTEXT_KEY
+    procedure_count: 7
+    procedures:
+      - "LaunchProcedure (procedures/LaunchProcedure.ts:24)"
+      - "PreloadProcedure (procedures/PreloadProcedure.ts:126)"
+      - "PrepareProcedure (procedures/PrepareProcedure.ts:33)"
+      - "BattleProcedure (procedures/BattleProcedure.ts:29)"
+      - "SettleProcedure (procedures/SettleProcedure.ts:40)"
+      - "GameOverProcedure (procedures/GameOverProcedure.ts:23)"
+    access_pattern: |
+      onEnter(fsm: IFsm<unknown>): void {
+          const ctx = fsm.getData<IAutoChessProcedureContext>(AUTO_CHESS_CONTEXT_KEY);
+          if (!ctx) {
+              Logger.error(TAG, 'Auto-chess Procedure 上下文缺失');
+              throw new Error(`[${TAG}] Auto-chess Procedure 上下文缺失`);
+          }
+          // 使用 ctx...
+      }
+    context_fields:
+      - "gameData: AutoChessGameData"
+      - "renderer: unknown"
+      - "boardSystem: BoardSystem"
+      - "shopSystem: ShopSystem"
+      - "mergeSystem: MergeSystem"
+      - "synergySystem: SynergySystem"
+      - "battleSystem: BattleSystem"
+      - "eventManager: EventManager"
+      - "timerManager: TimerManager"
+      - "fsmManager: FsmManager"
+      - "entityManager: EntityManager"
+      - "audioManager: AudioManager"
+      - "dataTableManager: DataTableManager"
+
+  cross_demo_observations:
+    - "所有 Procedure 的 onEnter 参数类型是 IFsm<unknown>（因为 ProcedureBase extends FsmState<unknown>）"
+    - "上下文获取模式完全一致: fsm.getData<IContext>(KEY_CONSTANT)"
+    - "每个 Demo 都有独立的 context 接口 + key 常量"
+    - "null 检查 + throw 是手写样板（4-5 行），demo2/demo3 都有，demo1 的 LaunchProcedure 省略了"
+    - "ProcedureManager.setData() 在 Demo 主入口中写入上下文（在 startProcedure 之前）"
+
+# ═══════════════════════════════════════════════════════════
+# 6. 测试文件列表
+# ═══════════════════════════════════════════════════════════
+
+test_files:
+  fsm:
+    directory: tests/fsm/
+    files:
+      - name: fsm.test.ts
+        description: "Fsm 类单元测试：创建、启动、状态切换、共享数据、递归保护、销毁"
+        test_states: "IdleState, WalkState, RecursiveState, RecursiveLeaveState, EmptyState, TestState"
+      - name: fsm-manager.test.ts
+        description: "FsmManager 模块测试：createFsm、destroyFsm、getFsm、hasFsm、update 驱动"
+        test_states: "IdleState, WalkState"
+
+  procedure:
+    directory: tests/procedure/
+    files:
+      - name: procedure-manager.test.ts
+        description: "ProcedureManager 模块测试：initialize、startProcedure、hasProcedure、切换流程"
+        test_procedures: "ProcedureLaunch, ProcedureMenu, ProcedureGame, ProcedureAutoSwitch"
+
+# ═══════════════════════════════════════════════════════════
+# 7. 破坏性变更风险分析
+# ═══════════════════════════════════════════════════════════
+
+breaking_change_impact:
+  scenario_1_change_FsmState_generic:
+    description: "修改 FsmState<T> 的泛型签名（如增加第二个类型参数）"
+    affected_files:
+      framework:
+        - file: assets/scripts/framework/procedure/ProcedureBase.ts
+          line: 24
+          current: "extends FsmState<unknown>"
+      demo1_idle:
+        - file: assets/scripts/game/demo1-idle/fsm/BuildingFsmStates.ts
+          lines: "42, 70, 119, 165"
+          states: 4
+          current_type_arg: "IBuildingBlackboard"
+      demo2_rpg_battle:
+        - file: assets/scripts/game/demo2-rpg/fsm/battle/RoundStartState.ts (line 34)
+        - file: assets/scripts/game/demo2-rpg/fsm/battle/SelectActionState.ts (line 39)
+        - file: assets/scripts/game/demo2-rpg/fsm/battle/ExecuteActionState.ts (line 37)
+        - file: assets/scripts/game/demo2-rpg/fsm/battle/RoundEndState.ts (line 35)
+        - file: assets/scripts/game/demo2-rpg/fsm/battle/VictoryState.ts (line 33)
+        - file: assets/scripts/game/demo2-rpg/fsm/battle/DefeatState.ts (line 32)
+          states: 6
+          current_type_arg: "IBattleBlackboard"
+      demo2_rpg_character:
+        - file: assets/scripts/game/demo2-rpg/fsm/character/CharIdleState.ts (line 33)
+        - file: assets/scripts/game/demo2-rpg/fsm/character/CharActingState.ts (line 35)
+        - file: assets/scripts/game/demo2-rpg/fsm/character/CharStunnedState.ts (line 35)
+        - file: assets/scripts/game/demo2-rpg/fsm/character/CharDeadState.ts (line 34)
+          states: 4
+          current_type_arg: "ICharacterBlackboard"
+      demo3_autochess:
+        - file: assets/scripts/game/demo3-autochess/fsm/chess-ai/IdleState.ts (line 34)
+        - file: assets/scripts/game/demo3-autochess/fsm/chess-ai/AttackState.ts (line 36)
+        - file: assets/scripts/game/demo3-autochess/fsm/chess-ai/MoveToState.ts (line 51)
+        - file: assets/scripts/game/demo3-autochess/fsm/chess-ai/DeadState.ts (line 31)
+          states: 4
+          current_type_arg: "string"
+      tests:
+        - file: tests/fsm/fsm.test.ts
+          lines: "11, 37, 54, 61, 68, 86"
+          states: 6
+          current_type_arg: "MockOwner"
+        - file: tests/fsm/fsm-manager.test.ts
+          lines: "18, 32"
+          states: 2
+          current_type_arg: "MockOwner"
+      benchmark:
+        - file: tools/benchmark/run-benchmarks.ts
+          lines: "32, 50"
+          states: 2
+          current_type_arg: "object"
+    total_FsmState_subclasses: 28
+    note: "含 .worktrees/ 副本 8 个，主仓库实际 20 个"
+
+  scenario_2_change_ProcedureBase_generic:
+    description: "修改 ProcedureBase 的泛型（如从 FsmState<unknown> 改为 FsmState<SomeType>）"
+    affected_files:
+      demo1_idle:
+        - assets/scripts/game/demo1-idle/procedures/LaunchProcedure.ts (line 20)
+        - assets/scripts/game/demo1-idle/procedures/PreloadProcedure.ts (line 26)
+        - assets/scripts/game/demo1-idle/procedures/OfflineSettleProcedure.ts (line 24)
+        - assets/scripts/game/demo1-idle/procedures/MainProcedure.ts (line 30)
+        - assets/scripts/game/demo1-idle/procedures/SettingsProcedure.ts (line 22)
+      demo2_rpg:
+        - assets/scripts/game/demo2-rpg/procedures/LaunchProcedure.ts (line 24)
+        - assets/scripts/game/demo2-rpg/procedures/PreloadProcedure.ts (line 59)
+        - assets/scripts/game/demo2-rpg/procedures/LobbyProcedure.ts (line 30)
+        - assets/scripts/game/demo2-rpg/procedures/BattlePrepProcedure.ts (line 42)
+        - assets/scripts/game/demo2-rpg/procedures/BattleProcedure.ts (line 38)
+        - assets/scripts/game/demo2-rpg/procedures/SettleProcedure.ts (line 27)
+      demo3_autochess:
+        - assets/scripts/game/demo3-autochess/procedures/LaunchProcedure.ts (line 24)
+        - assets/scripts/game/demo3-autochess/procedures/PreloadProcedure.ts (line 126)
+        - assets/scripts/game/demo3-autochess/procedures/PrepareProcedure.ts (line 33)
+        - assets/scripts/game/demo3-autochess/procedures/BattleProcedure.ts (line 29)
+        - assets/scripts/game/demo3-autochess/procedures/SettleProcedure.ts (line 40)
+        - assets/scripts/game/demo3-autochess/procedures/GameOverProcedure.ts (line 23)
+      tests:
+        - tests/procedure/procedure-manager.test.ts (lines 7, 13, 19, 29)
+    total_ProcedureBase_subclasses: 22
+    note: "含 .worktrees/ 副本 6 个，主仓库实际 16 + 4 测试 = 20 个"
+
+  scenario_3_change_IFsm_interface:
+    description: "修改 IFsm<T> 接口（如修改 getData/setData 签名或增加方法）"
+    affected_files:
+      - "所有使用 fsm.getData<>() 的文件（每个 FsmState 子类 + 每个 Procedure 子类中的 getBlackboard/上下文获取）"
+      - "Fsm.ts 实现类"
+      - "ProcedureManager.ts（调用 _procedureFsm.setData）"
+      - "所有 Demo 主入口（调用 procedureManager.setData）"
+    estimated_files: "30+ 文件"
+
+  risk_summary:
+    - "FsmState<T> 泛型变更: ~20 个子类需修改（高影响）"
+    - "ProcedureBase 泛型变更: ~20 个子类需修改（高影响）"
+    - "IFsm 的 getData/setData 签名变更: ~30 个文件需修改（最高影响）"
+    - "additive changes（新增方法到 IFsm）: 仅需改 Fsm.ts 实现（低影响）"
+    - "ProcedureManager 内部有 as unknown as 强转，泛型变更可能需要调整转换逻辑"
+
+# ═══════════════════════════════════════════════════════════
+# 8. 额外发现
+# ═══════════════════════════════════════════════════════════
+
+open_questions: []
+
+gaps: []

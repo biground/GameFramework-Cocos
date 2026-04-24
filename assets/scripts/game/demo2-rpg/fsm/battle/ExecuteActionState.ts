@@ -8,7 +8,7 @@
 import { FsmState } from '@framework/fsm/FsmState';
 import { IFsm } from '@framework/fsm/FsmDefs';
 import { Logger } from '@framework/debug/Logger';
-import { IBattleBlackboard, BattleFsmDataKeys } from '../BattleFsmDefs';
+import { IBattleBlackboard } from '../BattleFsmDefs';
 import { RpgEvents } from '../../events/RpgEvents';
 import { SelectActionState } from './SelectActionState';
 import { RoundEndState } from './RoundEndState';
@@ -18,26 +18,15 @@ import { DefeatState } from './DefeatState';
 const TAG = 'BattleFSM';
 
 /**
- * 从 FSM 共享数据中获取黑板
- */
-function getBlackboard(fsm: IFsm<IBattleBlackboard>): IBattleBlackboard {
-    const bb = fsm.getData<IBattleBlackboard>(BattleFsmDataKeys.BLACKBOARD);
-    if (!bb) {
-        throw new Error(`[${TAG}] 黑板数据缺失，FSM="${fsm.name}"`);
-    }
-    return bb;
-}
-
-/**
  * 执行行动状态
  *
  * 读取 actionDecision 并调用 BattleSystem 执行，发射战斗相关事件，
  * 检查战斗结束条件后决定下一个状态。
  */
-export class ExecuteActionState extends FsmState<IBattleBlackboard> {
+export class ExecuteActionState extends FsmState<IBattleBlackboard, IBattleBlackboard> {
     /** 进入执行行动状态 */
-    onEnter(fsm: IFsm<IBattleBlackboard>): void {
-        const bb = getBlackboard(fsm);
+    onEnter(fsm: IFsm<IBattleBlackboard, IBattleBlackboard>): void {
+        const bb = fsm.blackboard;
         const decision = bb.actionDecision;
 
         if (!decision) {
@@ -135,7 +124,10 @@ export class ExecuteActionState extends FsmState<IBattleBlackboard> {
     /**
      * 决定下一步：还有角色未行动则回到 SelectAction，否则进入 RoundEnd
      */
-    private _nextStep(fsm: IFsm<IBattleBlackboard>, bb: IBattleBlackboard): void {
+    private _nextStep(
+        fsm: IFsm<IBattleBlackboard, IBattleBlackboard>,
+        bb: IBattleBlackboard,
+    ): void {
         if (bb.currentActorIndex < bb.turnOrder.length) {
             this.changeState(fsm, SelectActionState);
         } else {

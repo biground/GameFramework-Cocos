@@ -9,22 +9,11 @@
 import { FsmState } from '@framework/fsm/FsmState';
 import { IFsm } from '@framework/fsm/FsmDefs';
 import { Logger } from '@framework/debug/Logger';
-import { ICharacterBlackboard, CharacterFsmDataKeys } from '@game/demo2-rpg/fsm/CharacterFsmDefs';
+import { ICharacterBlackboard } from '@game/demo2-rpg/fsm/CharacterFsmDefs';
 import { CharIdleState } from './CharIdleState';
 import { CharDeadState } from './CharDeadState';
 
 const TAG = 'CharacterFSM';
-
-/**
- * 从 FSM 共享数据中获取黑板
- */
-function getBlackboard(fsm: IFsm<ICharacterBlackboard>): ICharacterBlackboard {
-    const bb = fsm.getData<ICharacterBlackboard>(CharacterFsmDataKeys.BLACKBOARD);
-    if (!bb) {
-        throw new Error(`[${TAG}] 黑板数据缺失，FSM="${fsm.name}"`);
-    }
-    return bb;
-}
 
 /**
  * 角色眩晕状态
@@ -32,10 +21,10 @@ function getBlackboard(fsm: IFsm<ICharacterBlackboard>): ICharacterBlackboard {
  * 角色处于眩晕中，无法行动。每次 update 递减 stunRounds，
  * 递减至 0 时切换回 Idle。HP <= 0 时切换到 Dead。
  */
-export class CharStunnedState extends FsmState<ICharacterBlackboard> {
+export class CharStunnedState extends FsmState<ICharacterBlackboard, ICharacterBlackboard> {
     /** 进入眩晕状态 */
-    onEnter(fsm: IFsm<ICharacterBlackboard>): void {
-        const bb = getBlackboard(fsm);
+    onEnter(fsm: IFsm<ICharacterBlackboard, ICharacterBlackboard>): void {
+        const bb = fsm.blackboard;
         Logger.info(
             TAG,
             `[${fsm.name}] 角色 #${bb.characterId} 进入眩晕状态，剩余 ${bb.stunRounds} 回合`,
@@ -47,8 +36,8 @@ export class CharStunnedState extends FsmState<ICharacterBlackboard> {
      * - HP <= 0 → Dead
      * - stunRounds 递减 → 0 时切换回 Idle
      */
-    onUpdate(fsm: IFsm<ICharacterBlackboard>, _dt: number): void {
-        const bb = getBlackboard(fsm);
+    onUpdate(fsm: IFsm<ICharacterBlackboard, ICharacterBlackboard>, _dt: number): void {
+        const bb = fsm.blackboard;
 
         // 优先检测死亡
         if (bb.characterState.hp <= 0) {
@@ -66,8 +55,8 @@ export class CharStunnedState extends FsmState<ICharacterBlackboard> {
     }
 
     /** 离开眩晕状态 */
-    onLeave(fsm: IFsm<ICharacterBlackboard>): void {
-        const bb = getBlackboard(fsm);
+    onLeave(fsm: IFsm<ICharacterBlackboard, ICharacterBlackboard>): void {
+        const bb = fsm.blackboard;
         Logger.debug(TAG, `[${fsm.name}] 角色 #${bb.characterId} 离开眩晕状态`);
     }
 }

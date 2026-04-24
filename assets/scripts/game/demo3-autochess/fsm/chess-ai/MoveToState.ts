@@ -11,22 +11,13 @@
 import { FsmState } from '../../../../framework/fsm/FsmState';
 import { IFsm } from '../../../../framework/fsm/FsmDefs';
 import { Logger } from '../../../../framework/debug/Logger';
-import { IChessAiBlackboard, ChessAiDataKeys } from '../ChessAiFsmDefs';
+import { IChessAiBlackboard } from '../ChessAiFsmDefs';
 import { IGridPosition } from '../../AutoChessDefs';
 import { AttackState } from './AttackState';
 import { IdleState } from './IdleState';
 import { DeadState } from './DeadState';
 
 const TAG = 'ChessAiFSM';
-
-/** 从 FSM 共享数据中获取黑板 */
-function getBlackboard(fsm: IFsm<string>): IChessAiBlackboard {
-    const bb = fsm.getData<IChessAiBlackboard>(ChessAiDataKeys.BLACKBOARD);
-    if (!bb) {
-        throw new Error(`[${TAG}] 黑板数据缺失，FSM="${fsm.name}"`);
-    }
-    return bb;
-}
 
 /**
  * 计算朝目标移动一步的目标位置
@@ -48,10 +39,10 @@ function computeStepTowards(from: IGridPosition, to: IGridPosition): IGridPositi
  *
  * 每帧朝目标移动一格，到达攻击范围后切换到 Attack。
  */
-export class MoveToState extends FsmState<string> {
+export class MoveToState extends FsmState<string, IChessAiBlackboard> {
     /** 每帧移动一格 */
-    onUpdate(fsm: IFsm<string>, _deltaTime: number): void {
-        const bb = getBlackboard(fsm);
+    onUpdate(fsm: IFsm<string, IChessAiBlackboard>, _deltaTime: number): void {
+        const bb = fsm.blackboard;
         const piece = bb.pieceState;
 
         // 自身已死亡 → Dead

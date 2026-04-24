@@ -9,24 +9,13 @@
 import { FsmState } from '@framework/fsm/FsmState';
 import { IFsm } from '@framework/fsm/FsmDefs';
 import { Logger } from '@framework/debug/Logger';
-import { IBattleBlackboard, BattleFsmDataKeys } from '../BattleFsmDefs';
+import { IBattleBlackboard } from '../BattleFsmDefs';
 import { BuffType, ActionDecision, CharacterState } from '../../data/RpgGameData';
 import { EnemyAI } from '../../systems/EnemyAI';
 import { ExecuteActionState } from './ExecuteActionState';
 import { RoundEndState } from './RoundEndState';
 
 const TAG = 'BattleFSM';
-
-/**
- * 从 FSM 共享数据中获取黑板
- */
-function getBlackboard(fsm: IFsm<IBattleBlackboard>): IBattleBlackboard {
-    const bb = fsm.getData<IBattleBlackboard>(BattleFsmDataKeys.BLACKBOARD);
-    if (!bb) {
-        throw new Error(`[${TAG}] 黑板数据缺失，FSM="${fsm.name}"`);
-    }
-    return bb;
-}
 
 /**
  * 选择行动状态
@@ -36,10 +25,10 @@ function getBlackboard(fsm: IFsm<IBattleBlackboard>): IBattleBlackboard {
  * - 敌方角色使用 {@link EnemyAI} 决策
  * - 玩家角色本 Demo 中也用 AI 自动选择（默认普攻）
  */
-export class SelectActionState extends FsmState<IBattleBlackboard> {
+export class SelectActionState extends FsmState<IBattleBlackboard, IBattleBlackboard> {
     /** 进入选择行动状态 */
-    onEnter(fsm: IFsm<IBattleBlackboard>): void {
-        const bb = getBlackboard(fsm);
+    onEnter(fsm: IFsm<IBattleBlackboard, IBattleBlackboard>): void {
+        const bb = fsm.blackboard;
 
         // 跳过已死亡或被眩晕的角色
         while (bb.currentActorIndex < bb.turnOrder.length) {

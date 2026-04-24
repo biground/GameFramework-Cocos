@@ -257,7 +257,7 @@ describe('SettleProcedure', () => {
         it('上下文缺失时应抛出错误', () => {
             const fsm = createMockFsm();
             const proc = new SettleProcedure();
-            expect(() => proc.onEnter(fsm)).toThrow('上下文缺失');
+            expect(() => proc.onEnter(fsm)).toThrow('不存在');
         });
 
         it('战斗结果缺失时应抛出错误', () => {
@@ -338,6 +338,6 @@ describe('GameOverProcedure', () => {
     it('上下文缺失时应抛出错误', () => {
         const fsm = createMockFsm();
         const proc = new GameOverProcedure();
-        expect(() => proc.onEnter(fsm)).toThrow('上下文缺失');
+        expect(() => proc.onEnter(fsm)).toThrow('不存在');
     });
 });

@@ -24,11 +24,7 @@ const TAG = 'LaunchProcedure';
 export class LaunchProcedure extends ProcedureBase {
     /** 进入启动流程 */
     onEnter(fsm: IFsm<unknown>): void {
-        const ctx = fsm.getData<IAutoChessProcedureContext>(AUTO_CHESS_CONTEXT_KEY);
-        if (!ctx) {
-            Logger.error(TAG, 'Auto-chess Procedure 上下文缺失');
-            throw new Error(`[${TAG}] Auto-chess Procedure 上下文缺失`);
-        }
+        const ctx = this.getContext<IAutoChessProcedureContext>(fsm, AUTO_CHESS_CONTEXT_KEY);
 
         Logger.info(TAG, '🎮 自走棋框架初始化完成，进入启动流程');
 

@@ -22,7 +22,10 @@ import { IdleGameData } from '@game/demo1-idle/data/IdleGameData';
 import { BuildingConfigRow } from '@game/demo1-idle/data/BuildingConfigRow';
 import { UpgradeCurveRow } from '@game/demo1-idle/data/UpgradeCurveRow';
 import { AchievementConfigRow } from '@game/demo1-idle/data/AchievementConfigRow';
-import { IProcedureContext, PROCEDURE_CONTEXT_KEY } from '@game/demo1-idle/procedures/ProcedureContext';
+import {
+    IProcedureContext,
+    PROCEDURE_CONTEXT_KEY,
+} from '@game/demo1-idle/procedures/ProcedureContext';
 
 import { LaunchProcedure } from '@game/demo1-idle/procedures/LaunchProcedure';
 import { PreloadProcedure } from '@game/demo1-idle/procedures/PreloadProcedure';
@@ -35,9 +38,15 @@ import { SettingsProcedure } from '@game/demo1-idle/procedures/SettingsProcedure
 /** 内存存储 mock */
 class MapStorage implements IStorage {
     private _map = new Map<string, string>();
-    getItem(key: string): string | null { return this._map.get(key) ?? null; }
-    setItem(key: string, value: string): void { this._map.set(key, value); }
-    removeItem(key: string): void { this._map.delete(key); }
+    getItem(key: string): string | null {
+        return this._map.get(key) ?? null;
+    }
+    setItem(key: string, value: string): void {
+        this._map.set(key, value);
+    }
+    removeItem(key: string): void {
+        this._map.delete(key);
+    }
 }
 
 function makeConfig(overrides: Partial<BuildingConfigRow> & { id: number }): BuildingConfigRow {
@@ -56,7 +65,9 @@ function makeConfig(overrides: Partial<BuildingConfigRow> & { id: number }): Bui
     return c;
 }
 
-function makeAchievement(overrides: Partial<AchievementConfigRow> & { id: number }): AchievementConfigRow {
+function makeAchievement(
+    overrides: Partial<AchievementConfigRow> & { id: number },
+): AchievementConfigRow {
     const a = new AchievementConfigRow();
     Object.assign(a, {
         name: '',
@@ -105,7 +116,10 @@ function buildTestEnv(): TestEnv {
     // 注册数据表
     dataTableManager.createTable<BuildingConfigRow>('building_config', TEST_BUILDING_CONFIGS);
     dataTableManager.createTable<UpgradeCurveRow>('upgrade_curve', []);
-    dataTableManager.createTable<AchievementConfigRow>('achievement_config', TEST_ACHIEVEMENT_CONFIGS);
+    dataTableManager.createTable<AchievementConfigRow>(
+        'achievement_config',
+        TEST_ACHIEVEMENT_CONFIGS,
+    );
 
     const gameData = new IdleGameData();
     const buildingSystem = new BuildingSystem(gameData, eventManager, timerManager);
@@ -126,8 +140,15 @@ function buildTestEnv(): TestEnv {
     };
 
     return {
-        eventManager, timerManager, dataTableManager, fsmManager,
-        gameData, buildingSystem, achievementSystem, offlineRewardSystem, saveSystem,
+        eventManager,
+        timerManager,
+        dataTableManager,
+        fsmManager,
+        gameData,
+        buildingSystem,
+        achievementSystem,
+        offlineRewardSystem,
+        saveSystem,
         ctx,
     };
 }
@@ -150,11 +171,15 @@ function createMockFsm(ctx: IProcedureContext) {
         owner: {},
         currentState: null,
         isDestroyed: false,
+        blackboard: {},
         changeState: jest.fn(),
         getData: jest.fn((key: string) => dataMap.get(key)),
-        setData: jest.fn((key: string, value: unknown) => { dataMap.set(key, value); }),
+        setData: jest.fn((key: string, value: unknown) => {
+            dataMap.set(key, value);
+        }),
         removeData: jest.fn((key: string) => dataMap.delete(key)),
         hasState: jest.fn(() => true),
+        setBlackboard: jest.fn(),
     };
     return mockFsm as unknown as IFsm<unknown> & { changeState: jest.Mock };
 }
@@ -218,7 +243,7 @@ describe('IdleProcedures — 流程测试', () => {
             // 清空上下文
             (emptyFsm.getData as jest.Mock).mockReturnValue(undefined);
 
-            expect(() => proc.onEnter(emptyFsm)).toThrow('Procedure 上下文缺失');
+            expect(() => proc.onEnter(emptyFsm)).toThrow('流程上下文');
         });
     });
 

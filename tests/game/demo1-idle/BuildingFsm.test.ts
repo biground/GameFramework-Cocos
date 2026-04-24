@@ -4,6 +4,7 @@
 
 import { FsmManager } from '@framework/fsm/FsmManager';
 import { Fsm } from '@framework/fsm/Fsm';
+import { IFsmState } from '@framework/fsm/FsmDefs';
 import {
     IdleBuildingState,
     ProducingState,
@@ -40,7 +41,14 @@ function makeConfig(overrides: Partial<BuildingConfigRow> & { id: number }): Bui
 }
 
 const TEST_CONFIGS: BuildingConfigRow[] = [
-    makeConfig({ id: 1, name: 'mine', baseCost: 10, baseOutput: 1, outputInterval: 2, maxLevel: 3 }),
+    makeConfig({
+        id: 1,
+        name: 'mine',
+        baseCost: 10,
+        baseOutput: 1,
+        outputInterval: 2,
+        maxLevel: 3,
+    }),
 ];
 
 // ─── 测试套件 ──────────────────────────────────────────
@@ -73,8 +81,8 @@ describe('BuildingFsm — 建筑状态机', () => {
         jest.useRealTimers();
     });
 
-    /** 创建建筑 FSM 并写入黑板，返回 Fsm 实例 */
-    function createBuildingFsm(buildingId: number): Fsm<IBuildingBlackboard> {
+    /** 创建建筑 FSM 并设置黑板，返回 Fsm 实例 */
+    function createBuildingFsm(buildingId: number): Fsm<IBuildingBlackboard, IBuildingBlackboard> {
         const fsmName = `${BUILDING_FSM_PREFIX}${buildingId}`;
         const blackboard: IBuildingBlackboard = {
             buildingId,
@@ -82,15 +90,19 @@ describe('BuildingFsm — 建筑状态机', () => {
             gameData,
         };
 
-        const fsm = fsmManager.createFsm(
-            fsmName,
-            blackboard,
+        // FsmManager.createFsm 尚未支持 TBlackboard 泛型，使用类型断言绕过
+        const states = [
             new IdleBuildingState(),
             new ProducingState(),
             new UpgradingState(),
             new MaxLevelState(),
-        ) as Fsm<IBuildingBlackboard>;
-        fsm.setData(BuildingFsmDataKeys.BLACKBOARD, blackboard);
+        ] as unknown as IFsmState<IBuildingBlackboard>[];
+
+        const fsm = fsmManager.createFsm(fsmName, blackboard, ...states) as unknown as Fsm<
+            IBuildingBlackboard,
+            IBuildingBlackboard
+        >;
+        fsm.setBlackboard(blackboard);
         return fsm;
     }
 
@@ -130,8 +142,11 @@ describe('BuildingFsm — 建筑状态机', () => {
             fsm.start(IdleBuildingState);
 
             gameData.buildings.push({
-                id: 1, level: 1, owned: true,
-                isUpgrading: false, upgradeStartTime: 0,
+                id: 1,
+                level: 1,
+                owned: true,
+                isUpgrading: false,
+                upgradeStartTime: 0,
             });
 
             fsmManager.onUpdate(0.016);
@@ -147,8 +162,11 @@ describe('BuildingFsm — 建筑状态机', () => {
             fsm.start(IdleBuildingState);
 
             gameData.buildings.push({
-                id: 1, level: 1, owned: true,
-                isUpgrading: false, upgradeStartTime: 0,
+                id: 1,
+                level: 1,
+                owned: true,
+                isUpgrading: false,
+                upgradeStartTime: 0,
             });
 
             fsmManager.onUpdate(0.016);
@@ -171,8 +189,11 @@ describe('BuildingFsm — 建筑状态机', () => {
             fsm.start(IdleBuildingState);
 
             gameData.buildings.push({
-                id: 1, level: 1, owned: true,
-                isUpgrading: false, upgradeStartTime: 0,
+                id: 1,
+                level: 1,
+                owned: true,
+                isUpgrading: false,
+                upgradeStartTime: 0,
             });
 
             fsmManager.onUpdate(0.016);
@@ -197,8 +218,11 @@ describe('BuildingFsm — 建筑状态机', () => {
             fsm.start(IdleBuildingState);
 
             gameData.buildings.push({
-                id: 1, level: 1, owned: true,
-                isUpgrading: true, upgradeStartTime: Date.now(),
+                id: 1,
+                level: 1,
+                owned: true,
+                isUpgrading: true,
+                upgradeStartTime: Date.now(),
             });
 
             fsmManager.onUpdate(0.016);
@@ -225,8 +249,11 @@ describe('BuildingFsm — 建筑状态机', () => {
             fsm.start(IdleBuildingState);
 
             gameData.buildings.push({
-                id: 1, level: 3, owned: true,
-                isUpgrading: false, upgradeStartTime: 0,
+                id: 1,
+                level: 3,
+                owned: true,
+                isUpgrading: false,
+                upgradeStartTime: 0,
             });
 
             fsmManager.onUpdate(0.016);
@@ -241,8 +268,11 @@ describe('BuildingFsm — 建筑状态机', () => {
             fsm.start(IdleBuildingState);
 
             gameData.buildings.push({
-                id: 1, level: 3, owned: true,
-                isUpgrading: false, upgradeStartTime: 0,
+                id: 1,
+                level: 3,
+                owned: true,
+                isUpgrading: false,
+                upgradeStartTime: 0,
             });
 
             fsmManager.onUpdate(0.016);
@@ -276,19 +306,29 @@ describe('BuildingFsm — 建筑状态机', () => {
                 gameData,
             };
 
-            const fsm = fsmManager.createFsm(
-                fsmName,
-                blackboard,
-                idleState, producingState, upgradingState, maxLevelState,
-            ) as Fsm<IBuildingBlackboard>;
-            fsm.setData(BuildingFsmDataKeys.BLACKBOARD, blackboard);
+            // FsmManager.createFsm 尚未支持 TBlackboard 泛型，使用类型断言绕过
+            const states = [
+                idleState,
+                producingState,
+                upgradingState,
+                maxLevelState,
+            ] as unknown as IFsmState<IBuildingBlackboard>[];
+
+            const fsm = fsmManager.createFsm(fsmName, blackboard, ...states) as unknown as Fsm<
+                IBuildingBlackboard,
+                IBuildingBlackboard
+            >;
+            fsm.setBlackboard(blackboard);
 
             fsm.start(IdleBuildingState);
             expect(idleEnterSpy).toHaveBeenCalledTimes(1);
 
             gameData.buildings.push({
-                id: 1, level: 1, owned: true,
-                isUpgrading: false, upgradeStartTime: 0,
+                id: 1,
+                level: 1,
+                owned: true,
+                isUpgrading: false,
+                upgradeStartTime: 0,
             });
 
             fsmManager.onUpdate(0.016);
@@ -307,8 +347,11 @@ describe('BuildingFsm — 建筑状态机', () => {
 
             const now = Date.now();
             gameData.buildings.push({
-                id: 1, level: 1, owned: true,
-                isUpgrading: true, upgradeStartTime: now,
+                id: 1,
+                level: 1,
+                owned: true,
+                isUpgrading: true,
+                upgradeStartTime: now,
             });
 
             fsmManager.onUpdate(0.016);
@@ -327,8 +370,11 @@ describe('BuildingFsm — 建筑状态机', () => {
             expect(fsm.currentState).toBeInstanceOf(IdleBuildingState);
 
             gameData.buildings.push({
-                id: 1, level: 1, owned: true,
-                isUpgrading: false, upgradeStartTime: 0,
+                id: 1,
+                level: 1,
+                owned: true,
+                isUpgrading: false,
+                upgradeStartTime: 0,
             });
             fsmManager.onUpdate(0.016);
             expect(fsm.currentState).toBeInstanceOf(ProducingState);

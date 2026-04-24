@@ -29,11 +29,7 @@ export class GameOverProcedure extends ProcedureBase {
 
     /** 进入游戏结束流程 */
     onEnter(fsm: IFsm<unknown>): void {
-        const ctx = fsm.getData<IAutoChessProcedureContext>(AUTO_CHESS_CONTEXT_KEY);
-        if (!ctx) {
-            Logger.error(TAG, 'Auto-chess Procedure 上下文缺失');
-            throw new Error(`[${TAG}] Auto-chess Procedure 上下文缺失`);
-        }
+        const ctx = this.getContext<IAutoChessProcedureContext>(fsm, AUTO_CHESS_CONTEXT_KEY);
 
         this._fsm = fsm;
         this._ctx = ctx;
