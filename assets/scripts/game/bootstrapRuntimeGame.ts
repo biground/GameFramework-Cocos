@@ -2,10 +2,19 @@ import { GameEntry } from '@framework/core/GameEntry';
 import { ProcedureManager } from '@framework/procedure/ProcedureManager';
 import { ResourceManager } from '@framework/resource/ResourceManager';
 import { SceneManager } from '@framework/scene/SceneManager';
+import { UILayer } from '@framework/ui/UIDefs';
 import { UIManager } from '@framework/ui/UIManager';
 import { installCocosRuntime } from '@runtime/cc-385/installCocosRuntime';
 
-import { DEFAULT_RUNTIME_TARGET_SCENE_NAME, RuntimeGameContext } from './RuntimeGameContext';
+import {
+    DEFAULT_RUNTIME_TARGET_SCENE_NAME,
+    RUNTIME_GAME_CONTEXT_KEY,
+    RuntimeGameContext,
+} from './RuntimeGameContext';
+import { ProcedureLoadMainScene } from './procedure/ProcedureLoadMainScene';
+import { ProcedureMainSceneReady } from './procedure/ProcedureMainSceneReady';
+import { ProcedureSceneLoadFailed } from './procedure/ProcedureSceneLoadFailed';
+import { MainMenuForm } from './ui/MainMenuForm';
 
 export { DEFAULT_RUNTIME_TARGET_SCENE_NAME, RUNTIME_GAME_CONTEXT_KEY } from './RuntimeGameContext';
 
@@ -14,14 +23,15 @@ export interface BootstrapRuntimeGameOptions {
     /** Runtime 策略装配函数，测试中可注入替身。 */
     readonly installRuntime?: () => void;
 
+    /** Runtime 装配完成后的测试扩展点，可替换 Scene/UI 等运行时策略。 */
+    readonly afterInstallRuntime?: (context: RuntimeGameContext) => void;
+
     /** 目标主场景名称，未传时使用默认主场景。 */
     readonly targetSceneName?: string;
 }
 
 /**
  * 注册 Runtime 游戏所需的框架模块并装配 Cocos Runtime 策略。
- *
- * Wave 1 只负责 composition root 与上下文创建，暂不初始化 Procedure 链。
  */
 export function bootstrapRuntimeGame(
     options: BootstrapRuntimeGameOptions = {},
@@ -39,11 +49,28 @@ export function bootstrapRuntimeGame(
     const installRuntime = options.installRuntime ?? installCocosRuntime;
     installRuntime();
 
-    return {
+    const context: RuntimeGameContext = {
         resourceManager,
         sceneManager,
         uiManager,
         procedureManager,
         targetSceneName: options.targetSceneName ?? DEFAULT_RUNTIME_TARGET_SCENE_NAME,
     };
+
+    options.afterInstallRuntime?.(context);
+
+    uiManager.registerForm(MainMenuForm.FORM_NAME, {
+        path: MainMenuForm.RESOURCE_PATH,
+        layer: UILayer.Normal,
+    });
+
+    procedureManager.initialize(
+        new ProcedureLoadMainScene(),
+        new ProcedureMainSceneReady(),
+        new ProcedureSceneLoadFailed(),
+    );
+    procedureManager.setData(RUNTIME_GAME_CONTEXT_KEY, context);
+    procedureManager.startProcedure(ProcedureLoadMainScene);
+
+    return context;
 }
