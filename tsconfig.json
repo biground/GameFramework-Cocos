@@ -22,7 +22,6 @@
         "baseUrl": ".",
         "paths": {
             "@framework/*": ["assets/scripts/framework/*"],
-            "@runtime/*": ["assets/scripts/runtime/*"],
             "@game/*": ["assets/scripts/game/*"],
             "@utils/*": ["assets/scripts/utils/*"]
         },
@@ -35,7 +34,6 @@
         "tests/**/*.ts",
         "tools/**/*.ts",
         "packages/**/*.ts",
-        "types/**/*.d.ts",
         "playwright.config.ts"
     ],
     "exclude": ["node_modules", "dist", "build", "temp", "library"]
