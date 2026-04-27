@@ -834,10 +834,10 @@ tasks:
           - "lint 零新增错误"
           - "benchmark 文件编译通过"
         failure_modes:
-          - scenario: "某些边缘文件（如 .worktrees 中的副本）编译失败"
+          - scenario: "某些边缘文件（如隔离工作区副本）编译失败"
             likelihood: low
             impact: low
-            mitigation: ".worktrees 不在 tsconfig include 中，不影响。如有问题排除即可"
+            mitigation: "隔离工作区副本不在 tsconfig include 中，不影响。如有问题排除即可"
         tech_stack:
           - "TypeScript + Jest + ESLint"
         test_coverage: null
