@@ -7,11 +7,17 @@ created_by: gem-planner
 status: pending_approval
 research_confidence: high
 
-planning_pass: 1
+planning_pass: 2
 planning_history:
   - pass: 1
     date: 2026-04-24
     summary: 初版（已纳入 review 发现的 3 blocking 修复 + 关键 important）
+  - pass: 2
+    date: 2026-04-27
+    summary: |
+      修订 ADR-004 与 w3-t2 对齐实际实现：
+      installCocosRuntime() 改无参 + hasModule 逐模块校验（GameEntry 无 isInited API）；
+      文件名 installCocosRuntime.ts；新增 _isInstalled 防重入标记 + _resetCocosRuntimeForTesting() 测试钩子。
 
 plan_metrics:
   total_tasks: 19
@@ -44,9 +50,14 @@ adrs:
     decision: Runtime 侧在 owner 首次 load 调 asset.addRef，末次 release 调 asset.decRef(true)
     rationale: 框架层已按 owner 维护 refCount，Runtime 仅桥接到 cc Asset；IResourceLoader JSDoc 追加契约说明
   - id: ADR-004
-    title: installCocosRuntime(gameEntry) 统一入口 + isInited 校验
-    decision: 导出 installCocosRuntime，内部校验 gameEntry.isInited，拿 3 个 Manager 并注入 3 个策略实现
-    rationale: 入口集中便于调用方；未来可升级为 DI 装饰器自动注册
+    title: installCocosRuntime() 无参入口 + hasModule 校验 + 防重入
+    decision: |
+      导出 installCocosRuntime()（无参），内部按 GameModule.hasModule('ResourceManager'|'SceneManager'|'UIManager') 逐项校验；
+      任一未注册即抛 '[installCocosRuntime] 模块 ${name} 未注册...'；模块级 _isInstalled 标记防重入（重复调用 Logger.warn 不抛错）；
+      额外导出 _resetCocosRuntimeForTesting() 测试钩子。文件名 installCocosRuntime.ts（非 install.ts）。
+    rationale: |
+      GameEntry 当前并无 isInited API（初版 ADR 基于幻觉），改用 hasModule 逐模块校验更精确，
+      可在错误消息中点名缺失的模块；未来若引入 DI 装饰器自动装配，此入口仍可保留作 fallback。
   - id: ADR-005
     title: SceneManager guard 统一到 throw
     decision: 将 SceneManager.setSceneLoader 的 null warn 改为 throw，与 Resource/UI 风格一致
@@ -552,20 +563,25 @@ tasks:
     dependencies: [w2-t1-green, w2-t2-green, w2-t3-green, w3-t1]
     conflicts_with: []
     files_to_modify:
-      - assets/scripts/runtime/cc-385/install.ts
+      - assets/scripts/runtime/cc-385/installCocosRuntime.ts
       - tests/runtime/cc-385/install.test.ts
     description: |
-      installCocosRuntime(gameEntry)：校验 gameEntry.isInited；取 ResourceManager/SceneManager/UIManager；
-      new CocosResourceLoader / CocosSceneLoader / CocosUIFormFactory(resourceManager)；依次 setXxx 注入。
-      测试覆盖 isInited=false 抛错 + 注入顺序。
+      installCocosRuntime()（无参）：依次 GameModule.hasModule('ResourceManager'|'SceneManager'|'UIManager') 校验；
+      任一未注册抛 '[installCocosRuntime] 模块 ${name} 未注册...'；
+      经 GameEntry.getModule 取出三大 Manager；new CocosResourceLoader / CocosSceneLoader / CocosUIFormFactory(resourceManager)；
+      依次 setResourceLoader / setSceneLoader / setUIFormFactory 注入。
+      模块级 _isInstalled 防重入：重复调用仅 Logger.warn 跳过，不抛错。
+      额外导出 _resetCocosRuntimeForTesting() 供单测复位。
     estimated_effort: small
     estimated_files: 2
     estimated_lines: 120
     verification:
       - npx jest tests/runtime/cc-385/install.test.ts --no-coverage
     acceptance_criteria:
-      - gameEntry.isInited=false 时抛错
-      - 三个 setXxx 均被调用
+      - 任一模块未注册（hasModule=false）时抛错，错误消息含模块名
+      - 三个 setXxx 按 Resource → Scene → UI 顺序被调用
+      - 重复调用 installCocosRuntime() 第二次起仅 warn 不抛错（幂等）
+      - _resetCocosRuntimeForTesting() 可清掉 _isInstalled 标记
     failure_modes: []
     tech_stack:
       - TypeScript
