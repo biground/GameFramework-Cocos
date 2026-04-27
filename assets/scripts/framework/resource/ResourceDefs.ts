@@ -86,6 +86,11 @@ export interface PreloadCallbacks {
  *     }
  * }
  * ```
+ *
+ * @契约 引用计数由 ResourceManager 按 owner 维度统计；
+ * 实现方仅在「owner 首次 load(path)」时对底层资源 addRef，
+ * 「最后一个 owner release(path)」时 decRef(true)。
+ * 不要在每次 load/release 都增减底层引用，否则会导致双重记账。
  */
 export interface IResourceLoader {
     /**
