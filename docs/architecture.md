@@ -13,11 +13,9 @@
 ┌──────────────────────────────────────┐
 │           Game Layer（业务层）          │
 │  各 demo worktree 分支的              │
-│  assets/scripts/game/               │
 │    具体的游戏逻辑、UI、战斗等           │
 ├──────────────────────────────────────┤
 │         Runtime Layer（适配层）         │
-│      assets/scripts/runtime/         │
 │    桥接框架层与具体引擎（如 CC 3.8.5） │
 │   （独立 feature/runtime-* 分支）     │
 ├──────────────────────────────────────┤
@@ -50,7 +48,6 @@
 
 | 分支                       | 适配目标                | worktree 路径建议            |
 | -------------------------- | ----------------------- | ---------------------------- |
-| `feature/runtime-cc385`    | Cocos Creator 3.8.5     | `.worktrees/runtime-cc385`   |
 
 **协作模式**：runtime 分支以 main 为 upstream，框架接口变更后通过 `git merge main` 同步；新增 runtime（如 CC 3.9 / Laya）只需新建 `feature/runtime-*` 分支，不影响 main。
 

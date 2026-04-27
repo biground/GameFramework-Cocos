@@ -68,7 +68,6 @@ implementation_specification:
 
     affected_areas:
         - assets/scripts/framework/i18n/
-        - assets/scripts/runtime/i18n/
         - tests/framework/i18n/
         - docs/module-registry.md
 
@@ -541,7 +540,6 @@ tasks:
       description: |
           创建 Cocos Creator 本地化 Label 组件，自动翻译文本。
 
-          文件路径：assets/scripts/runtime/i18n/LocalizedLabel.ts
 
           组件功能：
           1. 使用 @ccclass 装饰器
@@ -594,7 +592,6 @@ tasks:
       description: |
           创建 Cocos Creator 本地化 Sprite 组件，根据语言切换图片。
 
-          文件路径：assets/scripts/runtime/i18n/LocalizedSprite.ts
 
           组件功能：
           1. 使用 @ccclass 装饰器
@@ -614,7 +611,6 @@ tasks:
           - task_005
       conflicts_with: []
       context_files:
-          - path: assets/scripts/runtime/i18n/LocalizedLabel.ts
             description: LocalizedLabel 实现参考
       estimated_effort: small
       estimated_files: 1

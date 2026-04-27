@@ -56,7 +56,6 @@ main 分支**不包含** runtime 实现，仅定义 framework 层策略接口（
 
 | 分支                    | 适配目标             | worktree 路径建议           | 详细文档                                              |
 | ----------------------- | -------------------- | --------------------------- | ----------------------------------------------------- |
-| `feature/runtime-cc385` | Cocos Creator 3.8.5  | `.worktrees/runtime-cc385`  | 该分支 `assets/scripts/runtime/cc-385/README.md`      |
 
 **协作模式**：
 

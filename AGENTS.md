@@ -22,13 +22,8 @@ npm run format        # Prettier 格式化
 Demo 相关命令（在对应 worktree 分支中执行）：
 
 ```bash
-cd .worktrees/demo1 && npm run demo1:serve   # 端口 3001
-cd .worktrees/demo2 && npm run demo2:serve   # 端口 3002
-cd .worktrees/demo3 && npm run demo3:serve   # 端口 3003
-cd .worktrees/demo2 && npm run test:e2e      # E2E 测试
 ```
 
-路径别名：`@framework/*`、`@runtime/*`、`@game/*`、`@utils/*`（见 jest.config.js / tsconfig.json）
 
 ---
 
@@ -39,7 +34,6 @@ cd .worktrees/demo2 && npm run test:e2e      # E2E 测试
 | 层        | 路径                        | 职责         | 约束                          |
 | --------- | --------------------------- | ------------ | ----------------------------- |
 | Framework | `assets/scripts/framework/` | 纯 TS 框架层 | **禁止** `import` cc 命名空间 |
-| Runtime   | `assets/scripts/runtime/`   | 桥接引擎 API | 唯一允许依赖 cc 的层          |
 | Game      | 各 demo worktree 分支          | Demo 业务层  | 依赖接口，不依赖实现          |
 
 ### 硬性规则
@@ -65,11 +59,7 @@ main 分支为纯框架仓库，Demo 业务代码已分离到独立的 git workt
 
 | Demo | 分支 | Worktree 路径 |
 | --- | --- | --- |
-| Demo 1 — Idle Clicker | `feature/demo1-idle` | `.worktrees/demo1` |
-| Demo 2 — Turn-based RPG | `feature/demo2-rpg` | `.worktrees/demo2` |
-| Demo 3 — Auto Chess | `feature/demo3-autochess` | `.worktrees/demo3` |
 
-切换方式：`cd .worktrees/demo1`。每个 worktree 分支包含 `assets/scripts/game/`、`tests/game/`、Demo 相关构建命令。
 
 ---
 

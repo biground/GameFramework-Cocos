@@ -1,6 +1,5 @@
 ---
 description: 'Demo 驱动开发规范。当开发 Demo 项目时加载，确保严格使用框架架构，禁止胶水代码，发现框架缺口时提出优化方向。'
-applyTo: 'assets/scripts/game/**'
 ---
 
 # Demo 驱动开发规范
@@ -112,7 +111,6 @@ framework_gaps:
 
 ## 四、Demo 与 demo-design.md 的关系
 
-- 每个 Demo 的设计蓝图在 `docs/demo-design.md` 中
 - 实现时**必须对照**设计文档的：
   - 模块覆盖矩阵（哪些模块标记为 ◉ 深度使用）
   - Procedure 流程设计
@@ -153,7 +151,6 @@ Demo 需求 ──→ 尝试用框架 API 实现
 
 ## 六、模块覆盖验证
 
-参照 `docs/demo-design.md` 的模块覆盖矩阵：
 
 - **◉（深度使用）** 的模块必须充分利用其核心 API，不能浅尝辄止
 - 每个 Demo 至少有 **3 个 ◉ 模块**

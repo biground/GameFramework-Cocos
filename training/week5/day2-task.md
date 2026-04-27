@@ -10,7 +10,6 @@
 
 - **目标**：设计一个能串联全部 17 个框架模块的综合 Demo
 - **涉及模块**：Core / Event / ObjectPool / DI / FSM / Procedure / Resource / UI / Network / Audio / Scene / Timer / DataTable / i18n / Logger / DebugPanel / HotUpdate
-- **交付物**：Demo 需求文档（`docs/demo-design.md`）
   - 游戏流程图（Procedure 驱动）
   - 每个模块在 Demo 中的职责和交互点
   - UI 界面清单和层级规划

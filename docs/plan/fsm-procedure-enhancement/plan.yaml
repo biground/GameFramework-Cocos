@@ -65,15 +65,8 @@ implementation_specification:
     - assets/scripts/framework/fsm/ — 核心泛型签名变更
     - assets/scripts/framework/procedure/ProcedureBase.ts — 添加 getContext 方法
     - assets/scripts/framework/interfaces/IFsmManager.ts — createFsm 签名微调
-    - assets/scripts/game/demo1-idle/fsm/ — 移除 getBlackboard 样板
-    - assets/scripts/game/demo2-rpg/fsm/ — 移除 getBlackboard 样板（battle + character）
-    - assets/scripts/game/demo3-autochess/fsm/ — 移除 getBlackboard 样板
-    - assets/scripts/game/demo1-idle/procedures/ — getContext 替代样板
-    - assets/scripts/game/demo2-rpg/procedures/ — getContext 替代样板
-    - assets/scripts/game/demo3-autochess/procedures/ — getContext 替代样板
     - tests/fsm/ — 框架层测试更新
     - tests/procedure/ — 框架层测试更新
-    - tests/game/ — Demo 测试更新
   component_details:
     - component: "IFsm<T, TBlackboard>"
       responsibility: "状态机公共契约，新增 blackboard 只读属性和 setBlackboard 方法"
@@ -458,13 +451,9 @@ tasks:
       - "task-3"
     conflicts_with: []
     context_files:
-      - path: assets/scripts/game/demo1-idle/fsm/BuildingFsmStates.ts
         description: "4 个建筑 FSM 状态，都有 getBlackboard 样板"
-      - path: assets/scripts/game/demo1-idle/fsm/BuildingFsmDefs.ts
         description: "黑板接口 + DataKeys 常量"
-      - path: assets/scripts/game/demo1-idle/systems/BuildingSystem.ts
         description: "创建建筑 FSM 的地方"
-      - path: tests/game/demo1-idle/
         description: "Demo1 测试目录"
     planning_pass: 1
     planning_history:
@@ -489,7 +478,6 @@ tasks:
             mitigation: "检查 BuildingSystem 中 createFsm 的调用方式，确保 setBlackboard 在 start 之前调用"
         tech_stack:
           - "TypeScript"
-        test_coverage: "tests/game/demo1-idle/"
 
   - id: "task-6"
     title: "Demo2 RPG — FSM 黑板重构（battle + character）"
@@ -528,15 +516,10 @@ tasks:
       - "task-3"
     conflicts_with: []
     context_files:
-      - path: assets/scripts/game/demo2-rpg/fsm/BattleFsmDefs.ts
         description: "战斗 FSM 定义和黑板接口"
-      - path: assets/scripts/game/demo2-rpg/fsm/battle/
         description: "6 个战斗状态文件"
-      - path: assets/scripts/game/demo2-rpg/fsm/CharacterFsmDefs.ts
         description: "角色 FSM 定义和黑板接口"
-      - path: assets/scripts/game/demo2-rpg/fsm/character/
         description: "4 个角色状态文件"
-      - path: tests/game/demo2-rpg/
         description: "Demo2 测试目录"
     planning_pass: 1
     planning_history:
@@ -561,7 +544,6 @@ tasks:
             mitigation: "grep 测试文件中所有 BLACKBOARD 引用，同步更新 mock 的 blackboard 属性"
         tech_stack:
           - "TypeScript"
-        test_coverage: "tests/game/demo2-rpg/"
 
   - id: "task-7"
     title: "Demo3 AutoChess — FSM 黑板重构（chess-ai）"
@@ -597,13 +579,9 @@ tasks:
       - "task-3"
     conflicts_with: []
     context_files:
-      - path: assets/scripts/game/demo3-autochess/fsm/ChessAiFsmDefs.ts
         description: "棋子 AI FSM 定义和黑板接口"
-      - path: assets/scripts/game/demo3-autochess/fsm/chess-ai/
         description: "4 个 AI 状态文件"
-      - path: tests/game/demo3-autochess/chess-ai-fsm.test.ts
         description: "棋子 AI FSM 测试"
-      - path: tests/game/demo3-autochess/ChessPieceEntity.test.ts
         description: "ChessPieceEntity 测试（可能涉及 FSM 创建）"
     planning_pass: 1
     planning_history:
@@ -628,7 +606,6 @@ tasks:
             mitigation: "检查 ChessPieceEntity 的 FSM 创建流程，确保 setBlackboard 在 fsm.start 之前调用"
         tech_stack:
           - "TypeScript"
-        test_coverage: "tests/game/demo3-autochess/"
 
   - id: "task-8"
     title: "Demo1 Idle — Procedure 上下文重构（getContext 替代样板）"
@@ -665,15 +642,10 @@ tasks:
     conflicts_with:
       - "task-5"
     context_files:
-      - path: assets/scripts/game/demo1-idle/procedures/ProcedureContext.ts
         description: "IProcedureContext 接口和 PROCEDURE_CONTEXT_KEY"
-      - path: assets/scripts/game/demo1-idle/procedures/PreloadProcedure.ts
         description: "Procedure 实现"
-      - path: assets/scripts/game/demo1-idle/procedures/MainProcedure.ts
         description: "Procedure 实现"
-      - path: assets/scripts/game/demo1-idle/procedures/OfflineSettleProcedure.ts
         description: "Procedure 实现"
-      - path: assets/scripts/game/demo1-idle/procedures/SettingsProcedure.ts
         description: "Procedure 实现"
     planning_pass: 1
     planning_history:
@@ -698,7 +670,6 @@ tasks:
             mitigation: "LaunchProcedure 不取 context 就不改，仅改有样板的 Procedure"
         tech_stack:
           - "TypeScript"
-        test_coverage: "tests/game/demo1-idle/"
 
   - id: "task-9"
     title: "Demo2 RPG — Procedure 上下文重构（getContext 替代样板）"
@@ -726,11 +697,8 @@ tasks:
     conflicts_with:
       - "task-6"
     context_files:
-      - path: assets/scripts/game/demo2-rpg/procedures/RpgProcedureContext.ts
         description: "IRpgProcedureContext 接口和 RPG_PROCEDURE_CONTEXT_KEY"
-      - path: assets/scripts/game/demo2-rpg/procedures/
         description: "6 个 Procedure 文件"
-      - path: tests/game/demo2-rpg/
         description: "Demo2 测试目录"
     planning_pass: 1
     planning_history:
@@ -755,7 +723,6 @@ tasks:
             mitigation: "getContext 返回完整 context 对象，后续解构不受影响"
         tech_stack:
           - "TypeScript"
-        test_coverage: "tests/game/demo2-rpg/"
 
   - id: "task-10"
     title: "Demo3 AutoChess — Procedure 上下文重构（getContext 替代样板）"
@@ -784,13 +751,9 @@ tasks:
     conflicts_with:
       - "task-7"
     context_files:
-      - path: assets/scripts/game/demo3-autochess/procedures/AutoChessProcedureContext.ts
         description: "IAutoChessProcedureContext 接口和 AUTO_CHESS_CONTEXT_KEY"
-      - path: assets/scripts/game/demo3-autochess/procedures/
         description: "6 个 Procedure 文件"
-      - path: assets/scripts/game/demo3-autochess/procedures/GameOverProcedure.ts
         description: "有特殊的 ctx 缓存模式"
-      - path: tests/game/demo3-autochess/procedures/
         description: "Demo3 Procedure 测试"
     planning_pass: 1
     planning_history:
@@ -815,7 +778,6 @@ tasks:
             mitigation: "GameOverProcedure.onEnter 用 getContext，_ctx 缓存的 fallback 保持原始 getData 调用"
         tech_stack:
           - "TypeScript"
-        test_coverage: "tests/game/demo3-autochess/procedures/"
 
   # ═══════════════════════════════════════════════════════
   # Wave 3：集成验证 + 文档

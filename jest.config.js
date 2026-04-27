@@ -6,10 +6,9 @@ module.exports = {
     },
     roots: ['<rootDir>/tests', '<rootDir>/packages'],
     testMatch: ['**/*.test.ts'],
-    testPathIgnorePatterns: ['/node_modules/', '/tests/e2e/'],
+    testPathIgnorePatterns: ['/node_modules/'],
     moduleNameMapper: {
         '^@framework/(.*)$': '<rootDir>/assets/scripts/framework/$1',
-        '^@game/(.*)$': '<rootDir>/assets/scripts/game/$1',
         '^@utils/(.*)$': '<rootDir>/assets/scripts/utils/$1',
     },
     collectCoverageFrom: [

@@ -128,9 +128,6 @@ Demo 业务代码（Game 层）已从 main 分支分离到独立的 git worktree
 
 | Demo | 分支 | Worktree 路径 | 说明 |
 | --- | --- | --- | --- |
-| Demo 1 — Idle Clicker | `feature/demo1-idle` | `.worktrees/demo1` | 放置类挂机游戏 |
-| Demo 2 — Turn-based RPG | `feature/demo2-rpg` | `.worktrees/demo2` | 回合制 RPG |
-| Demo 3 — Auto Chess | `feature/demo3-autochess` | `.worktrees/demo3` | 自走棋 |
 
 ### 切换到 Demo Worktree
 
@@ -139,19 +136,12 @@ Demo 业务代码（Game 层）已从 main 分支分离到独立的 git worktree
 git worktree list
 
 # 进入某个 demo worktree
-cd .worktrees/demo1
 
 # 在 worktree 中运行 demo
-npm run demo1:serve     # Idle Clicker Demo（端口 3001）
-npm run demo2:serve     # Turn-based RPG Demo（端口 3002）
-npm run demo3:serve     # Auto Chess Demo（端口 3003）
 
 # 运行 E2E 测试（在 demo2 worktree 中）
-cd .worktrees/demo2
-npm run test:e2e
 ```
 
-每个 worktree 分支包含 `assets/scripts/game/`（shared + demo 代码）和对应的测试文件。
 
 ## 文档
 

@@ -2,7 +2,10 @@
     "compilerOptions": {
         "target": "ES2020",
         "module": "ES2020",
-        "lib": ["ES2020", "DOM"],
+        "lib": [
+            "ES2020",
+            "DOM"
+        ],
         "moduleResolution": "node",
         "strict": true,
         "noImplicitAny": true,
@@ -18,23 +21,33 @@
         "sourceMap": true,
         "outDir": "./dist",
         "rootDir": "./",
-
         "baseUrl": ".",
         "paths": {
-            "@framework/*": ["assets/scripts/framework/*"],
-            "@game/*": ["assets/scripts/game/*"],
-            "@utils/*": ["assets/scripts/utils/*"]
+            "@framework/*": [
+                "assets/scripts/framework/*"
+            ],
+            "@utils/*": [
+                "assets/scripts/utils/*"
+            ]
         },
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,
-        "types": ["jest", "reflect-metadata"]
+        "types": [
+            "jest",
+            "reflect-metadata"
+        ]
     },
     "include": [
         "assets/scripts/**/*.ts",
         "tests/**/*.ts",
         "tools/**/*.ts",
-        "packages/**/*.ts",
-        "playwright.config.ts"
+        "packages/**/*.ts"
     ],
-    "exclude": ["node_modules", "dist", "build", "temp", "library"]
+    "exclude": [
+        "node_modules",
+        "dist",
+        "build",
+        "temp",
+        "library"
+    ]
 }

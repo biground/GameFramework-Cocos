@@ -8,8 +8,6 @@ applyTo: 'tests/**'
 ## 测试框架
 
 - **Jest** + **ts-jest**：单元/集成测试
-- **Playwright**：E2E 浏览器测试（`tests/e2e/`，被 Jest 的 `testPathIgnorePatterns` 排除）
-- 运行命令：`npm test`（Jest）| `npm run test:e2e`（Playwright）
 
 ## 目录结构
 
@@ -84,8 +82,6 @@ describe('XxxManager', () => {
 
 ### Cocos 引擎 Mock（仅 runtime 分支）
 
-main 分支为纯框架，**不 import 'cc'**，因此 main 上不存在 `tests/__mocks__/cc.ts`。
-runtime 适配层在独立分支（如 `feature/runtime-cc385`）中按需提供 cc mock 与 `^cc$` 映射，详见对应分支的 `tests/__mocks__/cc.ts` 与 `jest.config.js`。
 
 ### 模块级 Mock
 
@@ -120,8 +116,6 @@ jest.mock('@framework/debug/Logger', () => ({
 
 ## E2E 测试（Playwright）
 
-- 配置：`playwright.config.ts`，baseURL `http://localhost:3002`
-- 自动启动 webServer：`npm run demo2:serve`
 - 选择器策略：`getByRole('button', { name })` + `getByText(text)` + `waitFor`
 - 超时：60 秒，单 worker
 

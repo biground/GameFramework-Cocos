@@ -176,8 +176,6 @@ procedure_type_signatures:
 
 demo_fsm_blackboard_patterns:
   demo1_idle:
-    fsm_defs_file: assets/scripts/game/demo1-idle/fsm/BuildingFsmDefs.ts
-    state_file: assets/scripts/game/demo1-idle/fsm/BuildingFsmStates.ts
     state_count: 4
     states:
       - "IdleBuildingState extends FsmState<IBuildingBlackboard>"
@@ -204,8 +202,6 @@ demo_fsm_blackboard_patterns:
 
   demo2_rpg:
     battle_fsm:
-      defs_file: assets/scripts/game/demo2-rpg/fsm/BattleFsmDefs.ts
-      state_dir: assets/scripts/game/demo2-rpg/fsm/battle/
       state_count: 6
       states:
         - "RoundStartState extends FsmState<IBattleBlackboard>"
@@ -240,8 +236,6 @@ demo_fsm_blackboard_patterns:
         }
 
     character_fsm:
-      defs_file: assets/scripts/game/demo2-rpg/fsm/CharacterFsmDefs.ts
-      state_dir: assets/scripts/game/demo2-rpg/fsm/character/
       state_count: 4
       states:
         - "CharIdleState extends FsmState<ICharacterBlackboard>"
@@ -259,8 +253,6 @@ demo_fsm_blackboard_patterns:
         BLACKBOARD: "character_blackboard"
 
   demo3_autochess:
-    defs_file: assets/scripts/game/demo3-autochess/fsm/ChessAiFsmDefs.ts
-    state_dir: assets/scripts/game/demo3-autochess/fsm/chess-ai/
     state_count: 4
     states:
       - "IdleState extends FsmState<string>"
@@ -298,7 +290,6 @@ demo_fsm_blackboard_patterns:
 
 demo_procedure_context_patterns:
   demo1_idle:
-    context_file: assets/scripts/game/demo1-idle/procedures/ProcedureContext.ts
     interface_name: IProcedureContext
     context_key: "__procedure_context__"
     constant_name: PROCEDURE_CONTEXT_KEY
@@ -329,7 +320,6 @@ demo_procedure_context_patterns:
       - "fsmManager: FsmManager"
 
   demo2_rpg:
-    context_file: assets/scripts/game/demo2-rpg/procedures/RpgProcedureContext.ts
     interface_name: IRpgProcedureContext
     context_key: "__rpg_procedure_context__"
     constant_name: RPG_PROCEDURE_CONTEXT_KEY
@@ -367,7 +357,6 @@ demo_procedure_context_patterns:
       - "referencePool: ReferencePool"
 
   demo3_autochess:
-    context_file: assets/scripts/game/demo3-autochess/procedures/AutoChessProcedureContext.ts
     interface_name: IAutoChessProcedureContext
     context_key: "__auto_chess_context__"
     constant_name: AUTO_CHESS_CONTEXT_KEY
@@ -445,31 +434,16 @@ breaking_change_impact:
           line: 24
           current: "extends FsmState<unknown>"
       demo1_idle:
-        - file: assets/scripts/game/demo1-idle/fsm/BuildingFsmStates.ts
           lines: "42, 70, 119, 165"
           states: 4
           current_type_arg: "IBuildingBlackboard"
       demo2_rpg_battle:
-        - file: assets/scripts/game/demo2-rpg/fsm/battle/RoundStartState.ts (line 34)
-        - file: assets/scripts/game/demo2-rpg/fsm/battle/SelectActionState.ts (line 39)
-        - file: assets/scripts/game/demo2-rpg/fsm/battle/ExecuteActionState.ts (line 37)
-        - file: assets/scripts/game/demo2-rpg/fsm/battle/RoundEndState.ts (line 35)
-        - file: assets/scripts/game/demo2-rpg/fsm/battle/VictoryState.ts (line 33)
-        - file: assets/scripts/game/demo2-rpg/fsm/battle/DefeatState.ts (line 32)
           states: 6
           current_type_arg: "IBattleBlackboard"
       demo2_rpg_character:
-        - file: assets/scripts/game/demo2-rpg/fsm/character/CharIdleState.ts (line 33)
-        - file: assets/scripts/game/demo2-rpg/fsm/character/CharActingState.ts (line 35)
-        - file: assets/scripts/game/demo2-rpg/fsm/character/CharStunnedState.ts (line 35)
-        - file: assets/scripts/game/demo2-rpg/fsm/character/CharDeadState.ts (line 34)
           states: 4
           current_type_arg: "ICharacterBlackboard"
       demo3_autochess:
-        - file: assets/scripts/game/demo3-autochess/fsm/chess-ai/IdleState.ts (line 34)
-        - file: assets/scripts/game/demo3-autochess/fsm/chess-ai/AttackState.ts (line 36)
-        - file: assets/scripts/game/demo3-autochess/fsm/chess-ai/MoveToState.ts (line 51)
-        - file: assets/scripts/game/demo3-autochess/fsm/chess-ai/DeadState.ts (line 31)
           states: 4
           current_type_arg: "string"
       tests:
@@ -487,35 +461,16 @@ breaking_change_impact:
           states: 2
           current_type_arg: "object"
     total_FsmState_subclasses: 28
-    note: "含 .worktrees/ 副本 8 个，主仓库实际 20 个"
 
   scenario_2_change_ProcedureBase_generic:
     description: "修改 ProcedureBase 的泛型（如从 FsmState<unknown> 改为 FsmState<SomeType>）"
     affected_files:
       demo1_idle:
-        - assets/scripts/game/demo1-idle/procedures/LaunchProcedure.ts (line 20)
-        - assets/scripts/game/demo1-idle/procedures/PreloadProcedure.ts (line 26)
-        - assets/scripts/game/demo1-idle/procedures/OfflineSettleProcedure.ts (line 24)
-        - assets/scripts/game/demo1-idle/procedures/MainProcedure.ts (line 30)
-        - assets/scripts/game/demo1-idle/procedures/SettingsProcedure.ts (line 22)
       demo2_rpg:
-        - assets/scripts/game/demo2-rpg/procedures/LaunchProcedure.ts (line 24)
-        - assets/scripts/game/demo2-rpg/procedures/PreloadProcedure.ts (line 59)
-        - assets/scripts/game/demo2-rpg/procedures/LobbyProcedure.ts (line 30)
-        - assets/scripts/game/demo2-rpg/procedures/BattlePrepProcedure.ts (line 42)
-        - assets/scripts/game/demo2-rpg/procedures/BattleProcedure.ts (line 38)
-        - assets/scripts/game/demo2-rpg/procedures/SettleProcedure.ts (line 27)
       demo3_autochess:
-        - assets/scripts/game/demo3-autochess/procedures/LaunchProcedure.ts (line 24)
-        - assets/scripts/game/demo3-autochess/procedures/PreloadProcedure.ts (line 126)
-        - assets/scripts/game/demo3-autochess/procedures/PrepareProcedure.ts (line 33)
-        - assets/scripts/game/demo3-autochess/procedures/BattleProcedure.ts (line 29)
-        - assets/scripts/game/demo3-autochess/procedures/SettleProcedure.ts (line 40)
-        - assets/scripts/game/demo3-autochess/procedures/GameOverProcedure.ts (line 23)
       tests:
         - tests/procedure/procedure-manager.test.ts (lines 7, 13, 19, 29)
     total_ProcedureBase_subclasses: 22
-    note: "含 .worktrees/ 副本 6 个，主仓库实际 16 + 4 测试 = 20 个"
 
   scenario_3_change_IFsm_interface:
     description: "修改 IFsm<T> 接口（如修改 getData/setData 签名或增加方法）"

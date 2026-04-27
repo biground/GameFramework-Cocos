@@ -1,6 +1,5 @@
 ---
 description: 'Game 层 Demo 开发规范。当修改 game/ 下的 Demo、共享基础设施、Mock 策略实现时加载。'
-applyTo: 'assets/scripts/game/**'
 ---
 
 # Game 层 Demo 开发规范

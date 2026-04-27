@@ -32,17 +32,11 @@ npx tsc --noEmit        # TypeScript 类型检查
 Demo 相关命令（在对应 worktree 分支中执行）：
 
 ```bash
-cd .worktrees/demo1 && npm run demo1:serve   # Idle Clicker Demo（端口 3001）
-cd .worktrees/demo2 && npm run demo2:serve   # Turn-based RPG Demo（端口 3002）
-cd .worktrees/demo3 && npm run demo3:serve   # Auto Chess Demo（端口 3003）
-cd .worktrees/demo2 && npm run test:e2e      # Playwright E2E 测试
 ```
 
 路径别名（`tsconfig.json` + `jest.config.js` 同步配置）：
 
 - `@framework/*` → `assets/scripts/framework/*`
-- `@runtime/*` → `assets/scripts/runtime/*`
-- `@game/*` → `assets/scripts/game/*`（仅在 demo worktree 分支中可用）
 - `@utils/*` → `assets/scripts/utils/*`
 
 ## 目录结构与职责
@@ -89,7 +83,6 @@ tests/                  # 测试目录（镜像 framework/ 结构）
 | 层        | 路径                        | 职责         | 约束                          |
 | --------- | --------------------------- | ------------ | ----------------------------- |
 | Framework | `assets/scripts/framework/` | 纯 TS 框架层 | **禁止** `import` cc 命名空间 |
-| Runtime   | `assets/scripts/runtime/`   | 桥接引擎 API | 唯一允许依赖 cc 的层          |
 | Game      | 各 demo worktree 分支          | Demo 业务层  | 依赖接口，不依赖实现          |
 
 ### 架构硬性规则
@@ -108,11 +101,7 @@ main 分支为纯框架仓库，Demo 业务代码已分离到独立的 git workt
 
 | Demo | 分支 | Worktree 路径 |
 | --- | --- | --- |
-| Demo 1 — Idle Clicker | `feature/demo1-idle` | `.worktrees/demo1` |
-| Demo 2 — Turn-based RPG | `feature/demo2-rpg` | `.worktrees/demo2` |
-| Demo 3 — Auto Chess | `feature/demo3-autochess` | `.worktrees/demo3` |
 
-切换方式：`cd .worktrees/demo1`。每个 worktree 分支包含 `assets/scripts/game/`、`tests/game/`、Demo 相关构建命令。
 
 ### 模块生命周期
 
@@ -251,7 +240,6 @@ public setResourceLoader(loader: IResourceLoader): void {
 
 ### Demo 架构（DemoBase + HtmlRenderer）
 
-> Demo 代码位于各 worktree 分支的 `assets/scripts/game/` 目录中。
 
 - `DemoBase` 抽象基类：`bootstrap()` 注册 15 个模块 → 子类 `setupProcedures()` + `setupDataTables()`
 - `HtmlRenderer`：纯 DOM 渲染，`log()` 追加日志 / `updateLog(key)` 原地更新 / `updateStatus()` 状态面板
@@ -282,8 +270,6 @@ public setResourceLoader(loader: IResourceLoader): void {
 | 指令文件                                             | 覆盖范围                      | 说明                         |
 | ---------------------------------------------------- | ----------------------------- | ---------------------------- |
 | `instructions/framework-layer.instructions.md`       | `assets/scripts/framework/**` | 框架层编码规范与模块开发约定 |
-| `instructions/game-layer.instructions.md`            | `assets/scripts/game/**`      | Game 层 Demo 开发规范        |
-| `instructions/demo-driven-development.instructions.md` | `assets/scripts/game/**`      | Demo 驱动开发：架构遵循与框架缺口反馈 |
 | `instructions/testing.instructions.md`               | `tests/**`                    | 测试策略与约定               |
 | `instructions/plugins.instructions.md`               | `packages/**`                 | 插件包开发规范               |
 | `instructions/training.instructions.md`              | `training/**`                 | 培训流程规则                 |
@@ -308,6 +294,5 @@ public setResourceLoader(loader: IResourceLoader): void {
 | [docs/module-registry.md](docs/module-registry.md)             | 模块依赖图、priority 分配、API 摘要 |
 | [docs/consistency-guide.md](docs/consistency-guide.md)         | 跨 session 一致性三维度检查         |
 | [docs/code-review-checklist.md](docs/code-review-checklist.md) | PR 自查清单                         |
-| [docs/demo-design.md](docs/demo-design.md)                     | Demo 设计规则与 UI 规范             |
 | [docs/i18n-config-guide.md](docs/i18n-config-guide.md)         | i18n 配置表规范                     |
 | [training/progress.md](training/progress.md)                   | 培训进度、能力追踪、会话断点        |
