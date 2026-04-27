@@ -30,6 +30,6 @@ export interface RuntimeGameContext {
     /** 启动流程最终要进入的目标场景名称。 */
     readonly targetSceneName: string;
 
-    /** 最近一次启动失败信息，供后续 Wave 扩展错误流程。 */
-    readonly lastFailure?: Error;
+    /** 最近一次启动失败信息，供失败流程展示或上报。 */
+    lastFailure?: Error;
 }
