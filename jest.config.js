@@ -9,10 +9,8 @@ module.exports = {
     testPathIgnorePatterns: ['/node_modules/', '/tests/e2e/'],
     moduleNameMapper: {
         '^@framework/(.*)$': '<rootDir>/assets/scripts/framework/$1',
-        '^@runtime/(.*)$': '<rootDir>/assets/scripts/runtime/$1',
         '^@game/(.*)$': '<rootDir>/assets/scripts/game/$1',
         '^@utils/(.*)$': '<rootDir>/assets/scripts/utils/$1',
-        '^cc$': '<rootDir>/tests/__mocks__/cc.ts',
     },
     collectCoverageFrom: [
         'assets/scripts/framework/**/*.ts',

@@ -52,62 +52,17 @@ GameEntry（框架入口）
 
 ## Runtime 适配层
 
-Runtime 层是 framework 与具体引擎之间的桥接，按引擎/版本分目录。
+main 分支**不包含** runtime 实现，仅定义 framework 层策略接口（`IResourceLoader` / `ISceneLoader` / `IUIFormFactory` 等）。具体 runtime 实现按引擎/版本拆分到独立 git worktree 分支：
 
-### cc-385（Cocos Creator 3.8.5）
+| 分支                    | 适配目标             | worktree 路径建议           | 详细文档                                              |
+| ----------------------- | -------------------- | --------------------------- | ----------------------------------------------------- |
+| `feature/runtime-cc385` | Cocos Creator 3.8.5  | `.worktrees/runtime-cc385`  | 该分支 `assets/scripts/runtime/cc-385/README.md`      |
 
-| 项   | 内容                                                |
-| ---- | --------------------------------------------------- |
-| 路径 | `assets/scripts/runtime/cc-385/`                    |
-| 入口 | `installCocosRuntime()`（无参，幂等）               |
-| 状态 | ✅ 已实现，待人工端到端验证（w4-t2/t3）             |
-| 测试 | `tests/runtime/cc-385/`（5 套，38 个用例全绿）      |
+**协作模式**：
 
-#### 提供的策略实现
-
-| 策略接口         | 实现类                | 职责                                       |
-| ---------------- | --------------------- | ------------------------------------------ |
-| `IResourceLoader` | `CocosResourceLoader` | resources.load 三签名分派 + 引用计数转发   |
-| `ISceneLoader`    | `CocosSceneLoader`    | director.loadScene 单 flight + 闭包校验    |
-| `IUIFormFactory`  | `CocosUIFormFactory`  | Prefab 加载 + UI 分层 + Canvas 跨场景失效处理 |
-
-#### 桥接组件
-
-| 组件               | 用途                                                                            |
-| ------------------ | ------------------------------------------------------------------------------- |
-| `CocosUIFormBase`  | extends cc.Component；持有 `_uiForm: UIFormBase`；静态 `__IS_UI_FORM__ = true`  |
-
-#### 依赖
-
-- 框架侧：ResourceManager / SceneManager / UIManager 必须先 `GameEntry.register`
-- 引擎侧：cc 3.8.x（resources、director、Canvas、UITransform、instantiate、Prefab、Asset.addRef/decRef）
-
-#### 关键决策（详见 [plan ADR](plan/cocos-runtime/plan.yaml)）
-
-- ADR-002：UI 分层用 `Map<number, Node>` 懒建，支持 `registerLayer` 扩展
-- ADR-003：引用计数仅按 owner 首次/末次转发
-- ADR-004：`installCocosRuntime()` 无参 + `hasModule` 校验 + `_isInstalled` 防重入
-- ADR-006：Canvas 不缓存 + 订阅 director 场景事件防失效
-- ADR-007：`IUIFormFactory.createForm` 异步回调 + Factory 持有 IResourceManager
-
-#### 用法
-
-```typescript
-import { GameEntry } from '@framework/core/GameEntry';
-import { ResourceManager } from '@framework/resource/ResourceManager';
-import { SceneManager } from '@framework/scene/SceneManager';
-import { UIManager } from '@framework/ui/UIManager';
-import { installCocosRuntime } from '@runtime/cc-385';
-
-GameEntry.register('ResourceManager', new ResourceManager());
-GameEntry.register('SceneManager', new SceneManager());
-GameEntry.register('UIManager', new UIManager());
-GameEntry.init();
-
-installCocosRuntime(); // 注入三个策略
-
-GameEntry.start();
-```
+- runtime 分支以 main 为 upstream
+- 框架接口变更后，runtime 分支通过 `git merge main` 同步
+- 新增 runtime（如 CC 3.9 / Laya）只需新建 `feature/runtime-*` 分支，main 与现有 runtime 分支无需改动
 
 ## 模块间通信规则
 

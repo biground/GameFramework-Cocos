@@ -18,9 +18,8 @@
 ├──────────────────────────────────────┤
 │         Runtime Layer（适配层）         │
 │      assets/scripts/runtime/         │
-│    桥接框架层与 CocosCreator 引擎      │
-│   ├─ runtime/i18n/   （组件桥接）     │
-│   └─ runtime/cc-385/ （CC 3.8.5 三策略） │
+│    桥接框架层与具体引擎（如 CC 3.8.5） │
+│   （独立 feature/runtime-* 分支）     │
 ├──────────────────────────────────────┤
 │        Framework Layer（框架层）        │
 │      assets/scripts/framework/       │
@@ -28,7 +27,12 @@
 └──────────────────────────────────────┘
 ```
 
-> **注意**：Game 层已从 main 分支分离到独立的 git worktree 分支中（`.worktrees/demo1`、`.worktrees/demo2`、`.worktrees/demo3`），main 分支为纯框架仓库。
+> **注意**：Game 层与 Runtime 层均已从 main 分支分离到独立的 git worktree 分支：
+>
+> - Game 层：`feature/demo1-idle` / `feature/demo2-rpg` / `feature/demo3-autochess`
+> - Runtime 层：`feature/runtime-cc385`（Cocos Creator 3.8.5 适配，含 i18n + cc-385）
+>
+> main 分支为**纯框架仓库**，每个 runtime/demo 分支以 main 为 upstream，按需 `git merge main` 拉取框架更新。
 ```
 
 ## 核心原则
@@ -41,60 +45,14 @@
 
 ## 运行时适配（Runtime Layer）
 
-`assets/scripts/runtime/` 是框架层与具体游戏引擎之间的**唯一桥梁**，也是工程内**唯一允许 `import 'cc'` 的层**。框架层通过策略接口（`IResourceLoader` / `ISceneLoader` / `IUIFormFactory` 等）声明对引擎能力的需求，runtime 层提供具体实现并在启动时注入。
+本仓库 main 分支**不包含** runtime 实现，仅定义 framework 层的策略接口（`IResourceLoader` / `ISceneLoader` / `IUIFormFactory` 等）。
+具体 runtime 实现在独立分支维护，每个 runtime 一个分支：
 
-### 当前适配子目录
+| 分支                       | 适配目标                | worktree 路径建议            |
+| -------------------------- | ----------------------- | ---------------------------- |
+| `feature/runtime-cc385`    | Cocos Creator 3.8.5     | `.worktrees/runtime-cc385`   |
 
-| 子目录            | 职责                                                       |
-| ----------------- | ---------------------------------------------------------- |
-| `runtime/i18n/`   | `LocalizedLabel` / `LocalizedSprite` 等 cc 组件桥接        |
-| `runtime/cc-385/` | Cocos Creator 3.8.5 的资源 / 场景 / UI 三策略 + 一键装配入口 |
-
-### `runtime/cc-385/` 模块清单
-
-| 文件                       | 角色                | 注入目标                            |
-| -------------------------- | ------------------- | ----------------------------------- |
-| `CocosResourceLoader.ts`   | `IResourceLoader`   | `ResourceManager.setResourceLoader` |
-| `CocosSceneLoader.ts`      | `ISceneLoader`      | `SceneManager.setSceneLoader`       |
-| `CocosUIFormFactory.ts`    | `IUIFormFactory`    | `UIManager.setUIFormFactory`        |
-| `CocosUIFormBase.ts`       | UI 组件基类（桥接） | 由 Game 层 UIForm 继承              |
-| `installCocosRuntime.ts`   | 一键装配入口        | 在三大模块注册完毕后调用一次        |
-| `index.ts`                 | 统一导出            | —                                   |
-
-### 装配流程
-
-```
-GameEntry.registerModule(ResourceManager / SceneManager / UIManager)
-        │
-        ▼
-GameEntry.init()              ← 框架层走完 onInit
-        │
-        ▼
-installCocosRuntime()         ← runtime/cc-385 注入三策略
-        │  ├─ ResourceManager.setResourceLoader(new CocosResourceLoader())
-        │  ├─ SceneManager.setSceneLoader(new CocosSceneLoader())
-        │  └─ UIManager.setUIFormFactory(new CocosUIFormFactory(resourceManager))
-        ▼
-GameModule.update(dt)         ← 进入主循环
-```
-
-### 策略注入连线
-
-```
-┌──────────────────────────┐         ┌─────────────────────────────┐
-│  framework/resource      │ ◀─────  │ runtime/cc-385/             │
-│   IResourceLoader        │  注入   │  CocosResourceLoader  (cc)  │
-├──────────────────────────┤         ├─────────────────────────────┤
-│  framework/scene         │ ◀─────  │  CocosSceneLoader     (cc)  │
-│   ISceneLoader           │         │                             │
-├──────────────────────────┤         ├─────────────────────────────┤
-│  framework/ui            │ ◀─────  │  CocosUIFormFactory   (cc)  │
-│   IUIFormFactory         │         │                             │
-└──────────────────────────┘         └─────────────────────────────┘
-        ▲ 纯 TS，禁止 import 'cc'              ▲ 唯一允许 import 'cc'
-```
-
-> **设计要点**：所有引擎能力以策略形式注入。Game 层只面向 `framework/*` 接口编程，对 `cc` 模块零感知；将来若适配 CC 3.9 / 其他引擎，只需新增 `runtime/cc-39x/` 等同级目录并提供同名策略即可，框架层与游戏代码无需改动。
+**协作模式**：runtime 分支以 main 为 upstream，框架接口变更后通过 `git merge main` 同步；新增 runtime（如 CC 3.9 / Laya）只需新建 `feature/runtime-*` 分支，不影响 main。
 
 ## 模块列表
 

@@ -82,10 +82,10 @@ describe('XxxManager', () => {
 
 ## Mock 策略
 
-### 全局 Mock（tests/**mocks**/cc.ts）
+### Cocos 引擎 Mock（仅 runtime 分支）
 
-- 通过 `jest.config.js` 的 `moduleNameMapper: { '^cc$': 'tests/__mocks__/cc.ts' }` 映射
-- 提供最小 Cocos Creator API：`_decorator`、`Component`、`Node`、`Label`、`Sprite`、`resources`
+main 分支为纯框架，**不 import 'cc'**，因此 main 上不存在 `tests/__mocks__/cc.ts`。
+runtime 适配层在独立分支（如 `feature/runtime-cc385`）中按需提供 cc mock 与 `^cc$` 映射，详见对应分支的 `tests/__mocks__/cc.ts` 与 `jest.config.js`。
 
 ### 模块级 Mock
 
