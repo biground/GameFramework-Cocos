@@ -13,6 +13,9 @@ const TAG = 'CocosRuntime';
 
 /** 装配状态（防重入） */
 let _isInstalled = false;
+let _installedResourceManager: ResourceManager | null = null;
+let _installedSceneManager: SceneManager | null = null;
+let _installedUIManager: UIManager | null = null;
 
 /**
  * 把 cc 适配层一次性装配到框架。
@@ -26,11 +29,6 @@ let _isInstalled = false;
  * @throws 当 ResourceManager / SceneManager / UIManager 任一未注册时
  */
 export function installCocosRuntime(): void {
-    if (_isInstalled) {
-        Logger.warn(TAG, '已装配，跳过重复调用');
-        return;
-    }
-
     ensureRegistered('ResourceManager');
     ensureRegistered('SceneManager');
     ensureRegistered('UIManager');
@@ -39,11 +37,19 @@ export function installCocosRuntime(): void {
     const sceneManager = GameEntry.getModule<SceneManager>('SceneManager');
     const uiManager = GameEntry.getModule<UIManager>('UIManager');
 
+    if (_isInstalled && isSameInstallTarget(resourceManager, sceneManager, uiManager)) {
+        Logger.warn(TAG, '已装配，跳过重复调用');
+        return;
+    }
+
     resourceManager.setResourceLoader(new CocosResourceLoader());
     sceneManager.setSceneLoader(new CocosSceneLoader());
     uiManager.setUIFormFactory(new CocosUIFormFactory(resourceManager));
 
     _isInstalled = true;
+    _installedResourceManager = resourceManager;
+    _installedSceneManager = sceneManager;
+    _installedUIManager = uiManager;
     Logger.info(TAG, '装配完成');
 }
 
@@ -52,6 +58,21 @@ export function installCocosRuntime(): void {
  */
 export function _resetCocosRuntimeForTesting(): void {
     _isInstalled = false;
+    _installedResourceManager = null;
+    _installedSceneManager = null;
+    _installedUIManager = null;
+}
+
+function isSameInstallTarget(
+    resourceManager: ResourceManager,
+    sceneManager: SceneManager,
+    uiManager: UIManager,
+): boolean {
+    return (
+        _installedResourceManager === resourceManager &&
+        _installedSceneManager === sceneManager &&
+        _installedUIManager === uiManager
+    );
 }
 
 function ensureRegistered(moduleName: string): void {

@@ -5,6 +5,7 @@
  * - 一次装配三个策略：CocosResourceLoader / CocosSceneLoader / CocosUIFormFactory
  * - 三模块缺一抛错（消息含模块名）
  * - 重复调用幂等：Logger.warn + 不再装配
+ * - GameEntry.shutdown 后新注册的一批 Manager 需要重新装配
  * - _resetCocosRuntimeForTesting 后能再次装配成功
  */
 import 'reflect-metadata';
@@ -89,6 +90,28 @@ describe('installCocosRuntime', () => {
         expect(setUI).not.toHaveBeenCalled();
         expect(warnSpy).toHaveBeenCalledTimes(1);
         expect(warnSpy).toHaveBeenCalledWith('CocosRuntime', expect.any(String));
+    });
+
+    it('已安装后如果三大 Manager 实例变化则重新装配新实例', () => {
+        const first = registerAll();
+        installCocosRuntime();
+        GameEntry.shutdown();
+
+        const second = registerAll();
+        const setRes = jest.spyOn(second.resourceManager, 'setResourceLoader');
+        const setScene = jest.spyOn(second.sceneManager, 'setSceneLoader');
+        const setUI = jest.spyOn(second.uiManager, 'setUIFormFactory');
+        warnSpy.mockClear();
+
+        installCocosRuntime();
+
+        expect(setRes).toHaveBeenCalledTimes(1);
+        expect(setScene).toHaveBeenCalledTimes(1);
+        expect(setUI).toHaveBeenCalledTimes(1);
+        expect(first.resourceManager).not.toBe(second.resourceManager);
+        expect(first.sceneManager).not.toBe(second.sceneManager);
+        expect(first.uiManager).not.toBe(second.uiManager);
+        expect(warnSpy).not.toHaveBeenCalled();
     });
 
     it('ResourceManager 未注册 → throw 包含模块名', () => {

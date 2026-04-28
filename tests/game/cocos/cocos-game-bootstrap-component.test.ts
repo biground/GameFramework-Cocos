@@ -94,4 +94,25 @@ describe('CocosGameBootstrapComponent', () => {
         expect(GameModule.hasModule('UIManager')).toBe(false);
         expect(GameModule.hasModule('ProcedureManager')).toBe(false);
     });
+
+    it('onDestroy 后同一 JS runtime 可再次 onLoad 并再次加载目标场景', () => {
+        const firstComponent = new TestableCocosGameBootstrapComponent();
+        firstComponent.invokeOnLoad();
+        expect(director.loadScene).toHaveBeenCalledWith(
+            DEFAULT_RUNTIME_TARGET_SCENE_NAME,
+            expect.any(Function),
+        );
+
+        firstComponent.invokeOnDestroy();
+        (director.loadScene as jest.Mock).mockClear();
+
+        const secondComponent = new TestableCocosGameBootstrapComponent();
+        secondComponent.targetSceneName = 'SecondMainScene';
+
+        secondComponent.invokeOnLoad();
+
+        expect(secondComponent.context?.targetSceneName).toBe('SecondMainScene');
+        expect(director.loadScene).toHaveBeenCalledTimes(1);
+        expect(director.loadScene).toHaveBeenCalledWith('SecondMainScene', expect.any(Function));
+    });
 });
