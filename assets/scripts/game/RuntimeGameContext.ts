@@ -1,3 +1,4 @@
+import type { IHotUpdateManager } from '@framework/interfaces/IHotUpdateManager';
 import type { IProcedureManager } from '@framework/interfaces/IProcedureManager';
 import type { IResourceManager } from '@framework/interfaces/IResourceManager';
 import type { ISceneManager } from '@framework/interfaces/ISceneManager';
@@ -29,6 +30,15 @@ export interface RuntimeGameContext {
 
     /** 启动流程最终要进入的目标场景名称。 */
     readonly targetSceneName: string;
+
+    /** 热更新管理器（可选，不需要热更新时为 undefined）。 */
+    readonly hotUpdateManager?: IHotUpdateManager;
+
+    /** 需要预加载的资源目录列表（由调用方传入）。 */
+    readonly configDirs?: string[];
+
+    /** 需要预加载的场景名（由调用方传入，默认为 targetSceneName）。 */
+    readonly sceneToPreload?: string;
 
     /** 最近一次启动失败信息，供失败流程展示或上报。 */
     lastFailure?: Error;

@@ -32,6 +32,12 @@ describe('CocosGameBootstrapComponent', () => {
         GameModule.shutdownAll();
         _resetCocosRuntimeForTesting();
         (director.loadScene as jest.Mock).mockReset();
+        // preloadScene 立即回调成功，使 ProcedureScenePreload 能推进到 ProcedureLoadMainScene
+        (director.preloadScene as jest.Mock).mockImplementation(
+            (_sceneName: string, onLoaded?: (err: Error | null) => void) => {
+                onLoaded?.(null);
+            },
+        );
     });
 
     afterEach(() => {
@@ -39,6 +45,7 @@ describe('CocosGameBootstrapComponent', () => {
         _resetCocosRuntimeForTesting();
         jest.clearAllMocks();
         (director.loadScene as jest.Mock).mockReset();
+        (director.preloadScene as jest.Mock).mockReset();
     });
 
     it('onLoad 启动 runtime 并加载默认主场景', () => {

@@ -30,8 +30,9 @@ class MockSceneLoader implements ISceneLoader {
         // 测试替身不需要卸载场景。
     }
 
-    public preloadScene(_sceneName: string, _onComplete?: (error?: string) => void): void {
-        // 现有测试不需要此功能，提供空实现满足接口约束
+    public preloadScene(_sceneName: string, onComplete?: (error?: string) => void): void {
+        // 立即回调成功，使 ProcedureScenePreload 能顺利推进到 ProcedureLoadMainScene
+        onComplete?.(undefined);
     }
 }
 
@@ -106,6 +107,7 @@ describe('bootstrapRuntimeGame', () => {
         });
 
         expect(hookCalls).toEqual(['installRuntime', 'afterInstallRuntime']);
+        // 流程链：HotUpdateCheck（无管理器跳过）→ ConfigLoad（无目录跳过）→ ScenePreload（preload 完成）→ LoadMainScene（进行中）
         expect(context.procedureManager.currentProcedure).toBeInstanceOf(ProcedureLoadMainScene);
         expect(sceneLoader.loadedScenes).toEqual([DEFAULT_RUNTIME_TARGET_SCENE_NAME]);
 
