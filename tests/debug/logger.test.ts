@@ -509,4 +509,41 @@ describe('Logger', () => {
             expect(spyInfo).toHaveBeenCalledTimes(1);
         });
     });
+
+    describe('createTagLogger', () => {
+        it('应返回带有 tag 属性的 TaggedLogger 对象', () => {
+            const log = Logger.createTagLogger('TestModule');
+            expect(log.tag).toBe('TestModule');
+        });
+
+        it('应返回包含 debug/info/warn/error 四个方法的对象', () => {
+            const log = Logger.createTagLogger('TestModule');
+            expect(typeof log.debug).toBe('function');
+            expect(typeof log.info).toBe('function');
+            expect(typeof log.warn).toBe('function');
+            expect(typeof log.error).toBe('function');
+        });
+
+        it('不同 tag 应返回独立的 TaggedLogger 实例', () => {
+            const logA = Logger.createTagLogger('ModuleA');
+            const logB = Logger.createTagLogger('ModuleB');
+            expect(logA).not.toBe(logB);
+            expect(logA.tag).toBe('ModuleA');
+            expect(logB.tag).toBe('ModuleB');
+        });
+
+        it('debug/info/warn/error 方法应为可调用函数（不应抛出）', () => {
+            const log = Logger.createTagLogger('SmokeTest');
+            expect(() => log.debug('test message')).not.toThrow();
+            expect(() => log.info('test message')).not.toThrow();
+            expect(() => log.warn('test message')).not.toThrow();
+            expect(() => log.error('test message')).not.toThrow();
+        });
+
+        it('空 tag 字符串也应正常工作', () => {
+            const log = Logger.createTagLogger('');
+            expect(log.tag).toBe('');
+            expect(typeof log.debug).toBe('function');
+        });
+    });
 });

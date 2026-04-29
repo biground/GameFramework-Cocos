@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 import { ModuleBase } from '../core/ModuleBase';
-import { LogLevel, LogEntry, ILogOutput } from './LoggerDefs';
+import { LogLevel, LogEntry, ILogOutput, TaggedLogger } from './LoggerDefs';
 
 /**
  * 默认控制台输出策略
@@ -402,5 +402,56 @@ export class Logger extends ModuleBase {
         Logger._timers.delete(label);
         Logger.info(label, `耗时: ${elapsed.toFixed(2)}ms`);
         return elapsed;
+    }
+
+    // ─── TaggedLogger 工厂 ──────────────────
+
+    /**
+     * 创建绑定了指定 tag 的轻量日志器
+     *
+     * 内部使用 `console.*.bind()` ——DevTools 调用栈将指向实际业务调用位置，
+     * 而非 Logger.ts 内部，解决了静态 API 调用栈定位不准的问题。
+     *
+     * 使用示例：
+     * ```typescript
+     * private static readonly _log = Logger.createTagLogger('ResourceManager');
+     *
+     * public load(): void {
+     *     ResourceManager._log.info('开始加载'); // DevTools 定位到这一行
+     * }
+     * ```
+     *
+     * ⚠️ 不经过 Logger 的级别过滤、Tag 过滤、ILogOutput 插件和历史缓冲。
+     * 适用于开发调试；生产日志仍推荐使用 Logger.info(TAG, ...) 静态 API。
+     *
+     * @param tag - 模块标签，显示在控制台输出前缀中
+     * @returns TaggedLogger 实例，持有绑定了 tag 前缀的 console 方法
+     */
+    public static createTagLogger(tag: string): TaggedLogger {
+        return {
+            tag,
+            /* eslint-disable no-console */
+            debug: console.debug.bind(
+                console,
+                `%c[DEBUG][${tag}]`,
+                'color: #888; font-weight: bold',
+            ),
+            info: console.info.bind(
+                console,
+                `%c[INFO][${tag}]`,
+                'color: #2196F3; font-weight: bold',
+            ),
+            warn: console.warn.bind(
+                console,
+                `%c[WARN][${tag}]`,
+                'color: #FF9800; font-weight: bold',
+            ),
+            error: console.error.bind(
+                console,
+                `%c[ERROR][${tag}]`,
+                'color: #F44336; font-weight: bold',
+            ),
+            /* eslint-enable no-console */
+        };
     }
 }

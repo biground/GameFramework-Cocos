@@ -56,3 +56,26 @@ export interface ILogOutput {
      */
     log(entry: LogEntry): void;
 }
+
+/**
+ * 带 tag 绑定的轻量日志器
+ *
+ * 由 {@link Logger.createTagLogger} 创建。
+ * 内部使用 `console.*.bind()` 实现——DevTools 调用栈将正确指向
+ * 实际调用 `log.debug(...)` 的业务代码行，而非 Logger.ts 内部。
+ *
+ * ⚠️ 不经过 Logger 的级别过滤、Tag 过滤、ILogOutput 插件和历史缓冲。
+ * 适用于开发调试；生产日志仍推荐使用 `Logger.info(TAG, ...)` 静态 API。
+ */
+export interface TaggedLogger {
+    /** 该 logger 绑定的模块 tag */
+    readonly tag: string;
+    /** Debug 级别，调用栈精确指向业务调用方 */
+    readonly debug: (...args: unknown[]) => void;
+    /** Info 级别，调用栈精确指向业务调用方 */
+    readonly info: (...args: unknown[]) => void;
+    /** Warn 级别，调用栈精确指向业务调用方 */
+    readonly warn: (...args: unknown[]) => void;
+    /** Error 级别，调用栈精确指向业务调用方 */
+    readonly error: (...args: unknown[]) => void;
+}
