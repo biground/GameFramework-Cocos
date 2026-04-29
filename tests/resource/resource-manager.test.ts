@@ -1,5 +1,10 @@
 import { ResourceManager } from '@framework/resource/ResourceManager';
-import { IResourceLoader, LoadAssetCallbacks, LoadState } from '@framework/resource/ResourceDefs';
+import {
+    IResourceLoader,
+    LoadAssetCallbacks,
+    LoadDirCallbacks,
+    LoadState,
+} from '@framework/resource/ResourceDefs';
 
 // ─── Mock 工具 ──────────────────────────────────────
 
@@ -19,6 +24,10 @@ class MockResourceLoader implements IResourceLoader {
 
     releaseAsset(path: string): void {
         this.releaseRequests.push(path);
+    }
+
+    loadDir(_path: string, _callbacks: LoadDirCallbacks): void {
+        // 现有测试不需要此功能，提供空实现满足接口约束
     }
 
     /** 手动模拟加载成功 */
@@ -58,6 +67,10 @@ class AutoSuccessLoader implements IResourceLoader {
 
     releaseAsset(path: string): void {
         this.released.push(path);
+    }
+
+    loadDir(_path: string, _callbacks: LoadDirCallbacks): void {
+        // 现有测试不需要此功能，提供空实现满足接口约束
     }
 }
 
@@ -345,6 +358,9 @@ describe('ResourceManager', () => {
                     }
                 },
                 releaseAsset(): void {
+                    /* noop */
+                },
+                loadDir(_path: string, _callbacks: LoadDirCallbacks): void {
                     /* noop */
                 },
             };

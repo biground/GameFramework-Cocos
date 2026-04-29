@@ -28,6 +28,10 @@ class MockSceneLoader implements ISceneLoader {
         this.unloadHistory.push(sceneName);
     }
 
+    preloadScene(_sceneName: string, _onComplete?: (error?: string) => void): void {
+        // 现有测试不需要此功能，提供空实现满足接口约束
+    }
+
     // ─── 模拟辅助方法 ──────────────────────────────
 
     /** 模拟加载进度 */

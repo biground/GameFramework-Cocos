@@ -5,6 +5,7 @@ import {
     AssetInfo,
     IResourceLoader,
     LoadAssetCallbacks,
+    LoadDirCallbacks,
     LoadState,
     PreloadCallbacks,
     ReadonlyAssetInfo,
@@ -255,6 +256,48 @@ export class ResourceManager extends ModuleBase implements IResourceManager {
                 },
             });
         }
+    }
+
+    /**
+     * 批量加载目录下的所有资源，并记录 owner 的引用关系
+     */
+    public loadDir(path: string, owner: string, callbacks?: LoadDirCallbacks): void {
+        if (!this._loader) {
+            Logger.error(ResourceManager.TAG, '未设置 ResourceLoader，请先调用 setResourceLoader');
+            throw new Error('[ResourceManager] 未设置 ResourceLoader，请先调用 setResourceLoader');
+        }
+
+        Logger.debug(ResourceManager.TAG, `批量加载目录: ${path}`);
+
+        this._loader.loadDir(path, {
+            onProgress: (completed: number, total: number) => {
+                callbacks?.onProgress?.(completed, total);
+            },
+            onSuccess: (paths: string[]) => {
+                for (const assetPath of paths) {
+                    const existing = this._assets.get(assetPath);
+                    if (existing) {
+                        // 已有 AssetInfo（例如之前 loadAsset 过），只追加 owner
+                        this._addOwner(existing, owner);
+                    } else {
+                        // 新建 AssetInfo，loader 已缓存该资源，ResourceManager 记录 ownership
+                        const info = this._createAssetInfo(assetPath);
+                        info.state = LoadState.Loaded;
+                        this._assets.set(assetPath, info);
+                        this._addOwner(info, owner);
+                    }
+                }
+                Logger.debug(
+                    ResourceManager.TAG,
+                    `目录批量加载完成: ${path}, ${paths.length} 个资源`,
+                );
+                callbacks?.onSuccess?.(paths);
+            },
+            onFailure: (error: string) => {
+                Logger.warn(ResourceManager.TAG, `目录批量加载失败: ${path}`, error);
+                callbacks?.onFailure?.(error);
+            },
+        });
     }
 
     // ─── 内部辅助方法 ──────────────────────────────────

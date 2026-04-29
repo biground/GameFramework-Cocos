@@ -68,6 +68,18 @@ export interface PreloadCallbacks {
 }
 
 /**
+ * 目录加载回调
+ */
+export interface LoadDirCallbacks {
+    /** 全部加载完成，paths 为已加载的资源路径列表 */
+    onSuccess?: (paths: string[]) => void;
+    /** 加载进度：completed/total */
+    onProgress?: (completed: number, total: number) => void;
+    /** 加载失败 */
+    onFailure?: (error: string) => void;
+}
+
+/**
  * 资源加载器接口（策略模式）
  * Framework 层定义契约，Runtime 层提供实际实现
  *
@@ -105,6 +117,13 @@ export interface IResourceLoader {
      * @param path 资源路径
      */
     releaseAsset(path: string): void;
+
+    /**
+     * 加载指定目录下的所有资源
+     * @param path 目录路径
+     * @param callbacks 目录加载回调
+     */
+    loadDir(path: string, callbacks: LoadDirCallbacks): void;
 }
 
 /**

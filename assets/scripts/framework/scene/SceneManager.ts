@@ -138,4 +138,18 @@ export class SceneManager extends ModuleBase implements ISceneManager {
             },
         });
     }
+
+    /**
+     * 预加载场景到内存，不切换当前场景
+     * @param sceneName 场景名称
+     * @param onComplete 完成回调，失败时携带错误消息，成功时无参数
+     */
+    public preloadScene(sceneName: string, onComplete?: (error?: string) => void): void {
+        if (!this._sceneLoader) {
+            Logger.warn(SceneManager.TAG, '未设置场景加载器，请先调用 setSceneLoader');
+            return;
+        }
+        Logger.info(SceneManager.TAG, `预加载场景: ${sceneName}`);
+        this._sceneLoader.preloadScene(sceneName, onComplete);
+    }
 }

@@ -1,5 +1,6 @@
 import {
     LoadAssetCallbacks,
+    LoadDirCallbacks,
     PreloadCallbacks,
     ReadonlyAssetInfo,
     IResourceLoader,
@@ -81,4 +82,12 @@ export interface IResourceManager {
      * @param callbacks 预加载回调（可选）
      */
     preload(paths: string[], owner: string, callbacks?: PreloadCallbacks): void;
+
+    /**
+     * 加载指定目录下的所有资源，owner 拥有这些资源的引用
+     * @param path 目录路径
+     * @param owner 持有者标识
+     * @param callbacks 目录加载回调（可选）
+     */
+    loadDir(path: string, owner: string, callbacks?: LoadDirCallbacks): void;
 }

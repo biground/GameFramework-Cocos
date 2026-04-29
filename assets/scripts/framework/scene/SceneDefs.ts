@@ -45,6 +45,13 @@ export interface ISceneLoader {
      * @param sceneName 场景名称
      */
     unloadScene(sceneName: string): void;
+
+    /**
+     * 预加载场景到内存，不切换当前场景
+     * @param sceneName 场景名称
+     * @param onComplete 完成回调，失败时携带错误消息，成功时无参数
+     */
+    preloadScene(sceneName: string, onComplete?: (error?: string) => void): void;
 }
 
 // ─── 场景事件 ──────────────────────────────────────────

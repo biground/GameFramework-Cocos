@@ -29,6 +29,10 @@ class MockSceneLoader implements ISceneLoader {
     public unloadScene(_sceneName: string): void {
         // 测试替身不需要卸载场景。
     }
+
+    public preloadScene(_sceneName: string, _onComplete?: (error?: string) => void): void {
+        // 现有测试不需要此功能，提供空实现满足接口约束
+    }
 }
 
 class MockUIFormFactory implements IUIFormFactory {

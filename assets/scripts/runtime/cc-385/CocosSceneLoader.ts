@@ -40,4 +40,17 @@ export class CocosSceneLoader implements ISceneLoader {
             `unloadScene 在 Cocos 中由 loadScene 隐式触发，此处为空实现：${sceneName}`,
         );
     }
+
+    public preloadScene(sceneName: string, onComplete?: (error?: string) => void): void {
+        Logger.info(CocosSceneLoader.TAG, `预加载场景: ${sceneName}`);
+        director.preloadScene(sceneName, (err: Error | null) => {
+            if (err) {
+                Logger.error(CocosSceneLoader.TAG, '场景预加载失败', sceneName, err.message);
+                onComplete?.(err.message);
+            } else {
+                Logger.info(CocosSceneLoader.TAG, `场景预加载完成: ${sceneName}`);
+                onComplete?.();
+            }
+        });
+    }
 }

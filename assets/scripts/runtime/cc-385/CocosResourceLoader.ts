@@ -1,7 +1,11 @@
 import { Asset, resources } from 'cc';
 
 import { Logger } from '../../framework/debug/Logger';
-import type { IResourceLoader, LoadAssetCallbacks } from '../../framework/resource/ResourceDefs';
+import type {
+    IResourceLoader,
+    LoadAssetCallbacks,
+    LoadDirCallbacks,
+} from '../../framework/resource/ResourceDefs';
 
 /**
  * Cocos 资源加载器（Runtime 层 IResourceLoader 实现）
@@ -80,5 +84,48 @@ export class CocosResourceLoader implements IResourceLoader {
 
         this._loaded.delete(path);
         asset.decRef(true);
+    }
+
+    public loadDir(path: string, callbacks: LoadDirCallbacks): void {
+        /** cc.resources 目前在 TypeScript 类型定义中未包含 loadDir，使用 unknown 转型 */
+        type ResourcesWithDir = {
+            loadDir(
+                path: string,
+                type: null,
+                onProgress: (finished: number, total: number) => void,
+                onComplete: (err: Error | null, assets: Asset[], urls: string[]) => void,
+            ): void;
+        };
+        const res = resources as unknown as ResourcesWithDir;
+
+        res.loadDir(
+            path,
+            null,
+            (finished: number, total: number) => {
+                callbacks.onProgress?.(finished, total);
+            },
+            (err: Error | null, assets: Asset[], urls: string[]) => {
+                if (err) {
+                    Logger.error(CocosResourceLoader.TAG, '目录加载失败', path, err.message);
+                    callbacks.onFailure?.(err.message);
+                    return;
+                }
+                const paths: string[] = [];
+                for (let i = 0; i < assets.length; i++) {
+                    const asset = assets[i];
+                    const assetPath = urls[i] ?? (asset as unknown as { name: string }).name;
+                    if (!this._loaded.has(assetPath)) {
+                        asset.addRef();
+                        this._loaded.set(assetPath, asset);
+                    }
+                    paths.push(assetPath);
+                }
+                Logger.info(
+                    CocosResourceLoader.TAG,
+                    `目录加载完成: ${path}, 共 ${paths.length} 个资源`,
+                );
+                callbacks.onSuccess?.(paths);
+            },
+        );
     }
 }

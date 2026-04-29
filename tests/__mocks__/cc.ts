@@ -119,6 +119,17 @@ export function instantiate<T = Node>(_obj: unknown): T {
 // 默认空实现。测试中用 mockImplementation 注入行为；按 arguments.length 分派由被测代码自行识别。
 export const resources = {
     load: jest.fn(),
+    loadDir: jest.fn(
+        (
+            _path: string,
+            _type: unknown,
+            onProgress: ((finished: number, total: number) => void) | null,
+            onComplete: ((err: Error | null, assets: unknown[], urls: string[]) => void) | null,
+        ) => {
+            if (typeof onProgress === 'function') onProgress(0, 0);
+            if (typeof onComplete === 'function') onComplete(null, [], []);
+        },
+    ),
 };
 
 // ──────────────── director / Director ────────────────

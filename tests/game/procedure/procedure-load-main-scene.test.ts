@@ -25,6 +25,10 @@ class MockSceneManager implements ISceneManager {
         this.loadedScenes.push(sceneName);
         this.isLoading = true;
     }
+
+    public preloadScene(_sceneName: string, _onComplete?: (error?: string) => void): void {
+        // 现有测试不需要此功能，提供空实现满足接口约束
+    }
 }
 
 function createProcedureHarness(targetSceneName = 'MainScene'): {
