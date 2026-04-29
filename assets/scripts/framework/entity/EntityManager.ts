@@ -3,7 +3,7 @@ import { Logger } from '../debug/Logger';
 import { EntityBase } from './EntityBase';
 import { EntityGroup } from './EntityGroup';
 import { EntityId, IEntityFactory, ShowEntityCallbacks } from './EntityDefs';
-import { IEntityManager } from '@framework/interfaces/IEntityManager';
+import { IEntityManager } from '../interfaces/IEntityManager';
 
 /**
  * 实体管理器
